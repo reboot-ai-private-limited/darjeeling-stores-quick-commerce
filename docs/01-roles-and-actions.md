@@ -6,7 +6,7 @@ Status: draft v1 · Depends on: `PLAN.md`
 
 - **One role per user** (`users.roleId`). Roles are rows in the `roles` collection, not code.
 - Every protected API route is guarded by `requirePermission('<key>')`. Routes never check role names.
-- **Permission key format:** `module:action` (e.g. `orders:assign`). The full list is registered in code and seeded to the DB on startup so the admin UI always shows every key.
+- **Permission key format:** `module:view` / `module:manage` for admin (e.g. `orders:manage`); fixed `module:action` keys for customer and rider. The full list is registered in code and seeded to the DB on startup so the admin UI always shows every key.
 - **System roles** (`isSystem: true`, cannot be deleted): `super_admin` (`*`), `customer`, `rider`.
 - **Launch staff role:** one `admin` role holding all admin permissions. New roles later (Packer, Dispatcher, Support, Manager…) = new rows with a subset of keys, created in the admin panel – no deploy.
 - **Scope:** customer and rider actions are always limited to the user's **own** data (`scope: own`); admin actions are store-wide.
@@ -105,153 +105,37 @@ Customer keys are fixed (not editable in the role UI). `G` = also allowed for gu
 | `device:register_token` | Register FCM token | |
 | `auth:*` | Login/logout as above | Invite-only phone |
 
-## 5. Admin actions (all held by `admin` at launch; each key can be given to future roles)
+## 5. Admin actions
 
-🔒 = writes `audit_log`.
+Admin permissions are **module-level** (about 24 keys): `:view` = read-only, `:manage` = everything in that module. `admin` holds all of them at launch; a future role (e.g. Packer) gets a subset, and a key can be split later if finer control is needed. 🔒 = also written to `audit_log` regardless of key.
 
-### 5.1 Dashboard & reports
-| Key | Action |
-|---|---|
-| `dashboard:view` | Today's orders, revenue, active riders, pending refunds, low stock |
-| `reports:sales` | Sales by day/product/category, export CSV |
-| `reports:orders` | Order funnel, cancellations, failed deliveries |
-| `reports:cash` | COD cash by rider/day |
-| `reports:riders` | Deliveries, shift hours per rider |
-| `reports:stock` | Stock movement, wastage |
-| `reports:export` | Export any report to CSV |
-
-### 5.2 Orders
-| Key | Action | Notes |
+| Key | Module | Actions covered |
 |---|---|---|
-| `orders:list` / `orders:view` | List, filter, search, view order + timeline | |
-| `orders:confirm` | Confirm (if manual confirm enabled) | |
-| `orders:pack_start` / `orders:pack_complete` | Mark packing / ready | |
-| `orders:mark_item_unavailable` 🔒 | Mark line unavailable; bill recalculated; refund auto-created as `requested` if prepaid | |
-| `orders:edit_items` 🔒 | Adjust items before dispatch | Recalculates bill |
-| `orders:cancel` 🔒 | Cancel with reason; stock restored; refund created if paid | |
-| `orders:assign` 🔒 | Manually assign rider | |
-| `orders:reassign` 🔒 | Reassign to another rider | |
-| `orders:force_status` 🔒 | Override state (exceptions) | Reason required |
-| `orders:mark_cod_collected` 🔒 | Fix COD collection if rider app failed | |
-| `orders:resolve_failed_delivery` 🔒 | Re-dispatch, cancel, or return to stock | |
-| `orders:add_note` | Internal note on order | |
-| `orders:print_invoice` | Print/download invoice and packing slip | |
-| `orders:create_manual` 🔒 | Create order on behalf of customer (phone orders) | Optional |
-
-### 5.3 Dispatch
-| Key | Action |
-|---|---|
-| `dispatch:board_view` | Live board: unassigned, assigned, out for delivery, riders online |
-| `dispatch:view_rider_map` | Map of rider positions |
-| `dispatch:alerts_view` | Unaccepted-offer and delayed-order alerts |
-
-### 5.4 Catalog
-| Key | Action |
-|---|---|
-| `category:list/create/update/reorder` | Manage category tree |
-| `category:delete` 🔒 | Delete / archive category |
-| `category:toggle` | Activate/deactivate |
-| `product:list/view/create/update` | Manage products |
-| `product:delete` 🔒 | Archive product |
-| `product:toggle` | Activate/deactivate or mark out of stock |
-| `variant:create/update/delete` | Manage variants (label, weightGrams, price, mrp, sku) |
-| `product_image:upload/delete/reorder` | Cloudinary images |
-| `product:bulk_import` / `product:bulk_export` 🔒 | CSV import/export |
-| `product_tag:manage` | Tags, featured, sections for home |
-
-### 5.5 Inventory
-| Key | Action | Notes |
-|---|---|---|
-| `stock:view` | Stock levels, low-stock list | |
-| `stock:adjust` 🔒 | Add/remove stock with reason (purchase, wastage, correction) | Writes `stock_movements` |
-| `stock:count` 🔒 | Stock-take: set counted qty, record difference | |
-| `stock:history` | Movement history per product | |
-
-### 5.6 Pricing & offers
-| Key | Action |
-|---|---|
-| `price:update` 🔒 | Change price/MRP (single/bulk); writes `price_history` |
-| `price:schedule_sale` 🔒 | Sale price with date range |
-| `coupon:list/create/update` | Manage coupons |
-| `coupon:deactivate` 🔒 | Disable coupon |
-| `coupon:view_usage` | Redemptions per coupon/user |
-| `banner:manage` | Home banners, promo content |
-
-### 5.7 Customers
-| Key | Action |
-|---|---|
-| `customers:list/view` | Search, profile, order history, addresses |
-| `customers:block` / `customers:unblock` 🔒 | Block abusive/fraud users (e.g. COD abuse) |
-| `customers:cod_toggle` 🔒 | Allow/deny COD per customer |
-| `customers:delete_finalise` 🔒 | Finalise account deletion/anonymisation |
-| `customers:export` 🔒 | Export customer data |
-| `customers:add_note` | Internal notes |
-
-### 5.8 Riders & cash
-| Key | Action |
-|---|---|
-| `riders:list/view` | Rider list, status, today's orders |
-| `riders:create/update` 🔒 | Onboard rider (phone, name, photo, documents) |
-| `riders:deactivate` / `riders:reactivate` 🔒 | Suspend/restore access; revokes tokens |
-| `riders:shifts_view` | Attendance and shift log |
-| `riders:force_offline` 🔒 | Force a rider offline |
-| `cash:ledger_view` | Cash collected vs deposited per rider |
-| `cash:record_deposit` 🔒 | Record cash handed in by rider (end of day) |
-| `cash:adjust` 🔒 | Correct a ledger entry with reason |
-
-### 5.9 Payments & refunds
-| Key | Action | Notes |
-|---|---|---|
-| `payments:list/view` | Payments with Razorpay ids, status | |
-| `payments:reconcile` | Run/view Razorpay reconciliation, flag mismatches | |
-| `payments:mark_paid_manual` 🔒 | Resolve stuck payment after checking dashboard | |
-| `refunds:list` | Pending / done refunds | |
-| `refunds:view` | Detail, reason, photos | |
-| `refunds:approve` 🔒 | Approve customer-requested refund (or `refunds:reject` with reason) | |
-| `refunds:reject` 🔒 | Reject with reason | |
-| `refunds:create` 🔒 | Create refund (cancellation, unavailable item, manual) | |
-| `refunds:mark_done` 🔒 | After paying outside the system: method, reference, note → notify customer | |
-
-### 5.10 Zones & store
-| Key | Action |
-|---|---|
-| `zones:list/view` | See zones |
-| `zones:create/update` 🔒 | Draw/edit polygon, per-zone fee, min order, hours |
-| `zones:toggle` 🔒 | Enable/disable zone |
-| `store:pause_orders` 🔒 | Quick "pause orders" switch (also in settings) |
-
-### 5.11 Notifications
-| Key | Action |
-|---|---|
-| `notifications:templates_view/update` 🔒 | Edit push/WhatsApp template mapping and text |
-| `notifications:send_broadcast` 🔒 | Promo push to segment |
-| `notifications:log_view` | Delivery log, failures |
-| `notifications:retry` | Retry failed message |
-
-### 5.12 Settings
-| Key | Action |
-|---|---|
-| `settings:view` | View all settings |
-| `settings:update_store` 🔒 | Store info, hours, pause |
-| `settings:update_delivery` 🔒 | Fee mode, thresholds, min order, ETA |
-| `settings:update_assignment` 🔒 | Assignment mode, offer timeout, max orders per rider |
-| `settings:update_payments` 🔒 | COD enable/cap, expiry minutes, refund window/rules |
-| `settings:update_stock` 🔒 | Low-stock threshold, max qty, reservation timeout |
-| `settings:update_auth` 🔒 | OTP rules, delivery-OTP on/off |
-| `settings:update_app` 🔒 | Min app version, download link, support number |
-| `settings:update_tax` 🔒 | GST rates, inclusive/exclusive |
-| `settings:history` | See change history |
-
-### 5.13 Users, roles & security (`admin` has view only; edits are `super_admin`)
-| Key | Action |
-|---|---|
-| `staff:list/view` | See staff accounts |
-| `staff:create/update/deactivate` 🔒 | Manage staff accounts |
-| `staff:reset_password` 🔒 | Reset password / 2FA |
-| `roles:list/view` | See roles and their permissions |
-| `roles:create/update/delete` 🔒 | Build roles by ticking permission keys (super_admin only at launch) |
-| `audit:view` | Audit log search |
-| `sessions:revoke` 🔒 | Force logout a user |
+| `dashboard:view` | Dashboard | Today's orders, revenue, active riders, pending refunds, low stock |
+| `reports:view` | Reports | Sales (day/product/category), order funnel & cancellations, COD cash by rider/day, rider deliveries & shift hours, stock movement/wastage, CSV export |
+| `orders:view` | Orders | List, filter, search, view order + timeline, internal notes, print invoice/packing slip |
+| `orders:manage` | Orders | Confirm (if `orderConfirmMode = manual`), start/complete packing, mark item unavailable 🔒, edit items before dispatch 🔒, cancel with reason 🔒, force status 🔒, fix COD collection 🔒, resolve failed delivery (re-dispatch / cancel / return to stock) 🔒, add note |
+| `dispatch:manage` | Dispatch | Live board (unassigned / assigned / out for delivery), rider map, delayed & unaccepted-offer alerts, assign 🔒, reassign 🔒 |
+| `catalog:view` | Catalog | View categories, products, variants |
+| `catalog:manage` | Catalog | Category tree (create/update/reorder/toggle, delete 🔒), products (create/update/toggle, archive 🔒), variants (label, weightGrams, price, MRP, SKU), Cloudinary images, tags/featured sections, CSV import/export 🔒 |
+| `stock:view` | Inventory | Stock levels, low-stock list, movement history |
+| `stock:manage` | Inventory | Adjust stock with reason (purchase / wastage / correction) 🔒, stock-take count 🔒 |
+| `pricing:manage` | Pricing & offers | Change price/MRP single or bulk 🔒 (writes `price_history`), scheduled sale price 🔒, coupons (create/update, deactivate 🔒, view usage), home banners & promo content |
+| `customers:view` | Customers | Search, profile, order history, addresses |
+| `customers:manage` | Customers | Block/unblock 🔒, allow/deny COD per customer 🔒, finalise account deletion 🔒, export 🔒, internal notes |
+| `riders:view` | Riders | List, status, today's orders, shift/attendance log |
+| `riders:manage` | Riders | Onboard/edit (phone, name, photo) 🔒, deactivate/reactivate 🔒 (revokes tokens), force offline 🔒 |
+| `cash:manage` | Rider cash | View ledger (collected vs deposited), record end-of-day deposit 🔒, adjust entry with reason 🔒 |
+| `payments:view` | Payments | Payments with Razorpay ids/status, reconciliation results |
+| `payments:manage` | Payments | Run reconciliation, mark stuck payment paid after checking Razorpay dashboard 🔒 |
+| `refunds:manage` | Refunds | Pending/done lists, view detail & photos, create 🔒, approve 🔒, reject with reason 🔒, **mark done** (method, reference, note → notifies customer) 🔒 |
+| `zones:manage` | Zones | View/draw/edit polygon, per-zone fee/min order/hours, enable/disable 🔒, pause orders switch 🔒 |
+| `notifications:manage` | Notifications | Edit push/WhatsApp templates 🔒, send broadcast 🔒, delivery log, retry failed |
+| `settings:view` | Settings | View all settings and change history |
+| `settings:manage` | Settings | Edit all setting groups 🔒: store, delivery (fee mode), assignment, payments (COD cap, expiry, refund window), stock, auth, app, tax, `orderConfirmMode` |
+| `staff:manage` | Staff | Create/update/deactivate staff accounts 🔒, reset password/2FA 🔒, force logout 🔒 |
+| `roles:manage` | Roles | View, create, edit, delete roles by ticking keys 🔒 (`super_admin` only at launch) |
+| `audit:view` | Audit | Search audit log |
 
 ## 6. System / background actions (no user, no permission)
 
@@ -279,12 +163,12 @@ Customer keys are fixed (not editable in the role UI). `G` = also allowed for gu
 | Orders, dispatch, catalog, stock, pricing | – | – | – | ✔ | ✔ |
 | Customers, riders, cash, payments, refunds | – | – | – | ✔ | ✔ |
 | Zones, notifications, settings | – | – | – | ✔ | ✔ |
-| Staff & roles edit | – | – | – | view | ✔ |
+| Staff & roles edit | – | – | – | – | ✔ |
 | Audit log | – | – | – | ✔ | ✔ |
 
-## 8. Open points
+## 8. Decisions
 
-1. Does a customer need to confirm the order manually before packing (`orders:confirm`), or is it automatic after payment/COD placement? (Default: automatic.)
-2. Cancel cutoff: customer can cancel until which state? (Default: before `PACKING`; setting.)
-3. Phone-created orders (`orders:create_manual`): needed at launch?
-4. Rider documents (licence, ID) stored in Cloudinary private assets: required at onboarding?
+1. Order confirmation (auto / manual) is an admin setting `orderConfirmMode`.
+2. Customer cancel cutoff: before `PACKING` (admin setting).
+3. No phone-created orders at launch.
+4. No rider documents at launch.
