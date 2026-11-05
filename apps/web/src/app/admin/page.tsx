@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import DevLogin, { type AdminSession } from "./dev-login";
+import Roles from "./roles";
+import DevLogin from "./dev-login";
+import { readAdminSession, type AdminSession } from "./session-client";
 import "./admin.css";
 
 const groups = [
@@ -27,33 +29,49 @@ function Icon({ name }: { name: string }) {
 
 export default function AdminPage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [section, setSection] = useState("Overview");
   const [session, setSession] = useState<AdminSession | null>(null);
   const [logoutError, setLogoutError] = useState("");
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [sessionCheckError, setSessionCheckError] = useState("");
+  const [checkAttempt, setCheckAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setCheckingSession(true);
+    setSessionCheckError("");
+    void readAdminSession().then(value => { if (active) setSession(value); }, () => { if (active) setSessionCheckError("The sign-in service is unavailable. Check the API connection and try again."); }).finally(() => { if (active) setCheckingSession(false); });
+    return () => { active = false; };
+  }, [checkAttempt]);
   useEffect(() => {
     if (!session) return;
-    const timer = setTimeout(() => setSession(null), Math.max(0, session.expiresAt - Date.now()));
-    return () => clearTimeout(timer);
+    let active = true;
+    const check = () => { void readAdminSession().then(value => { if (active) setSession(value); }, () => { /* A network outage is not proof of session revocation. */ }); };
+    const timer = setInterval(check, 60_000);
+    window.addEventListener("focus", check);
+    return () => { active = false; clearInterval(timer); window.removeEventListener("focus", check); };
   }, [session]);
   async function logout() {
     try {
-      const response = await fetch("/api/v1/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${session?.token}` } });
+      const response = await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": "1", "X-Client": "admin" } });
       if (!response.ok) throw new Error("Logout failed");
-    } catch { setLogoutError("Server logout could not be confirmed. The development session will expire within 15 minutes."); }
-    finally { setSession(null); setMenuOpen(false); }
+    } catch { setLogoutError("Server logout could not be confirmed. Retry sign-out when the API is reachable; the refresh cookie may still be active."); }
+    finally { setSession(null); setMenuOpen(false); setSection("Overview"); }
   }
-  if (!session) return <div className="admin-shell"><DevLogin onLogin={value => { setSession(value); setLogoutError(""); }} />{logoutError && <p className="admin-logout-warning" role="alert">{logoutError}</p>}</div>;
+  if (checkingSession || sessionCheckError) return <div className="admin-shell"><main className="admin-login-screen"><section className="admin-login-card"><h1>Darjeeling Stores</h1>{checkingSession ? <p role="status">Checking your session…</p> : <><p role="alert">{sessionCheckError}</p><button className="admin-login-submit" onClick={() => setCheckAttempt(value => value + 1)}>Try again</button></>}</section></main></div>;
+  if (!session) return <div className="admin-shell"><DevLogin onLogin={value => { setSession(value); setLogoutError(""); }} />{logoutError && <p className="admin-logout-warning" role="alert">{logoutError}<button className="admin-signout" onClick={logout}>Retry sign-out</button></p>}</div>;
   return <div className="admin-shell">
     <a className="admin-skip" href="#admin-main">Skip to content</a>
     <aside id="admin-navigation" className={`admin-sidebar ${menuOpen ? "is-open" : ""}`} aria-label="Admin navigation">
       <a className="admin-brand" href="/admin"><span className="admin-brand-mark">ds.</span><span>Darjeeling Stores<small>Administration</small></span></a>
-      <nav aria-label="Workspace sections">{groups.map(group => <div className="admin-nav-group" key={group.label}><p>{group.label}</p>{group.items.map(item => <button key={item} disabled={item !== "Overview"} aria-current={item === "Overview" ? "page" : undefined} onClick={() => setMenuOpen(false)}><Icon name={item} /><span>{item}</span>{item !== "Overview" && <small>Soon<span className="admin-sr-only"> — Coming soon</span></small>}</button>)}</div>)}</nav>
+      <nav aria-label="Workspace sections">{groups.map(group => <div className="admin-nav-group" key={group.label}><p>{group.label}</p>{group.items.map(item => <button key={item} disabled={item !== "Overview" && item !== "Roles & permissions"} aria-current={item === section ? "page" : undefined} onClick={() => { setSection(item); setMenuOpen(false); }}><Icon name={item} /><span>{item}</span>{item !== "Overview" && item !== "Roles & permissions" && <small>Soon<span className="admin-sr-only"> — Coming soon</span></small>}</button>)}</div>)}</nav>
       <div className="admin-sidebar-note"><Icon name="Lock" /><span>Development session<small>Mock OTP authentication</small></span></div>
       <div className="admin-account"><span className="admin-avatar" aria-hidden="true">DS</span><div>{session.user.name}<small>{session.user.phone} · {session.user.role}</small><button className="admin-signout" onClick={logout}>Sign out</button></div></div>
     </aside>
     {menuOpen && <button className="admin-backdrop" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
     <div className="admin-workspace">
-      <header className="admin-topbar"><div className="admin-breadcrumb"><button className="admin-menu" aria-label="Toggle navigation" aria-controls="admin-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Icon name="Menu" /></button><span>Workspace</span><span className="admin-slash" aria-hidden="true">/</span><strong>Overview</strong></div><span className="admin-connection"><span aria-hidden="true" />Dev session active</span></header>
+      <header className="admin-topbar"><div className="admin-breadcrumb"><button className="admin-menu" aria-label="Toggle navigation" aria-controls="admin-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Icon name="Menu" /></button><span>Workspace</span><span className="admin-slash" aria-hidden="true">/</span><strong>{section}</strong></div><span className="admin-connection"><span aria-hidden="true" />Dev session active</span></header>
       <main className="admin-content" id="admin-main">
+        {section === "Roles & permissions" ? <Roles /> : <>
         <div className="admin-heading"><div><h1>Overview</h1><p>Your store operations, in one place.</p></div><label className="admin-warehouse"><Icon name="Warehouses" /><select disabled aria-label="Warehouse selection unavailable"><option>Warehouses unavailable</option></select></label></div>
         <section className="admin-panel" aria-labelledby="admin-unavailable">
           <div className="admin-panel-toolbar"><h2>Workspace activity</h2><span>Awaiting connection</span></div>
@@ -62,6 +80,7 @@ export default function AdminPage() {
         </section>
         <section className="admin-availability" aria-labelledby="admin-availability-title"><div><h2 id="admin-availability-title">Before you get started</h2><p>The workspace is ready for the next stage of setup.</p></div><div className="admin-setup-rows"><div><Icon name="Lock" /><span><strong>Secure sign-in</strong><small>Staff authentication and session management</small></span><span className="admin-pending">Dev access enabled</span></div><div><Icon name="Warehouses" /><span><strong>Connect your operation</strong><small>Warehouse access and operational data</small></span><span className="admin-pending">Coming soon</span></div></div></section>
         <details className="admin-explanation"><summary>Why are the other sections unavailable?</summary><p>Development OTP sign-in is connected. Business APIs and production authentication are not implemented. Navigation will become available as each service is connected. No sample records or operational metrics are displayed.</p></details>
+        </>}
         <footer className="admin-footer"><span>Darjeeling Stores</span><span>Administration workspace</span></footer>
       </main>
     </div>

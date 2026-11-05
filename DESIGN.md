@@ -14,7 +14,7 @@ Use one bordered workspace panel and flat setup rows. Do not nest decorative car
 
 ## Interaction and state
 
-Only Overview is enabled. Disabled sections visibly say Soon with an accessible Coming soon label. No fake profile or sign-in action is provided. Warehouse selection stays disabled until real services exist. Native details/summary provides the explanation of unavailable features.
+Overview and read-only roles are enabled behind development sign-in. Disabled sections visibly say Soon with an accessible Coming soon label. Use the authenticated API profile; never invent a profile. Session restoration and refresh use HTTP-only cookies, with no raw token browser storage. Warehouse selection stays disabled until real services exist. Native details/summary provides the explanation of unavailable features.
 
 At mobile widths navigation becomes a toggleable sidebar with an explicit dismiss backdrop. Focus rings and a skip link remain visible on keyboard use. Restrict motion to a short selected-control hover transition; respect reduced motion.
 

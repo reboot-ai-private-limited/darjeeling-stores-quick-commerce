@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-
-export type AdminSession = { token: string; expiresAt: number; user: { name: string; phone: string; role: string } };
+import { readAdminSession, type AdminSession } from "./session-client";
 
 export default function DevLogin({ onLogin }: { onLogin: (session: AdminSession) => void }) {
   const [phone, setPhone] = useState("");
@@ -16,7 +15,7 @@ export default function DevLogin({ onLogin }: { onLogin: (session: AdminSession)
     setError("");
     try {
       const response = await fetch(`/api/v1/auth/${requested ? "verify-otp" : "request-otp"}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Client": "admin", "X-CSRF-Token": "1" },
         body: JSON.stringify(requested ? { phone, otp } : { phone, app: "admin" }),
       });
       if (!response.ok) {
@@ -25,13 +24,9 @@ export default function DevLogin({ onLogin }: { onLogin: (session: AdminSession)
       }
       const result = await response.json();
       if (!requested) { setRequested(true); return; }
-      const token = result.data?.accessToken;
-      if (typeof token !== "string") throw new Error("The API did not return a valid session.");
-      const profileResponse = await fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } });
-      if (!profileResponse.ok) throw new Error("Your session could not be verified. Please sign in again.");
-      const { data: user } = await profileResponse.json();
-      if (!["super_admin", "admin"].includes(user?.role)) throw new Error("This account does not have admin access.");
-      onLogin({ token, user, expiresAt: Date.now() + result.data.accessTokenExpiresInSeconds * 1000 });
+      const session = await readAdminSession();
+      if (!session) throw new Error("This account does not have admin access.");
+      onLogin(session);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to sign in.");
     } finally { setBusy(false); }
@@ -50,7 +45,7 @@ export default function DevLogin({ onLogin }: { onLogin: (session: AdminSession)
         <button className="admin-login-submit" disabled={busy}>{busy ? "Please wait…" : requested ? "Verify and sign in" : "Request code"}</button>
         {requested && <button className="admin-login-back" type="button" disabled={busy} onClick={() => { setRequested(false); setOtp(""); setError(""); }}>Use another number</button>}
       </form>
-      <p className="admin-login-footnote">Sessions last 15 minutes. Refreshing this page signs you out of the UI.</p>
+      <p className="admin-login-footnote">Access renews securely with HTTP-only cookies until your session expires.</p>
     </> : <p>Production sign-in is not available yet.</p>}
   </section></main>;
 }

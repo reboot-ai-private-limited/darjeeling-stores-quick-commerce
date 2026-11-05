@@ -1,5 +1,13 @@
 # Backend foundation checklist
 
+## JWT and dual-cookie session progress
+
+The dev login now issues signed 15-minute access JWTs and seven-day absolute refresh-session families in host-only HTTP-only SameSite=Strict cookies. Session hashes persist in MongoDB, rotation is atomic, used-token replay revokes the family, and logout clears both cookies and revokes access. Exact-origin/custom-header checks protect refresh and cookie mutations. Browser restoration and one-time authenticated-read retry are connected, with tab-level refresh serialization. Production password/2FA login and native refresh contracts remain pending; B10 is not marked fully complete. New signing key configuration is private runtime state, with no committed key.
+
+## Reusable authorization progress
+
+`requirePermission` now wraps HTTP handlers with current identity, permission and target-scope checks. The development permission registry endpoint uses it. HTTP tests cover missing identity, permission denial, foreign warehouse, live scope changes and safe failure on actor lookup errors. The database-backed dev-auth case also checks role changes during an existing session. This advances B11 but does not complete production sessions, record ownership resolution or list-query scope filtering.
+
 ## Development-only OTP override
 
 The user requested `mockOTP=true`, shared code `000000`, and development super-admin phone `9000000001`. This is a separate temporary dev path, not completion of B08–B16 production authentication. It is explicitly development-only, loopback-bound and restricted to databases ending `_dev`/`_test`; it refuses existing-account promotion. Five disposable integration tests and one environment-guard test cover the override. Production 2FA, durable sessions, refresh rotation and provider delivery remain pending. See [development auth](../docs/engineering/development-auth.md).
