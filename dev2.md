@@ -1,6 +1,6 @@
-﻿# Dev 2 — Mobile apps and delivery operations
+# Dev 2 — Mobile apps and delivery operations
 
-Planning baseline: 2026-11-05. This repository is specifications only. Companion and shared decision register: [dev1.md](dev1.md). Read its shared sequence and working agreement before starting.
+Planning baseline: 2026-11-05. The repository now includes an API foundation and a placeholder web application; business features and mobile applications remain planned. See [current documentation](docs/README.md) for implemented behavior. Companion and shared decision register: [dev1.md](dev1.md). Read its shared sequence and working agreement before starting.
 
 ## Ownership and reading order
 

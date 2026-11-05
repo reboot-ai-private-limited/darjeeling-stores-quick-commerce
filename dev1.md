@@ -1,4 +1,4 @@
-﻿# Dev 1 — Commerce, platform and web
+# Dev 1 — Commerce, platform and web
 
 Planning baseline: 2026-11-05. Repository currently contains README plus 27 specification documents, with no application code or test commands. This is proposed work, not completed implementation. Companion: [dev2.md](dev2.md).
 

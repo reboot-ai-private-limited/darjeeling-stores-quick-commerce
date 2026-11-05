@@ -6,10 +6,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm -r --if-present dev",
+    "dev": "pnpm -r --parallel --if-present dev",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "check:boundaries": "pnpm --filter @darjeeling/api check:boundaries"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
