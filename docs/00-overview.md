@@ -166,3 +166,7 @@ Endpoints for every feature, with request and response examples: [API reference]
 | Offering | A warehouse's price and stock for a product (`warehouse_products`) |
 | Ack | A rider's acknowledgement of an assignment |
 | Grace time | Pack time plus rider-arrival time added to the ETA |
+
+## Foundation implementation decisions
+
+The backend foundation follows the decisions in [the implementation plan](../tasks/plan.md#proposed-decisions-before-coding): one role per user, warehouse-scoped staff, owner 2FA and revocable sessions. These describe the intended implementation; authentication and roles are not implemented yet. Zone-level operations initially require all-scope access. Warehouse hours and timers are authoritative on the warehouse record; scoped settings contain only registry keys allowed at that scope. Adjacent zone boundaries may touch, with deterministic resolution required. Changes to dependent operational records remain guarded until their owning modules can validate them.
