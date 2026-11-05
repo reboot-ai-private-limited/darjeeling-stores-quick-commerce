@@ -1,3 +1,2 @@
-export default function Home() {
-  return <main><h1>Darjeeling Stores</h1><p>Storefront setup is in progress.</p></main>;
-}
+import { redirect } from "next/navigation";
+export default function Home() { redirect("/admin"); }

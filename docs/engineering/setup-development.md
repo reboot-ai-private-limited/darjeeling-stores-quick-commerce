@@ -51,7 +51,7 @@ The advertised member address is `127.0.0.1:27017`; this configuration is for a 
 
 ## Configure the API terminal
 
-The API reads `process.env`; it does not load `.env` automatically. [`.env.example`](../../.env.example) is a reference, not a startup mechanism. Runnable in the PowerShell terminal that will start the API:
+The API reads `process.env`. Its dev script now passes the ignored root `.env` to Node; copy `.env.example` to `.env` before running that script. Compiled startup does not load it automatically. See [development authentication](development-auth.md) for the explicit mock OTP override. [`.env.example`](../../.env.example) is a reference, not a startup mechanism. Runnable in the PowerShell terminal that will start the API:
 
 ```powershell
 $env:PORT = '4000'

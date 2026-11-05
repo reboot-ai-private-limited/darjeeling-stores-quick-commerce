@@ -1,5 +1,9 @@
 # API reference and contract policy
 
+## Development mock OTP exception
+
+With explicit `NODE_ENV=development` and `mockOTP=true`, local-only mock request/verify OTP, profile and logout routes are available. Phone `9000000001` uses `000000` as the development super-admin OTP; other customer phones use that code without admin privileges. These routes use temporary opaque bearer sessions and do not implement production F01 JWT/refresh/2FA contracts. See [development authentication](../engineering/development-auth.md) for database guards, startup and limits. The production endpoint inventory below remains unchanged when mock mode is disabled.
+
 Status: Implemented foundation endpoints.
 Owner: Backend maintainers
 Last verified: 2026-11-05, app/router/shared types and test source inspection.
@@ -7,7 +11,7 @@ Scope: Existing HTTP routes, errors, CORS and future schema ownership.
 
 ## Planned business endpoints
 
-The upstream [proposed endpoint catalog](planned-endpoints.md) preserves the per-feature API designs and conventions. Those contracts remain proposals; where they differ from current middleware or routes, this implemented reference describes current behavior.
+The upstream [proposed endpoint catalog](planned-endpoints.md) and [business API conventions](00-conventions.md) preserve the per-feature API designs and proposed conventions. Those contracts remain proposals; where they differ from current middleware or routes, this implemented reference describes current behavior.
 
 ## Source of truth
 
