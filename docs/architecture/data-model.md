@@ -9,7 +9,15 @@ Scope: Current MongoDB configuration and interpretation of existing model design
 
 [Mongo lifecycle helper](../../apps/api/src/shared/db/mongo.ts) uses the default Mongoose connection. Startup awaits connection before HTTP listening. Readiness reads `mongoose.connection.readyState === 1`. Shutdown awaits disconnect after HTTP closes.
 
-No application schemas, collection migrations, business indexes, seed command or owner bootstrap exist. The [existing data-model document](../01-data-model.md) defines proposed entities and conventions; it is not a database inventory. Do not create collections from that document without implementing their owning rules and tests.
+The identity module now provides a validated user-creation store and a `users` schema with partial unique email/phone indexes. The audit module provides transaction-bound allowlisted writes. Neither introduces a public business endpoint. No role seed command, owner bootstrap or authentication session exists. The [existing data-model document](../01-data-model.md) remains the proposed full model, not a list of implemented collections.
+
+### Identity persistence slice
+
+[Identity store](../../apps/api/src/modules/identity/identity.public.ts) accepts unknown input through a strict schema, normalizes email to lowercase and strips spaces/hyphens from international phones. Staff require email; customers/riders require an international phone. Unknown fields, null identifiers and malformed role identifiers are rejected. Unique indexes permit absent optional identifiers and reject concurrent claims to the same normalized identifier.
+
+The stored account `kind` is immutable and separate from `roleId`. Creation defaults to active status with no warehouse grants and returns an explicit safe projection. This is an internal persistence operation, not account-registration authorization. It does not yet verify that a referenced role exists or matches account kind; the role module and creation orchestration must supply that invariant before any route uses it. `initialize()` creates indexes explicitly; it is not yet wired into production bootstrap.
+
+[Identity integration tests](../../apps/api/test/integration/identity.test.ts) verify canonical identifiers, optional identifiers, concurrent unique-phone claims, rejected authority/credential fields and stored defaults using a disposable replica set. No production database is used.
 
 ## Development and test databases
 

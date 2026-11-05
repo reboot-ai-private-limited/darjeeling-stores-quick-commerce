@@ -18,6 +18,8 @@ Use Node.js satisfying `>=22` and dependency engine requirements, pnpm 12.6.0, G
 
 ## Quickstart
 
+Development-only authentication is configured with `NODE_ENV=development` and `mockOTP=true` in the ignored root `.env`. The API `dev` command now loads that file; copy `.env.example` on a new checkout. Phone `9000000001` and OTP `000000` provide the requested mock super-admin flow on a dedicated `_dev` database. See [development authentication](docs/engineering/development-auth.md); this does not implement production authentication.
+
 From a clean checkout root in PowerShell, with prerequisites available and ports 27017/3000/4000 free:
 
 ```powershell
@@ -29,7 +31,7 @@ $env:CORS_ORIGINS = 'http://localhost:3000'
 pnpm --filter @darjeeling/api dev
 ```
 
-Expected: Mongo is healthy and the API logs `server_listening` on port 4000. The API reads process variables; copying `.env.example` does not load them automatically. Local Mongo is unauthenticated and loopback-bound, for development only.
+Expected: Mongo is healthy and the API logs `server_listening` on port 4000. The API dev command loads the root `.env`; compiled startup reads process variables unless Node is explicitly given an env file. Local Mongo is unauthenticated and loopback-bound, for development only.
 
 In a second root PowerShell terminal, with installation complete:
 
