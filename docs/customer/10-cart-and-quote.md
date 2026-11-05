@@ -47,6 +47,8 @@ flowchart TD
 Cart (items, steppers, free-delivery bar, split notice, coupon row, bill details) · coupon list · checkout sheet · pre-order slot picker (F17) · payment confirming (F15).
 
 ## 5. API
+Full request and response reference with examples: [API · F10](../api/F10-cart-and-quote.md).
+
 `GET/PUT /cart` · `POST /cart/coupon` · `DELETE /cart/coupon` · `POST /quotes {addressId, couponCode?, scheduledWindow?}` · `GET /quotes/:id`.
 
 ## 6. Data

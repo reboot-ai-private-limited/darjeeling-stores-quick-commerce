@@ -33,6 +33,8 @@ Track the COD cash each rider holds and settle it with the store at the end of t
 - **Admin:** rider cash overview (balance per rider and warehouse) · record deposit · adjustment dialog · reconciliation lists (UPI unverified, overpaid, unmatched, offline reviews) · daily summary.
 
 ## 6. API
+Full request and response reference with examples: [API · F22](../api/F22-rider-cash-and-settlement.md).
+
 Rider: `GET /rider/cash`. Admin: `GET /admin/cash/riders` · `GET /admin/cash/ledger?riderId=` · `POST /admin/cash/deposit {riderId, warehouseId, amount}` · `POST /admin/cash/adjust` · `GET /admin/reconciliation` · `POST /admin/reconciliation/:id/resolve`.
 
 ## 7. Data

@@ -15,6 +15,8 @@ Start here: [docs/00-overview.md](docs/00-overview.md) (architecture, roadmap, d
 
 Shared: [docs/01-data-model.md](docs/01-data-model.md).
 
+**API reference:** [docs/api/README.md](docs/api/README.md) lists every endpoint (259) with request and response examples, one file per feature (F01–F25), plus [conventions](docs/api/00-conventions.md) for envelopes, auth, errors, pagination and idempotency.
+
 ## Development setup
 
 Prerequisites: Node.js 22 or later and pnpm 12.6.0. Install dependencies with `pnpm install --frozen-lockfile`, then run `pnpm build` once to build the shared package. Start the API with `pnpm --filter @darjeeling/api dev` and the web app in a second terminal with `pnpm --filter @darjeeling/web dev`. The web app runs at http://localhost:3000 and the API health endpoint at http://localhost:4000/api/v1/health. Set `PORT` in the environment to change the API port.

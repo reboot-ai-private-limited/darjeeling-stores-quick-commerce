@@ -48,6 +48,8 @@ flowchart TD
 Warehouse picker · product tree with inline edit · bulk edit panel · import wizard (source → select → target → preview → confirm) · import result summary.
 
 ## 6. API
+Full request and response reference with examples: [API · F06](../api/F06-product-import-and-admin-tree.md).
+
 `GET /admin/warehouses/:id/tree` · `PUT /admin/warehouse-products/:id` · `POST /admin/warehouse-products/bulk` · `POST /admin/import/preview {sourceWarehouseId, targetWarehouseId, productIds[], options}` · `POST /admin/import/commit`.
 
 ## 7. Data

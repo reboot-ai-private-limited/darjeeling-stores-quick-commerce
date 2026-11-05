@@ -32,6 +32,8 @@ Capture an address a rider can actually find in hilly terrain, where GPS pins ar
 Map pin with zone banner · address form (locality, house, landmark, voice note, photo, label) · saved addresses list · address picker in checkout.
 
 ## 5. API
+Full request and response reference with examples: [API · F09](../api/F09-addresses.md).
+
 `GET/POST/PUT/DELETE /addresses` · `POST /addresses/:id/default` · `POST /media/upload-url` and `POST /media/complete` (F24).
 
 ## 6. Data

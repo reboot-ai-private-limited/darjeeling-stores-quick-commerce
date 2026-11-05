@@ -35,7 +35,11 @@ The in-house rider's tool for the whole shift: punch in, receive orders, pick up
 Splash/update check · phone · OTP · permission setup · start shift (warehouse + punch-in) · home dashboard (today's orders, cash, pending sync) · assignment alarm · my orders / batch list · order detail (items, landmark, voice note, call) · pickup checklist · stop list and map · arrived and OTP entry · payment (cash / UPI QR) · delivered confirmation · failed delivery form · report a problem · cash in hand and ledger · delivery history · profile · sync status.
 
 ## 5. API (`/api/v1/rider`)
+Full request and response reference with examples: [API · F19](../api/F19-rider-app.md).
+
 `POST /shift/start` · `/shift/switch-warehouse` · `/shift/break` · `/shift/end` · `GET /assignments?since=` (polled every ~15 s in foreground) · `POST /assignments/:id/ack` · `POST /orders/:id/pickup` · `/start-ride` · `/arrived` · `/deliver` · `/failed` · `/problem` · `POST /sync` (offline events, F21) · `POST /location` · `GET /cash` · `GET /history`.
+
+Admin-side rider management (`GET/POST /admin/riders`, `PUT /admin/riders/:id`, deactivate, reactivate, force-offline, shifts) is specified in the API reference above; it implements the `riders:view` and `riders:manage` permissions.
 
 ## 6. Data
 

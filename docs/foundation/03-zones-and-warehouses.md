@@ -43,6 +43,8 @@ City (label, locality dropdown)
 Zones map editor · zone list · warehouse list · warehouse editor (hours, slots, timers, priority) · cities and localities.
 
 ## 6. API
+Full request and response reference with examples: [API · F03](../api/F03-zones-and-warehouses.md).
+
 `POST /location/resolve {lat,lng | localityId}` · `POST /zones/check` · admin: `GET/POST/PUT /admin/cities` · `/admin/localities` · `/admin/zones` · `/admin/warehouses`.
 
 ## 7. Data

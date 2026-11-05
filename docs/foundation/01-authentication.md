@@ -48,7 +48,9 @@ sequenceDiagram
 - **Admin (web):** email + password · 2FA code.
 
 ## 6. API (`/api/v1`)
-`POST /auth/request-otp` · `POST /auth/verify-otp` · `POST /auth/refresh` · `POST /auth/logout` · `POST /admin/auth/login` · `POST /admin/auth/2fa` · `GET/PUT /me` · `POST /me/delete-request` · `POST /devices` (FCM token) · `GET /app/config` (min version, maintenance flag).
+Full request and response reference with examples: [API · F01](../api/F01-authentication.md).
+
+`POST /auth/request-otp` · `POST /auth/verify-otp` · `POST /auth/refresh` · `POST /auth/logout` · `POST /admin/auth/login` · `POST /admin/auth/2fa/setup` · `POST /admin/auth/2fa/enable` (2FA code is sent with the login as `totpCode`) · `GET/PUT /me` · `GET /me/access` · `POST /me/phone/request-otp` · `POST /me/phone/verify` · `POST /me/delete-request` · `POST /devices` (FCM token) · `GET /app/config` (min version, maintenance flag).
 
 ## 7. Data
 

@@ -44,6 +44,8 @@ A "Refund via Razorpay" API button can be added later without changing the data 
 - **Admin:** pending refunds list · refund detail with photos · approve/reject · mark-done dialog.
 
 ## 5. API
+Full request and response reference with examples: [API · F16](../api/F16-cancellations-and-refunds.md).
+
 `POST /orders/:id/cancel` · `POST /orders/:id/refund-request` · `GET /refunds` · admin `GET /admin/refunds` · `POST /admin/refunds/:id/approve` · `/reject` · `/mark-done`.
 
 ## 6. Data

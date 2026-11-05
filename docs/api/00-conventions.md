@@ -1,0 +1,180 @@
+# API Conventions
+
+Status: draft v1 · Applies to every file in `docs/api/` · Source of truth for behaviour: the feature docs F01–F25
+
+Read this once. Each feature file (`F01-…` to `F25-…`) then lists its endpoints with request and response examples.
+
+## 1. Basics
+
+| Item | Rule |
+|---|---|
+| Base URL | `https://<host>/api/v1` (local: `http://localhost:4000/api/v1`). Every path in these docs is relative to it |
+| Format | JSON, UTF-8. `Content-Type: application/json` |
+| Auth | `Authorization: Bearer <accessToken>`. Access tokens last ~15 min; renew with `POST /auth/refresh` |
+| IDs | 24-character hex strings. **Examples use short ids such as `prod_1` for readability** |
+| Money | Integer **paise** (`3200` = ₹32.00). Never floats |
+| Weight | Integer grams |
+| Time | ISO-8601 UTC strings (`2026-11-05T10:30:00Z`). Business windows (hours, night fee) are evaluated in `Asia/Kolkata` by the server |
+| Phone | E.164 (`+919876543210`). Spaces and dashes are stripped by the server |
+| Location | `{ "lat": 27.0410, "lng": 88.2663 }`. GeoJSON positions are `[lng, lat]` |
+| Naming | JSON keys are `camelCase`. Enum values are `snake_case` or `UPPER_CASE` exactly as shown |
+| Client headers | `X-Client: customer-app \| rider-app \| web \| admin`, `X-App-Version: 1.4.2` (used for force-update checks), `X-Request-Id` (optional, echoed back) |
+
+## 2. Who can call an endpoint (the **Auth** column)
+
+| Value | Meaning |
+|---|---|
+| Public | No token needed (guest) |
+| Auth | Any logged-in user |
+| Customer | Role `customer` |
+| Rider | Role `rider` (can only touch their own assignments) |
+| Admin `perm` | Staff with permission key `perm` (F02). Warehouse-scoped staff only see their own warehouses |
+| Webhook | Called by a provider; verified by signature, not a token |
+| Token link | Public link carrying an expiring token (tracking page) |
+
+A missing or bad token gives `401`; a valid token without the permission gives `403`.
+
+## 3. Success and error envelopes
+
+Success (`2xx`): the payload is always inside `data`.
+
+```json
+{ "data": { "…": "…" } }
+```
+
+Lists:
+
+```json
+{ "data": [ { "id": "zone_1" } ], "meta": { "count": 1, "nextCursor": null } }
+```
+
+Actions with nothing to return:
+
+```json
+{ "data": { "ok": true } }
+```
+
+Error (`4xx`/`5xx`): always this shape.
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Phone must be in international format, e.g. +919876543210",
+    "details": [{ "path": "phone", "message": "Invalid phone" }],
+    "requestId": "req_8f2c"
+  }
+}
+```
+
+Apps should branch on `error.code`, never on `message`.
+
+## 4. Error codes
+
+| Code | HTTP | When |
+|---|---|---|
+| `VALIDATION_ERROR` | 400 | Body, query or path failed validation. `details` lists fields |
+| `UNAUTHORIZED` | 401 | Missing, invalid or expired token |
+| `TOKEN_EXPIRED` | 401 | Access token expired → call `/auth/refresh` and retry once |
+| `FORBIDDEN` | 403 | Logged in but not allowed (permission, scope, ownership, blocked account) |
+| `NOT_FOUND` | 404 | Resource does not exist or is not yours |
+| `CONFLICT` | 409 | State conflict (duplicate, already done) |
+| `VERSION_CONFLICT` | 409 | Optimistic-lock failure: the row changed (`rev` mismatch). Reload and retry |
+| `RATE_LIMITED` | 429 | Too many requests. Header `Retry-After` (seconds) |
+| `INVALID_OTP` | 401 | Wrong OTP. `details.attemptsLeft` |
+| `OTP_EXPIRED` | 400 | OTP too old; request a new one |
+| `OTP_LOCKED` | 429 | Too many wrong OTPs; wait |
+| `OTP_REQUEST_REJECTED` | 403 | We cannot send a code to this number (generic on purpose) |
+| `OTP_DELIVERY_FAILED` | 502 | WhatsApp and SMS both failed |
+| `INVALID_CREDENTIALS` | 401 | Wrong email or password |
+| `ACCOUNT_LOCKED` | 429 | Staff account temporarily locked after repeated failures |
+| `TOTP_REQUIRED` | 401 | 2FA code needed; resend the login with `totpCode` |
+| `REFRESH_REUSED` | 401 | A used refresh token was replayed; all sessions revoked. Log in again |
+| `ZONE_OVERLAP` | 409 | Zone polygon overlaps an enabled zone. `details.zoneId` |
+| `INVALID_POLYGON` | 400 | Polygon not closed, self-crossing, too few points |
+| `OUT_OF_ZONE` | 422 | Location is not inside any enabled zone |
+| `ZONE_PAUSED` | 409 | Zone or warehouse paused. `details.message`, `details.until` |
+| `STORE_CLOSED` | 409 | Closed now. `details.opensAt`, `details.preOrderAvailable` |
+| `ITEM_UNAVAILABLE` | 409 | A line cannot be supplied. `details.lines[]` |
+| `INSUFFICIENT_STOCK` | 409 | Not enough stock. `details.productId`, `details.available` |
+| `PRICE_CONFLICT` | 409 | Same product would have two prices in one zone |
+| `MIN_ORDER_NOT_MET` | 422 | Below the zone minimum. `details.minOrder` |
+| `COD_NOT_ALLOWED` | 422 | COD blocked (cap, zone, customer flag) |
+| `COUPON_INVALID` | 422 | `details.reason` = `expired`, `min_order`, `limit_reached`, `first_order_only`, `not_applicable` |
+| `QUOTE_EXPIRED` | 410 | Quote older than its validity. Request a new one |
+| `QUOTE_CHANGED` | 409 | Prices, fees or surcharges changed. `details.quote` holds the new quote; ask the customer to accept |
+| `ZONE_CHANGE_UNCONFIRMED` | 409 | Address zone differs from the cart's; customer must confirm re-priced cart |
+| `IDEMPOTENCY_KEY_REUSED` | 422 | Same `Idempotency-Key` with a different body |
+| `INVALID_TRANSITION` | 409 | Order status change not allowed from the current status |
+| `ORDER_NOT_CANCELLABLE` | 409 | Past the cancel cutoff |
+| `PAYMENT_MISMATCH` | 409 | Paid amount differs from the due amount |
+| `PAYMENT_EXPIRED` | 410 | Online payment window ended |
+| `REFUND_NOT_ALLOWED` | 422 | Outside the refund window or category |
+| `REFUND_EXCEEDS_AMOUNT` | 422 | More than the refundable amount |
+| `RIDER_NOT_ELIGIBLE` | 409 | Rider is offline, on break, wrong zone/warehouse or at capacity. `details.reasons[]` |
+| `ALREADY_ACKNOWLEDGED` | 409 | Assignment already acknowledged |
+| `OTP_MISMATCH` | 401 | Delivery OTP wrong. `details.attemptsLeft` |
+| `UPLOAD_REJECTED` | 422 | File type, size or duration not allowed |
+| `INTERNAL_ERROR` | 500 | Unexpected. Safe to retry reads only |
+| `SERVICE_UNAVAILABLE` | 503 | Maintenance or dependency down. `details.message` |
+
+## 5. Lists, pagination and polling
+
+| Pattern | Used for | Request | Response |
+|---|---|---|---|
+| Small lists | Cities, zones, roles, categories | none | `data[]`, `meta.count` |
+| Cursor pagination | Orders, ledger, audit, notifications | `?limit=50&cursor=<opaque>` (limit 1–100, default 50) | `data[]`, `meta.nextCursor` (`null` at the end) |
+| Change polling | Admin order board, rider assignments, catalog delta | `?since=<cursor>` | `data[]` changed since the cursor and `meta.cursor` to send next time |
+
+Common filters: `?status=`, `?warehouseId=`, `?from=&to=` (ISO dates), `?q=` (search). Unknown query params are ignored.
+
+## 6. Idempotency and concurrency
+
+- **`Idempotency-Key: <uuid>`** is required on `POST /orders` and `POST /payments/verify` and recommended on any POST that spends money or stock. Retrying the same key and body returns the original response; a different body gives `IDEMPOTENCY_KEY_REUSED`.
+- **Optimistic locking:** admin edits of stock and prices send the row's `rev`. A stale `rev` gives `VERSION_CONFLICT`.
+- **Rider events** carry a client-made `clientEventId`; replays are safe (F21).
+
+## 7. Rate limits
+
+OTP endpoints and admin login are limited per phone/email and per IP; other endpoints have a generous default per user. A limited call returns `429` with `Retry-After`.
+
+## 8. Polling intervals (no sockets)
+
+| Client | Endpoint | Interval |
+|---|---|---|
+| Customer tracking | `GET /orders/:id/tracking` | ~10 s while out for delivery, ~30 s before |
+| Admin order board | `GET /admin/orders/changes?since=` | ~5 s |
+| Rider app (foreground) | `GET /rider/assignments?since=` | ~15 s |
+| Rider location | `POST /rider/location` | ~10 s on an order, ~60 s idle |
+
+## 9. Common objects
+
+```json
+// GeoPoint
+{ "lat": 27.0410, "lng": 88.2663 }
+
+// Pause
+{ "active": true, "message": "Road blocked at Chowrasta", "until": "2026-11-05T14:00:00Z" }
+
+// User
+{ "id": "user_1", "name": "Asha Rai", "phone": "+919876543210", "email": null, "role": "customer", "status": "active" }
+
+// Session
+{
+  "accessToken": "eyJhbGciOi…",
+  "accessTokenExpiresInSeconds": 900,
+  "refreshToken": "rt_Zk3p…",
+  "user": { "id": "user_1", "name": "Asha Rai", "phone": "+919876543210", "role": "customer", "status": "active" }
+}
+
+// Media (image)
+{
+  "mediaId": "media_1",
+  "alt": "Tomatoes",
+  "urls": { "160": "https://cdn.example.com/public/products/prod_1/media_1/160.webp", "320": "…/320.webp", "640": "…/640.webp", "1080": "…/1080.webp" }
+}
+```
+
+## 10. Endpoint index
+
+The full table of every endpoint is in [README.md](README.md).

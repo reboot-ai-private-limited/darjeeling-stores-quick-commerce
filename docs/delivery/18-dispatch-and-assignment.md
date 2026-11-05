@@ -59,6 +59,8 @@ Columns: unassigned · assigned (ack status) · out for delivery · failed. Ride
 Dispatch board · assign dialog (suggested rider, batch builder, same/different rider for split orders) · rider map · handover dialog · failed-delivery resolution.
 
 ## 8. API
+Full request and response reference with examples: [API · F18](../api/F18-dispatch-and-assignment.md).
+
 Admin: `POST /admin/orders/:id/assign {riderId}` · `POST /admin/batches` · `PUT /admin/batches/:id` (stops order) · `POST /admin/orders/:id/unassign` · `POST /admin/orders/:id/handover {riderId}` · `POST /admin/orders/:id/failed/resolve`. Rider: see F19.
 
 ## 9. Data

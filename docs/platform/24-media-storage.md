@@ -75,6 +75,8 @@ Backstops:
 - **Rider:** voice note player (F19).
 
 ## 7. API
+Full request and response reference with examples: [API · F24](../api/F24-media-storage.md).
+
 `POST /media/upload-url` · `POST /media/complete` · `GET /media/:id/url` (presigned GET) · `DELETE /media/:id` · admin `GET /admin/media/failed`.
 
 ## 8. Data

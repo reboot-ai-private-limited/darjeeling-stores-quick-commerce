@@ -1,0 +1,143 @@
+# API · F18 Dispatch, Assignment & Handover
+
+Spec: [F18](../delivery/18-dispatch-and-assignment.md) · Conventions: [00](00-conventions.md)
+
+The admin or store manager assigns orders; **riders cannot reject**. A rider acknowledges, or the system escalates after `ackTimeoutSeconds` (WhatsApp to the rider and an alert to the admin). The board is fed by `GET /admin/orders/changes` ([F14](F14-order-lifecycle-and-packing.md)). Rider-side calls are in [F19](F19-rider-app.md).
+
+## Endpoints
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/admin/dispatch/suggestions` | Admin `dispatch:manage` | Ranked eligible riders for an order |
+| `POST` | `/admin/orders/:id/assign` | Admin `dispatch:manage` | Assign an order to a rider 🔒 |
+| `POST` | `/admin/orders/:id/unassign` | Admin `dispatch:manage` | Take it back (before pickup) 🔒 |
+| `POST` | `/admin/order-groups/:id/dispatch` | Admin `dispatch:manage` | Dispatch a split order: same or different riders 🔒 |
+| `POST` | `/admin/batches` | Admin `dispatch:manage` | Build a batch of stops for one rider |
+| `GET` | `/admin/batches` | Admin `dispatch:manage` | List batches |
+| `PUT` | `/admin/batches/:id` | Admin `dispatch:manage` | Reorder stops or add/remove orders |
+| `POST` | `/admin/batches/:id/cancel` | Admin `dispatch:manage` | Cancel a batch that has not started |
+| `POST` | `/admin/orders/:id/handover` | Admin `dispatch:manage` | Hand a picked-up order to another rider 🔒 |
+| `POST` | `/admin/orders/:id/failed/resolve` | Admin `orders:manage` | Resolve a failed delivery 🔒 |
+| `GET` | `/admin/assignments` | Admin `dispatch:manage` | Assignments with acknowledgement status |
+| `GET` | `/admin/dispatch/alerts` | Admin `dispatch:manage` | Unacknowledged, delayed, offline, rider-reported problems |
+| `GET` | `/admin/riders/live` | Admin `dispatch:manage` | Rider positions and loads for the map |
+
+## GET /admin/dispatch/suggestions
+Query: `orderId` (a child order in `READY`). Eligible = active, in the order's zone, allowed at its warehouse, on shift, not on break, under `maxActiveOrders`, with a recent ping. 200:
+```json
+{
+  "data": {
+    "orderId": "ord_1",
+    "suggested": [
+      { "riderId": "rider_1", "name": "Pema Sherpa", "activeOrders": 0, "distanceMeters": 450, "lastAssignedAt": "2026-11-05T08:40:00Z", "score": 1 },
+      { "riderId": "rider_2", "name": "Tashi Lepcha", "activeOrders": 1, "distanceMeters": 900, "lastAssignedAt": "2026-11-05T09:10:00Z", "score": 2 }
+    ],
+    "ineligible": [{ "riderId": "rider_3", "name": "Karma Bhutia", "reasons": ["on_break"] }]
+  }
+}
+```
+Ranking: fewest active orders → nearest to the warehouse → least recently assigned. `reasons`: `offline`, `on_break`, `wrong_zone`, `wrong_warehouse`, `at_capacity`, `stale_location`.
+
+## POST /admin/orders/:id/assign
+Body: `{ "riderId": "rider_1", "batchId": null }`. 200:
+```json
+{
+  "data": {
+    "assignment": { "id": "asg_1", "orderId": "ord_1", "riderId": "rider_1", "status": "assigned", "mode": "manual", "ackDeadlineAt": "2026-11-05T10:41:00Z", "assignedAt": "2026-11-05T10:39:00Z" },
+    "order": { "id": "ord_1", "status": "ASSIGNED" }
+  }
+}
+```
+The rider app gets a full-screen alarm push. Order → `ASSIGNED`.
+
+Errors: `409 RIDER_NOT_ELIGIBLE` (`details.reasons[]`) · `409 INVALID_TRANSITION` (order not `READY`, or already assigned: unassign first) · `404 NOT_FOUND`.
+
+## POST /admin/orders/:id/unassign
+Body: `{ "reason": "Rider unreachable" }`. Order goes back to `READY`; any live acknowledgement timer is cancelled and the rider's list is updated. Errors: `409 INVALID_TRANSITION` (after pickup: use handover).
+
+## POST /admin/order-groups/:id/dispatch
+For a split group, the admin chooses one rider for both children (one batch with a pickup at each warehouse, one drop) or a different rider per child.
+
+Same rider:
+```json
+{ "mode": "same_rider", "riderId": "rider_1", "pickupOrder": ["wh_1", "wh_2"] }
+```
+Different riders:
+```json
+{ "mode": "different_riders", "assignments": [{ "orderId": "ord_1", "riderId": "rider_1" }, { "orderId": "ord_2", "riderId": "rider_2" }] }
+```
+200: `{ "data": { "batch": <batch or null>, "assignments": [<assignment>] } }`. Errors: `409 RIDER_NOT_ELIGIBLE` (for same rider: not allowed at both warehouses, or over the batch limit; `details.reasons[]`) · `409 INVALID_TRANSITION` (a child is not `READY`).
+
+One group OTP completes the delivery for the same-rider case; separate riders each verify the same group OTP.
+
+## Batches
+```json
+{
+  "id": "batch_1",
+  "riderId": "rider_1",
+  "zoneId": "zone_1",
+  "status": "planned",
+  "stops": [
+    { "seq": 1, "type": "pickup", "warehouseId": "wh_1", "orderIds": ["ord_1"], "status": "pending" },
+    { "seq": 2, "type": "pickup", "warehouseId": "wh_2", "orderIds": ["ord_2"], "status": "pending" },
+    { "seq": 3, "type": "drop", "orderIds": ["ord_1", "ord_2"], "status": "pending" }
+  ],
+  "createdBy": "user_9"
+}
+```
+`status`: `planned`, `active`, `done`, `cancelled`. `stops[].status`: `pending`, `arrived`, `done`. A batch holds up to `maxActiveOrders` orders (default 2, max 3) and may include pickups from several warehouses of the zone.
+
+- `POST /admin/batches` body `{ "riderId": "rider_1", "orderIds": ["ord_1", "ord_2"], "stops": [ … optional explicit order … ] }` → 201 batch. All orders must be `READY` and in the rider's zone. Errors: `409 RIDER_NOT_ELIGIBLE` · `422 VALIDATION_ERROR` (over the batch limit).
+- `GET /admin/batches?status=&riderId=` → `{ "data": [<batch>] }`.
+- `PUT /admin/batches/:id` body `{ "stops": [ … reordered … ] }` or `{ "addOrderIds": [], "removeOrderIds": [] }`; only while `planned`.
+- `POST /admin/batches/:id/cancel` → 200 `{ "data": { "ok": true } }`.
+
+## POST /admin/orders/:id/handover
+For a breakdown or road block **after pickup**. Body: `{ "toRiderId": "rider_2", "reason": "Scooter breakdown at Hill Cart Road" }`. 200:
+```json
+{ "data": { "assignment": { "id": "asg_5", "orderId": "ord_1", "riderId": "rider_2", "status": "assigned", "ackDeadlineAt": "…" }, "order": { "id": "ord_1", "status": "OUT_FOR_DELIVERY" } } }
+```
+The order status does not change; the new rider acknowledges and then confirms physical hand-over in the app (F19). If goods cannot be handed over, the first rider returns to the warehouse and the admin unassigns the order (it goes back to `READY`). Errors: `409 RIDER_NOT_ELIGIBLE`.
+
+## POST /admin/orders/:id/failed/resolve
+For an order in `FAILED_DELIVERY`. Body:
+```json
+{ "action": "redispatch", "note": "Customer will be home at 6 PM" }
+```
+```json
+{ "action": "cancel_return", "goodsCondition": "good", "note": "Customer refused" }
+```
+`action`: `redispatch` (→ `READY`) or `cancel_return` (→ `CANCELLED`). `goodsCondition`: `good` (stock restored, reason `return`) or `spoiled` (written off, reason `wastage`). Prepaid orders get a refund; COD has nothing to refund. 200: `{ "data": { "order": { "id": "ord_1", "status": "READY" }, "refund": null } }`. Repeated failures can lead to COD being disabled for the customer ([F25](F25-admin-panel-settings-and-reports.md)).
+
+## GET /admin/assignments
+Query: `status`, `riderId`, `warehouseId`. 200:
+```json
+{ "data": [{ "id": "asg_1", "orderNo": "DS-240001-A", "riderId": "rider_1", "riderName": "Pema Sherpa", "status": "assigned", "ackDeadlineAt": "2026-11-05T10:41:00Z", "overdue": false }], "meta": { "count": 1 } }
+```
+`status`: `assigned`, `acknowledged`, `reassigned`, `cancelled`, `completed` (no `rejected`).
+
+## GET /admin/dispatch/alerts
+200:
+```json
+{
+  "data": [
+    { "type": "ack_overdue", "orderId": "ord_1", "riderId": "rider_1", "since": "2026-11-05T10:41:00Z", "message": "Pema has not acknowledged for 2 min (WhatsApp sent)" },
+    { "type": "rider_problem", "orderId": "ord_3", "riderId": "rider_2", "problem": "vehicle_issue", "note": "Puncture" },
+    { "type": "order_delayed", "orderId": "ord_4", "state": "READY", "minutes": 9 },
+    { "type": "rider_offline", "riderId": "rider_3", "hasActiveOrder": true }
+  ]
+}
+```
+`type`: `ack_overdue`, `rider_problem`, `order_delayed`, `rider_offline`, `failed_delivery`, `offline_delivery_flagged`.
+
+## GET /admin/riders/live
+Query: `zoneId`, `warehouseId`. Poll about every 10 s for the map. 200:
+```json
+{
+  "data": [{
+    "riderId": "rider_1", "name": "Pema Sherpa", "status": "online", "currentWarehouseId": "wh_1",
+    "location": { "lat": 27.0415, "lng": 88.2660 }, "lastLocationAt": "2026-11-05T10:44:20Z",
+    "activeOrders": [{ "orderId": "ord_1", "orderNo": "DS-240001-A", "status": "OUT_FOR_DELIVERY" }]
+  }]
+}
+```

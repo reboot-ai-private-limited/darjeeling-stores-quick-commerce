@@ -80,6 +80,8 @@ Customer and rider keys are listed in the feature docs that own them (F01, F08鈥
 Roles list 路 role editor (tick permission keys) 路 staff list 路 staff editor (role + warehouse scope) 路 audit log.
 
 ## 7. API
+Full request and response reference with examples: [API 路 F02](../api/F02-roles-and-permissions.md).
+
 `GET/POST/PUT/DELETE /admin/roles` 路 `GET/POST/PUT /admin/staff` 路 `GET /admin/permissions` (registered keys) 路 `GET /admin/audit`.
 
 ## 8. Data

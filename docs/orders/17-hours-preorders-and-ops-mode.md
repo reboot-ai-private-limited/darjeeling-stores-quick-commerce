@@ -50,6 +50,8 @@ Every use is audited 🔒. A background job turns rain mode off at `activeUntil`
 - **Admin:** warehouse hours editor · pre-order slot editor · ops switches (rain, pause) · pre-order list for the next morning.
 
 ## 6. API
+Full request and response reference with examples: [API · F17](../api/F17-hours-preorders-and-ops-mode.md).
+
 `GET /store/status?zoneId=` (open, paused, pre-order windows) · `GET /preorder/slots?zoneId=` · admin `PUT /admin/warehouses/:id/hours` · `POST /admin/ops/pause` · `POST /admin/ops/rain`.
 
 ## 7. Data

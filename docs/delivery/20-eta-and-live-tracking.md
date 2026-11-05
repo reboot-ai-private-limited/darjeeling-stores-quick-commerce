@@ -50,6 +50,8 @@ promisedAt      = placedAt + promisedMinutes
 - **Admin:** rider map on the dispatch board · promised vs actual report (F25).
 
 ## 5. API
+Full request and response reference with examples: [API · F20](../api/F20-eta-and-live-tracking.md).
+
 `GET /orders/:id/tracking` · `GET /track/:token` (public) · `POST /rider/location` (F19). Quotes carry ETA per child (F10).
 
 ## 6. Data
