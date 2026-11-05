@@ -1,3 +1,4 @@
+import { createAccessStore } from "./modules/access/access.public.js";
 import { shutdown } from "./shutdown.js";
 import mongoose from "mongoose";
 import { createDevOtpRoutes } from "./modules/identity/dev-otp.public.js";
@@ -11,8 +12,10 @@ async function main() {
   catch (error) { console.error(error instanceof Error ? error.message : "Invalid configuration"); process.exitCode = 1; return; }
   try { await connectDatabase(config.MONGODB_URI); }
   catch { console.error(JSON.stringify({ event: "database_connection_failed" })); process.exitCode = 1; return; }
+  try { await createAccessStore(mongoose.connection).initialize(); }
+  catch { console.error(JSON.stringify({ event: "access_initialization_failed" })); await disconnectDatabase(); process.exitCode = 1; return; }
   let additionalRoutes;
-  try { additionalRoutes = config.mockOTP ? await createDevOtpRoutes(mongoose.connection, config.NODE_ENV) : []; }
+  try { additionalRoutes = config.mockOTP && config.JWT_SECRET ? await createDevOtpRoutes(mongoose.connection, config.NODE_ENV, config.JWT_SECRET, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config) : []; }
   catch { console.error(JSON.stringify({ event: "mock_otp_initialization_failed" })); await disconnectDatabase(); process.exitCode = 1; return; }
   if (config.mockOTP) console.warn(JSON.stringify({ event: "development_mock_otp_enabled" }));
   const app = createApp({ isReady: isDatabaseReady, corsOrigins: config.CORS_ORIGINS, trustProxyHops: config.TRUST_PROXY_HOPS, additionalRoutes });

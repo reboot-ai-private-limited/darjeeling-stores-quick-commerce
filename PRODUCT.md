@@ -10,7 +10,7 @@ Darjeeling Stores owners and staff use the admin workspace to operate the busine
 
 ## Current capabilities and constraints
 
-The current admin application is an empty UI shell at `/admin`. The root redirects there. Only Overview is enabled; unfinished sections remain disabled. Authentication and business APIs are not implemented. The user explicitly requested removal of all sample data; do not invent customers, staff, metrics, warehouses or authenticated identities.
+The current admin application lives at `/admin`; the root redirects there. Development OTP authentication is connected, using HTTP-only JWT access and rotating refresh cookies. Overview and read-only roles are available; other unfinished sections remain disabled. Production password/2FA authentication and business mutation APIs remain pending. The user explicitly requested removal of all sample data; do not invent customers, staff, metrics, warehouses or authenticated identities.
 
 ## Evidence
 

@@ -17,7 +17,7 @@ The user-selected redesign uses a minimal light workspace with grouped navigatio
 
 The web UI now requires development OTP sign-in before showing the workspace. Phone 9000000001 and code 000000 authenticate the seeded super admin when backend mock mode is explicitly enabled. The UI verifies the returned profile through `/me`, shows the real account name/phone/role and provides logout. The development Next rewrite proxies `/api/v1` to the loopback API on port 4000; no production rewrite is enabled.
 
-The bearer token stays in React memory, expires after the API's stated lifetime and is not written to browser storage. Reloading requires a new sign-in. Production sign-in remains unavailable. Disabled business sections stay disabled; authentication does not imply their APIs exist.
+The browser uses HTTP-only JWT access and rotating refresh cookies. No raw token is stored in React state or browser storage. Reload restores the session; expired access can refresh and retry an authenticated read once. Logout clears cookies and revokes the session family. Production sign-in remains unavailable. See [session behavior and limits](../engineering/development-auth.md).
 
 ## Sources and verification
 

@@ -2,7 +2,7 @@
 
 ## Development mock OTP exception
 
-With explicit `NODE_ENV=development` and `mockOTP=true`, local-only mock request/verify OTP, profile and logout routes are available. Phone `9000000001` uses `000000` as the development super-admin OTP; other customer phones use that code without admin privileges. These routes use temporary opaque bearer sessions and do not implement production F01 JWT/refresh/2FA contracts. See [development authentication](../engineering/development-auth.md) for database guards, startup and limits. The production endpoint inventory below remains unchanged when mock mode is disabled.
+With explicit `NODE_ENV=development`, `mockOTP=true` and a private `JWT_SECRET`, local-only mock request/verify OTP, refresh, profile and logout routes are available. Phone `9000000001` uses `000000` as the development super-admin OTP; other customer phones use that code without admin privileges. Access is a signed JWT (default `30m`) and refresh is a rotating random secret with a configurable family lifetime (default `15d`), both delivered in HTTP-only browser cookies. Session hashes persist in MongoDB; logout/replay revokes the family. Production password/2FA authentication remains pending. See [development authentication](../engineering/development-auth.md) for cookie/CSRF contracts, startup and limits. Mock routes remain absent when mock mode is disabled.
 
 Status: Implemented foundation endpoints.
 Owner: Backend maintainers
@@ -75,3 +75,5 @@ JSON parsing runs before the routes and fallback 404, so malformed JSON can prod
 Finished requests log event, request ID, method, status and duration. They omit paths, queries, headers and bodies. Internal-error logging currently records the event and request ID only. Use the ID for support correlation; do not ask clients to submit tokens or private request payloads.
 
 The `/api/v1` prefix is the existing compatibility boundary. Before business endpoints land, choose an authoritative machine-readable schema source and validate examples against it. Update consumers and examples alongside contract changes, accounting for native clients that may remain installed on older versions. Do not promise generated documentation before generation actually runs.
+
+Development-only role listing: `GET /admin/roles` requires a valid mock staff session, `roles:manage`, and all-warehouse scope. It returns `{data: [{id, name, permissions, isSystem}], meta: {count}}`, sorted by name. `GET /admin/permissions` returns the registered admin permission keys under `data.admin`. Both routes are absent unless development mock OTP is enabled; role mutations and staff APIs remain unimplemented.
