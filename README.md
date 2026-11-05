@@ -14,3 +14,9 @@ Start here: [docs/00-overview.md](docs/00-overview.md) (architecture, roadmap, d
 | [docs/platform](docs/platform) | F23 Notifications · F24 Media storage · F25 Admin, settings & reports |
 
 Shared: [docs/01-data-model.md](docs/01-data-model.md).
+
+## Development setup
+
+Prerequisites: Node.js 22 or later and pnpm 12.6.0. Install dependencies with `pnpm install --frozen-lockfile`, then run `pnpm build` once to build the shared package. Start the API with `pnpm --filter @darjeeling/api dev` and the web app in a second terminal with `pnpm --filter @darjeeling/web dev`. The web app runs at http://localhost:3000 and the API health endpoint at http://localhost:4000/api/v1/health. Set `PORT` in the environment to change the API port.
+
+Run `pnpm build`, `pnpm typecheck`, and `pnpm test` from the root. The health endpoint checks that the HTTP process is running; it does not check a database. The Expo app directories are reserved for future implementation. See [dev1.md](dev1.md) and [dev2.md](dev2.md) for the work sequence.

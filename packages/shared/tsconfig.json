@@ -1,0 +1,13 @@
+{
+  "extends": "@darjeeling/config/tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true
+  },
+  "include": [
+    "src"
+  ]
+}

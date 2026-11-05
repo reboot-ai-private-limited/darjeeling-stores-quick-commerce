@@ -1,0 +1,27 @@
+{
+  "name": "@darjeeling/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@darjeeling/shared": "workspace:*",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@darjeeling/config": "workspace:*",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.15.0",
+    "supertest": "^7.1.0",
+    "@types/supertest": "^6.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.0"
+  }
+}
