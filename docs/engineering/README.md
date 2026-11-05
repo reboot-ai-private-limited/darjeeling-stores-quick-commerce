@@ -14,6 +14,7 @@ Use this handbook for work on the current scaffold. Read the owning feature spec
 | Which checks should I run? | [Testing](testing.md) |
 | What can be deployed? | [Build and deployment](build-and-deploy.md) |
 | How will mobile work be verified? | [Mobile workflow](mobile.md) |
+| Who owns which files, modules and endpoints? | [Team split and working agreement](team-split.md) |
 
 ## Contributing a change
 

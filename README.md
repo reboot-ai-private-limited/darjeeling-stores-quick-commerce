@@ -56,7 +56,7 @@ These are available checks, not claims of a clean CI result. Windows skips the p
 
 ## Documentation and contribution
 
-Start at the [documentation index](docs/README.md). Read [architecture](docs/architecture/overview.md), [engineering/contribution guidance](docs/engineering/README.md), [API reference](docs/api/README.md), and the existing [product/feature overview](docs/00-overview.md). Active foundation work remains in [tasks/plan.md](tasks/plan.md) and [tasks/todo.md](tasks/todo.md); broader responsibilities remain in [Dev 1](dev1.md) and [Dev 2](dev2.md).
+Start at the [documentation index](docs/README.md). Read [architecture](docs/architecture/overview.md), [engineering/contribution guidance](docs/engineering/README.md), [API reference](docs/api/README.md), and the existing [product/feature overview](docs/00-overview.md). Active foundation work remains in [tasks/plan.md](tasks/plan.md) and [tasks/todo.md](tasks/todo.md); the division of work between two developers (ownership, ports, events, gates) is in the [team split](docs/engineering/team-split.md), with personal plans in [Dev 1](dev1.md) and [Dev 2](dev2.md).
 
 ## Common failures
 
