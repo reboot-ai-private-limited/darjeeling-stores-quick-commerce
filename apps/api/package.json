@@ -8,18 +8,24 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "pnpm build && vitest run test/integration --config vitest.integration.config.ts",
+    "check:boundaries": "depcruise --config .dependency-cruiser.cjs src"
   },
   "dependencies": {
     "@darjeeling/shared": "workspace:*",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "mongoose": "^9.11.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@darjeeling/config": "workspace:*",
     "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
-    "supertest": "^7.1.0",
     "@types/supertest": "^6.0.0",
+    "dependency-cruiser": "^18.7.2",
+    "mongodb-memory-server-core": "^11.3.0",
+    "supertest": "^7.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.3",
     "vitest": "^3.1.0"
