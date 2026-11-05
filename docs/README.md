@@ -10,7 +10,7 @@ This repository contains a working backend foundation and a placeholder web page
 | Feature author | [Product design](00-overview.md), owning feature specification below, [architecture](architecture/overview.md), [module anatomy](engineering/module-anatomy.md), [coding standards](engineering/coding-standards.md) | Identify rules, owners, contracts and acceptance cases before implementation |
 | API consumer | [API reference](api/README.md), [frontend architecture](engineering/frontend-architecture.md) | Understand existing endpoints and distinguish future session behavior |
 | Operator | [Build and deployment](engineering/build-and-deploy.md), [runbooks](runbooks/README.md) | Understand artifacts and remaining deployment prerequisites |
-| Planner | [Foundation plan](../tasks/plan.md), [execution checklist](../tasks/todo.md), [Dev 1](../dev1.md), [Dev 2](../dev2.md) | Find active work and cross-team dependencies |
+| Planner | [Team split](engineering/team-split.md), [Foundation plan](../tasks/plan.md), [execution checklist](../tasks/todo.md), [Dev 1](../dev1.md), [Dev 2](../dev2.md) | Find who owns what, active work and the contracts between the two developers |
 
 ## Current implementation references
 

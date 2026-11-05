@@ -1,71 +1,94 @@
-# Dev 2 — Mobile apps and delivery operations
+# Dev 2 — Catalog, delivery, engagement and both mobile apps
 
-Planning baseline: 2026-11-05. The repository now includes an API foundation and a placeholder web application; business features and mobile applications remain planned. See [current documentation](docs/README.md) for implemented behavior. Companion and shared decision register: [dev1.md](dev1.md). Read its shared sequence and working agreement before starting.
+Status: Proposed, 2026-11-05. Shared rules, ports, events and gates: [team split and working agreement](docs/engineering/team-split.md). **Read that first.** Companion: [dev1.md](dev1.md). Mobile device-verification rules: [docs/engineering/mobile.md](docs/engineering/mobile.md).
 
-## Ownership and reading order
+Already in code: only the API runtime foundation (validated config, safe errors, MongoDB connection and readiness, boundary checks). The mobile directories contain notes only. Everything below is planned.
 
-Own `apps/customer-app`, `apps/rider-app`, delivery API modules for F18–F22, delivery collections (`riders`, `rider_shifts`, `assignments`, `delivery_batches`, `offline_events`, `cash_ledger`, optional location trail), and delivery routes/screens under the existing Next.js `/admin` app. Own mobile tests and delivery-service tests. Dev 1 owns commerce/platform services and storefront; both agree contracts before parallel work.
+## 1. Your job in one sentence
 
-Read [overview](docs/00-overview.md) and [data model](docs/01-data-model.md), then F01/F02, F18–F22, F08–F17 and F23–F25. The [README](README.md) links every feature. All 25 features are covered across these two plans; frontend and backend tasks refer to the same specifications rather than separate behavior.
+Own what is for sale and where its stock is, how an order reaches the door and cash comes back, the messages and files around it, and both mobile apps. Build every package against the contracts and fakes, so you never wait for Dev 1's modules.
 
-Do not write a second order state machine, pricing engine, auth service or job queue. Use Dev 1's shared services. Coordinate edits to `packages/shared`, API bootstrap, root config/lockfile and web navigation with Dev 1. Each checkbox below is a work package: split it into small PRs where needed, and merge API contract → service → client integration in that order.
+## 2. What you own
 
-## 0. Start in parallel with Dev 1
+**Features (13):** F04 master catalog · F05 offerings and stock · F06 import and product tree · F07 Notify Me · F08 discovery · F09 addresses · F18 dispatch · F19 rider app · F20 ETA and tracking · F21 offline · F22 rider cash · F23 notifications · F24 media. About 126 endpoints, listed in `docs/api/F??-*.md`.
 
-- [ ] D2.0a — Agree DTOs/error examples for login, zone catalog, address, quote, group/child, assignment, pickup bundle, collection and sync; review Dev 1's specification conflicts. **Done:** shared fixtures describe success, permission denial, retry and conflict cases. **Dependency:** none; joint D1.0a.
-- [ ] D2.0b — After root scaffold lands, create Expo dev-build shells for customer Android/iOS and rider Android, navigation, configuration, secure session storage, login/update/maintenance and permission screens. **Done:** real API login, refresh and logout work when D1.0c lands; blocked/deactivated users cannot continue. **Dependency:** D1.0b/contracts; fixtures may unblock layout only.
-- [ ] D2.0c — Early Android feasibility spike: assignment push, Notifee alarm, background location, battery/permission behavior and APK distribution on intended rider hardware. **Done:** record observed behavior with screen locked, app backgrounded, permissions denied and battery restrictions; document fallback handling. **Dependency:** rider dev build and FCM setup. Do not wait until release to discover hardware restrictions.
+| Area | You own |
+|---|---|
+| API modules | `catalog`, `offerings`, `availability`, `discovery`, `addresses`, `media`, `notifications`, `jobs`, `riders`, `dispatch`, `delivery`, `cash`, `tracking`, `offline-sync` under `apps/api/src/modules/`, plus `composition/dev2.ts` |
+| Collections | `categories`, `products`, `warehouse_products`, `stock_movements`, `price_history`, `catalog_revisions`, `stock_subscriptions`, `waitlist`, `addresses`, `media_files`, `notification_templates`, `notifications`, `jobs`, `riders`, `rider_shifts`, `assignments`, `delivery_batches`, `offline_events`, `cash_ledger`, `rider_location_trail` |
+| Mobile | `apps/customer-app` (Android and iOS), `apps/rider-app` (Android only), `packages/mobile-kit` (API client, secure session, offline outbox, UI kit) |
+| Web pages | Under `apps/web/src/app/(admin)/admin/`: `catalog`, `inventory`, `media`, `notifications`, `riders`, `dispatch`, `cash`, `reconciliation`, `offline-reviews`; and the public `apps/web/src/app/track/` page; menu in `dev2.nav.ts` |
+| Contracts | `packages/contracts/mock-api`; fixtures for your features; `packages/shared/src/dev2` |
 
-Verification for mobile work: before authoring executable mobile UI tests, inspect connected devices with `adb devices -l`, confirm preferred serial if multiple, and explore actual screens/interactions with ARTEMIS. Use Flash for simple deterministic paths, Pro for diagnostics/checkpoints. On errors call `mobile_diagnose` first, including self-heal before manual ADB intervention; if unavailable, follow the supplied MCP/doctor diagnostic instructions. Write framework-native dynamic locators with verified coordinate fallback only where supported, and explicit deterministic waits. Do not claim device verification if ARTEMIS/device access is missing. iOS acceptance needs separate iOS-capable tooling/device coverage; Android results do not verify iOS.
+Besides the features you own, **you build the mobile screens for every customer and rider feature, including Dev 1's** (login, cart, quote, orders, payments, refunds, coupons, pre-orders). Dev 1 owns those features' backend and fixtures; you consume them through the mock until they are real.
 
-## 1. Customer discovery and rider setup
+## 3. What you must not touch
 
-- [ ] D2.1a — F08 customer GPS/locality selection, outside-zone waitlist, home/category/search/product screens, variant steppers and closed/paused states. **Done:** correct zone catalog, no prices before zone selection, usable denied-location flow. **Dependency:** D1.1a/1c/1e; implement fixtures while APIs are being built, then replace them before gate.
-- [ ] D2.1b — F09 address picker/form with required locality/landmark, receiver details, pin and accuracy warning, optional voice/photo upload/retry and delete. **Done:** cross-zone selection requests cart confirmation; private media uses Dev 1's authorized upload/read APIs. **Dependency:** D1.1b/1e and late-upload decision.
-- [ ] D2.1c — F19 rider onboarding/profile, zone/allowed warehouses, shifts, breaks, warehouse switching and admin rider management. Build APIs plus delivery admin pages. **Done:** cross-zone warehouse grants are rejected, deactivated riders cannot start, outside-radius punch-in is flagged and active-order shift-end rules are enforced. **Dependency:** D1 auth/scope/geography/settings.
+Dev 1's modules (`health`, `identity`, `access`, `audit`, `settings`, `geography`, `pricing`, `coupons`, `cart`, `quotes`, `orders`, `payments`, `refunds`, `preorders`), `server.ts`, `app.ts`, `container.ts`, `platform/` (without a contract PR), `composition/dev1.ts`, the root config and lockfile, the rest of `apps/web`, `packages/shared/src/{core,dev1}`. Call their `.public.ts` or a port. **Never write a second order state machine, pricing engine or auth service.** (You do own the job queue itself, as the `jobs` module.)
 
-Gate with Dev 1: an admin creates stock that appears in customer browse; a preregistered rider logs in and starts a shift at an allowed warehouse. Verify own-data and scoped-staff boundaries server-side.
+## 4. What you give Dev 1 (and when)
 
-## 2. COD checkout through delivery
+| You provide | Port | Needed by Dev 1 for | Ready |
+|---|---|---|---|
+| Durable jobs: enqueue, handler, cancel | `jobs` | Payment expiry, reconciliation, pre-order release | D2-2 (real); fake until then |
+| OTP sending with WhatsApp then SMS fallback | `otp-transport` | Customer and rider login | D2-2 |
+| File copy onto orders, signed read URL, deletion scheduling | `media` | Order placement, refunds | D2-3 |
+| Atomic stock reserve, release, restore, availability | `stock` | Orders and cart | D2-4 |
+| Zone prices and availability for cart lines | `catalog` | Cart and quote | D2-4 |
+| A customer's address with its zone | `addresses` | Quote and orders | D2-6 |
+| Routes-based ETA (same interface as the baseline) | `eta` | Quotes, tracking | D2-10 |
+| Fixtures and real endpoints for your features | `docs/api` + `packages/contracts` | Web admin pages | Per package |
+| Domain events (stock, assignment, delivery, collection) | `platform/events.ts` | Notifications, reports | Per package |
 
-- [ ] D2.2a — F10 customer cart/checkout: optimistic steppers, server corrections, itemised bill, quote expiry/change confirmation, zone repricing, split notice and persistent checkout idempotency key. **Done:** lost response/retry produces one group, offline placement is blocked, changed totals need acceptance. **Dependency:** D1.2a/2b.
-- [ ] D2.2b — F13/F14 customer order success/history/detail, child timelines and delivery OTP. **Done:** each child updates independently and group status matches server roll-up. **Dependency:** D1 placement/transition contracts.
-- [ ] D2.2c — F18 manual assignment and suggested-rider ranking, ack deadline, unassign/reassign, assignment polling and admin dispatch board. Use Dev 1 jobs/events and transition service. **Done:** only eligible riders are assigned; no reject action; stale ack escalation is cancelled after reassignment; counts stay correct under retries. **Dependency:** D2.1c, D1.2c/2d.
-- [ ] D2.2d — F19 rider alarm/ack, pickup checklist, start ride, navigation/call/voice, arrival, online OTP and delivery. **Done:** customer receives updates; rider cannot read another rider's order; a single-stop shortcut records both transitions. **Dependency:** 2c and media/OTP contracts.
-- [ ] D2.2e — F22 cash collection/ledger APIs, rider balance, admin deposits/adjustments and warehouse totals. **Done:** repeat collection cannot duplicate cash, balances are atomic and append-only, each child's warehouse is preserved, adjustments require a reason. **Dependency:** 2d and agreed payment contract.
+## 5. What you use from Dev 1 (and your stand-in until it lands)
 
-Joint gate: one COD order from customer to packing to rider delivery to deposit. Repeat with two warehouses; check stock, events, amount due, notifications and cash totals together. This gate requires real integrated APIs, not fixture-only screens.
+| You consume | Port | Until real, use |
+|---|---|---|
+| Actor, permissions, warehouse scope | `auth` | Fake actor from a test header (dev and test only, never production) |
+| Pre-register or deactivate a rider's user | `identity` | In-memory users |
+| Zone, warehouse, open or paused now | `geography` | Two warehouses in one zone, one in another |
+| Settings and audit | `settings`, `audit` | Defaults and an in-memory log |
+| Order read, status change, collection record, delivery OTP | `orders` | In-memory state machine with the legal transitions |
+| Automatic refund creation | `refunds` | Records the call |
+| Register reports and dashboard widgets | `reports` | Local registry |
+| Login, quotes, orders, payments, refunds endpoints for the apps | `docs/api` fixtures | `packages/contracts/mock-api` |
 
-## 3. Complete delivery and financial edge cases
+Switching to the real module is one line in `composition/dev2.ts`; for the apps it is changing the API base URL from the mock to the real server.
 
-- [ ] D2.3a — F18 same/different-rider split dispatch, batch stop order, pickup-before-ride checks, post-pickup handover and failed delivery resolution. **Done:** one OTP can complete the appropriate same-rider children, handover is acknowledged, return vs spoiled stock uses Dev 1 services correctly. **Dependency:** Stage 2 and reconciled transition rules.
-- [ ] D2.3b — F15 mobile Razorpay checkout/UPI intent, confirming/retry UI and COD pay-link UI; F16 cancel/refund request/status and photo upload. **Done:** client success never confirms payment authoritatively; partial cancellation remains per child; refund status comes from server. **Dependency:** D1.3a/3b.
-- [ ] D2.3c — F22 reconciliation views for overpaid/unmatched collections and UPI; integrate paid updates into rider UI. **Done:** online payment shows “Already paid — do not collect”; recorded extra cash is retained and sent to refund review, never silently discarded. **Dependency:** D1.3c and cash ledger.
+## 6. Work packages, in order
 
-Verification: assignment-vs-reassignment, duplicate deliver/collect, separate riders sharing a group OTP, cancelled child, failed delivery return/wastage, mixed-warehouse deposits and online payment racing collection.
+Every package can start now. "Stand-in" is what you use for anything Dev 1 owns. "App" means the mobile screens in the same package. "Web" means the admin pages for the module.
 
-## 4. Offline resilience and Phase 2
+| ID | Work | Features | Stand-in | Done when |
+|---|---|---|---|---|
+| **D2-0** | **Mobile foundation.** Expo dev-build shells for both apps, navigation, config, secure session storage, force-update and maintenance screens, permission screens. `packages/mobile-kit` (API client with the error envelope, polling helpers). `packages/contracts/mock-api` serving the fixtures | F01 (client) | `mock-api` | Both apps run in dev builds against the mock; login, refresh and logout screens work with fixtures; a blocked user cannot continue |
+| **D2-1** | **Android feasibility spike** on the real rider phones: assignment push, Notifee full-screen alarm, background location, battery and permission behavior, APK install. Follow [mobile.md](docs/engineering/mobile.md) | F19 | none | Observed results recorded for screen locked, app backgrounded, permissions denied and battery limits, with a fallback plan |
+| D2-2 | **Jobs and notifications.** Mongo-backed `jobs` with retries and sweepers; FCM, WhatsApp, SMS adapters; templates, delivery log, retry, broadcast, WhatsApp webhooks; `otp-transport`. Web: templates and log | F23 | `auth`, `audit` fakes | A restarted worker recovers jobs without duplicate effects; failures are visible and retryable. Submit WhatsApp templates early |
+| D2-3 | **Media.** Presigned upload, image sizes, private signed reads, deletion jobs and sweepers, 7-day order-media expiry. Web: failed-deletion list | F24 | `auth` fake, `jobs` real | Removing an image deletes every size; private files need ownership or scope; expiry deletes on schedule |
+| D2-4 | **Catalog and stock.** Master catalog, offerings (pooled grams and per-variant units), price rule, revisions, movements, atomic `StockService`, `CatalogReader`. Web: catalog, inventory, product tree | F04, F05 | `geography`, `auth` fakes | Concurrent orders cannot oversell the last unit; stale edits fail with `VERSION_CONFLICT`; same-zone price conflicts follow the agreed policy |
+| D2-5 | **Import and Notify Me.** Preview and commit import between warehouses (skip or overwrite, quantity confirm); back-in-stock subscriptions and demand list. Web: import wizard | F06, F07 | `geography` fake | Source stock is unchanged; subscribers are notified once when zone availability goes from none to some |
+| D2-6 | **Discovery and addresses.** Zone catalog read, search, delta sync with tombstones and full resync, store status, waitlist; address CRUD with landmark, voice note and photo. **App:** login, location, home, category, search, product, address | F08, F09 | `geography`, `auth` fakes; `mock-api` for login | Catalog deduplicates warehouses; no price appears before a zone is known; a changed price arrives through delta sync. **G2 reached with Dev 1** |
+| D2-7 | **Riders, shifts and dispatch.** Rider admin, shifts and punch-in, assignment with acknowledgement and sweeper, batches, dispatch board, live map. **App (rider):** login, shift, alarm, order list. Web: riders, dispatch board | F19, F18 | `identity`, `orders`, `geography` fakes | Only eligible riders can be assigned; no reject action; a stale acknowledgement timer is cancelled after reassignment |
+| D2-8 | **Delivery execution and cash.** Pickup, ride, arrived, deliver through `OrderTransitions`; failed delivery, handover, same or different rider for split orders; cash collection and ledger, deposits, reconciliation. **App (rider):** pickup checklist, navigation, doorstep, cash. Web: cash, reconciliation | F19, F18, F22 | `orders`, `refunds` fakes | Repeat collection cannot duplicate cash; the ledger is append-only and per warehouse; one group OTP completes same-rider children. **G3 with Dev 1** |
+| D2-9 | **Customer app: shopping and orders.** Cart with optimistic steppers, quote and change confirmation, checkout with the idempotency key, order history and detail, payments, cancel and refund screens | F10, F13, F15, F16 (client) | `mock-api` for Dev 1's endpoints | A lost response and retry gives one order; offline placement is blocked; client payment success is never treated as final. **G4 with Dev 1** |
+| D2-10 | **Offline and tracking.** Pickup bundle, SQLite outbox, sequence-ordered sync with applied, duplicate and conflict results, offline OTP gate, local UPI QR; Routes ETA, location pings, tracking APIs, public tracking page; customer MMKV cache and delta sync | F21, F20 | `orders`, `eta` fakes | Restart keeps pending events; replay applies each effect once; rider location shows only after pickup. **G5** |
+| D2-11 | **Engagement, reports, devices, release.** Coupons, banners, pre-order and Notify Me screens; delivery reports registered with `reports`; device acceptance; signed rider APK and customer builds; rehearsal. Web: delivery dashboards | F12, F17, F07 (client), F25 (delivery reports) | `reports` fake | Results recorded for low-end Android, weak network and locked screen; a clean install and an upgrade both work. **G6** |
 
-- [ ] D2.4a — F21 rider pickup bundle, durable SQLite outbox, encrypted sensitive payloads, sequence-ordered batch sync and per-event applied/duplicate/conflict results. **Done:** restart preserves pending events; replay applies each effect once; reassigned/cancelled events remain inspectable, with unmatched cash preserved. **Dependency:** stable delivery/payment contracts. Design event IDs and payloads in Stage 0 even though implementation is here.
-- [ ] D2.4b — Offline OTP gate and server re-verification, attempt cap, GPS/device-time flags, review queue, shift-end sync block and local media cleanup. **Done:** airplane-mode delivery syncs safely; wrong OTP/conflicts are reviewed under an explicit server policy; no success message is sent before authoritative processing. **Dependency:** 4a and Dev 1 OTP/media/notification services.
-- [ ] D2.4c — F15 local warehouse UPI QR and F22 bank verification workflow. **Done:** zero-network QR uses correct warehouse VPA/amount; UPI remains unverified until reconciled and is excluded from cash in hand. **Dependency:** 4a/4b, business VPA confirmed, D2.3c.
-- [ ] D2.4d — F20 cached Routes ETA service, rider pings/buffering, batch ETA, private tracking APIs, expiring public link, customer/admin maps and public tracking web page. **Done:** no other customer stops leak, location appears only after pickup, stale timestamps are visible and polling stops appropriately. **Dependency:** delivery events/geography; baseline fallback ETA already supplied for Stage 2 with Dev 1.
-- [ ] D2.4e — F21 customer MMKV cache, optimistic mutation persistence, delta/tombstone/full-resync integration and upload recovery. **Done:** warm home meets documented under-one-second target on representative hardware; network loss preserves cart and makes stale prices visible; reconnect does not duplicate checkout. **Dependency:** D1.4d and Stage 2.
-- [ ] D2.4f — Customer F07 Notify Me, F12 coupons/banners, F17 preorder slots and rain/night notices; notification preferences/deep links. **Done:** UI follows server validation, coupon errors/capacity exhaustion are handled, notifications open the correct screen. **Dependency:** matching D1.4a–4c APIs; build each independently as it lands.
-- [ ] D2.4g — F25 delivery dashboard/reports: rider activity/shifts, cash/reconciliation, offline reviews and promised-vs-actual delivery metrics. **Done:** scoped admin visibility and totals agree with underlying ledger/orders; CSV reporting works. **Dependency:** stable delivery records; coordinate dashboard composition with Dev 1.
+Order: D2-0 and D2-1 first (no shared files), then D2-2 to D2-5 (backend modules Dev 1 will plug in), then D2-6 to D2-8, D2-9 as Dev 1's endpoints land, then D2-10 and D2-11. D2-0 to D2-2 can all run at once.
 
-Offline gate: verify complete pickup → airplane mode → arrival/OTP/cash → process restart → reconnect → repeated sync. Also cover paid-online while offline, reassign while offline, corrupted/rejected event, pending photo, exhausted OTP attempts and stale location. Queue conflicts must have an operational resolution path.
+## 7. Spec conflicts you decide
 
-## 5. Pilot and release
+From the [conflict table](docs/engineering/team-split.md#12-spec-conflicts-to-settle-each-has-one-owner): catalog deletion versus the data-model ban (before D2-3 and D2-4), price `warn` versus one guaranteed price (before D2-4), late media upload versus copy at placement (jointly with Dev 1, before D2-3), stock crash recovery (jointly, before D2-4). Record each answer in the owning spec.
 
-- [ ] D2.5a — Device acceptance: permission denial, locked screen, killed/background app, reconnect, weak network, update/maintenance behavior, accessibility and low-end Android performance. Cover customer iOS separately. **Done:** observed results and known limitations are recorded with reproducible checks.
-- [ ] D2.5b — Release customer builds and signed rider APK through agreed distribution; document install, update, permission and recovery steps for six riders. **Done:** clean install and upgrade retain required local state securely.
-- [ ] D2.5c — With Dev 1, rehearse opening, packing, dispatch, failure/handover, cash deposit, bank reconciliation, manual refund and closing on staging. **Done:** no unexplained stock/cash/payment discrepancies, no unresolved blocking sync conflicts; owner confirms operating settings.
+## 8. Device and mobile rules
 
-Treat Stage 2–3 as an integrated controlled MVP. The documented dead-spot delivery promise requires Stage 4 offline acceptance before general hill-region rollout. Any earlier operational pilot needs an explicitly agreed limitation and recovery procedure.
+Before writing any mobile UI test, follow [mobile.md](docs/engineering/mobile.md): `adb devices -l`, explore real screens, then author tests with deterministic waits. Do not claim device verification without device access. iOS acceptance for the customer app needs separate iOS tooling; Android results do not cover it.
 
-## Coordination rhythm
+## 9. Rhythm with Dev 1
 
-At each day's start identify the next API contract and dependency; at day's end demo the smallest integrated path. Dev 1 hands off endpoints, example payloads, errors and test fixtures; Dev 2 reports integration gaps and provides delivery events/results back. Review each other's financial and permission changes. Keep PRs feature-sized; do not wait for a whole stage to merge. If blocked, take another independent checkbox in the same stage, not an unrequested Phase 3 feature.
+- **Handoff:** after each package, post the endpoints you finished, the fixtures path and any new event or port change. Dev 1 switches the matching fake to real.
+- **Your reviews:** only Dev 1's contract PRs, and anything touching money, permissions or scope. Everything else merges on green checks.
+- **Gates you lead:** G2 (stock shows in the customer app) and G5 (offline and tracking).
+- **If Dev 1 is late:** keep going on the fake and the mock. A fake that enforces the same rules as the real module is a contract, not a shortcut. Replace it at the gate.
 
-No app code, automated tests or device runs were created/performed for this planning task. External service access, real hardware behavior and business/tax/retention decisions remain to be validated during implementation.
+Not planned here: Phase 3 items (abandoned-cart nudges, substitutions, ratings, bulk CSV import, advanced analytics, expiry tracking, barcode packing, automatic route ordering).
