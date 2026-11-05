@@ -68,6 +68,8 @@ Shares are pro-rata by `itemsSubtotal`, with the rounding remainder on the first
 - **Admin:** orders list (group and children linked), new-order bell, order detail (F14).
 
 ## 9. API
+Full request and response reference with examples: [API · F13](../api/F13-order-placement-and-split-orders.md).
+
 `POST /orders {quoteId}` (header `Idempotency-Key`) · `GET /orders` · `GET /orders/:id` (child) · `GET /order-groups/:id`.
 
 ## 10. Data

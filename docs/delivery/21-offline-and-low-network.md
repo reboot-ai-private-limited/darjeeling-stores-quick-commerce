@@ -2,6 +2,8 @@
 
 Status: draft v3 · Folder: delivery · Depends on: F08, F10, F19 · See also: F15 (UPI QR), F20 (tracking), F24 (uploads)
 
+Endpoints (rider bundle, sync queue, offline review) with request and response examples: [API · F21](../api/F21-offline-and-low-network.md).
+
 Context: hilly region, 2G/3G and dead spots, budget phones. Goals: home screen under 1 s from cache, no blocking spinners on cart actions, and a rider who can finish a delivery with zero signal.
 
 ## 1. Customer app

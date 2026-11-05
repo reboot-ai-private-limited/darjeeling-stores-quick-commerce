@@ -32,6 +32,8 @@ Let the owner run discounts and promotions: coupon codes, a first-order offer, f
 - **Admin:** coupon list and editor with usage counts, banner manager, offers on the product tree.
 
 ## 5. API
+Full request and response reference with examples: [API · F12](../api/F12-coupons-and-offers.md).
+
 `POST /cart/coupon {code}` · `DELETE /cart/coupon` · `GET /coupons/available` · admin: `GET/POST/PUT /admin/coupons` · `GET/POST/PUT /admin/banners`.
 
 ## 6. Data

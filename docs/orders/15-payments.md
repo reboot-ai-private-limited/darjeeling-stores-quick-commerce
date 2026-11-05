@@ -64,6 +64,8 @@ Daily job compares Razorpay payments with our DB and flags mismatches. Admin can
 - **Admin:** payments list (status, Razorpay ids) · reconciliation results · stuck-payment action.
 
 ## 9. API
+Full request and response reference with examples: [API · F15](../api/F15-payments.md).
+
 `POST /payments/verify` · `POST /payments/retry` · `POST /orders/:id/pay-link` · `POST /webhooks/razorpay` · admin `GET /admin/payments` · `POST /admin/payments/reconcile` · `POST /admin/payments/:id/mark-paid`.
 
 ## 10. Data

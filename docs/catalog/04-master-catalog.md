@@ -33,6 +33,8 @@ Groceries, vegetables, fruits, dairy, staples, household. Loose items are sold a
 Category tree (create, reorder, toggle) · product list with search and filters · product editor (details, variants, images, tax) · duplicate warning.
 
 ## 6. API
+Full request and response reference with examples: [API · F04](../api/F04-master-catalog.md).
+
 Admin: `GET/POST/PUT /admin/categories` · `GET/POST/PUT/DELETE /admin/products` · `POST /admin/products/:id/images` · `DELETE /admin/products/:id/images/:mediaId`. Customer reads go through the zone catalog (F08).
 
 ## 7. Data

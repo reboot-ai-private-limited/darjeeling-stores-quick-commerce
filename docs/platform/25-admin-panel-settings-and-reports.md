@@ -101,6 +101,8 @@ Sensitive actions (🔒 in each doc) write `audit_log` with actor, role, action,
 Dashboard · every module list and editor named in §2 · settings editor (group, scope selector, preview) · settings history · audit log · login with 2FA.
 
 ## 9. API
+Full request and response reference with examples: [API · F25](../api/F25-admin-panel-settings-and-reports.md).
+
 `GET/PUT /admin/settings/:group?scope=` · `GET /admin/settings/history` · `GET /admin/dashboard?warehouseId=` · `GET /admin/reports/:name` · `GET/PUT /admin/customers` · `GET /admin/audit`.
 
 ## 10. Data

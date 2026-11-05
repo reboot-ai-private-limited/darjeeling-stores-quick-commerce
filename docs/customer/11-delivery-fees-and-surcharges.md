@@ -92,6 +92,8 @@ For a group that splits across warehouses (F13), all of the above is computed **
 - **Admin:** delivery rules per zone (tiers editor, always-free toggle), surcharge editor, rain-mode switch, fee preview.
 
 ## 8. API
+Full request and response reference with examples: [API · F11](../api/F11-delivery-fees-and-surcharges.md).
+
 `GET /admin/delivery-rules?zoneId=` · `POST/PUT /admin/delivery-rules` · `POST /admin/delivery-rules/preview {zoneId, subtotal, at}` · `POST /admin/ops/rain {on, until}` · customer pricing is returned inside quotes (F10).
 
 ## 9. Data

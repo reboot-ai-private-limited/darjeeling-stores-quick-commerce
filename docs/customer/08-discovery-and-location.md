@@ -42,6 +42,8 @@ Every offering has a `rev`. `GET /catalog/changes?zoneId=&since=<rev>` returns o
 Location permission / locality picker · "Coming soon" with waitlist · Home · Category view · Search · Product detail (pack sizes, details, Add) · Closed / pre-order notice.
 
 ## 7. API
+Full request and response reference with examples: [API · F08](../api/F08-discovery-and-location.md).
+
 `POST /location/resolve` · `GET /catalog/home?zoneId=` · `GET /catalog/categories?zoneId=` · `GET /catalog/products?zoneId=&categoryId=` · `GET /catalog/products/:id?zoneId=` · `GET /catalog/search?zoneId=&q=` · `GET /catalog/changes?zoneId=&since=` · `GET /store/status?zoneId=` · `GET /banners?zoneId=` · `POST /waitlist`.
 
 ## 8. Data

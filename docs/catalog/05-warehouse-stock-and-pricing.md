@@ -51,6 +51,8 @@ A **warehouse offering** (`warehouse_products`) links one warehouse to one maste
 Warehouse product tree and import live in F06. Inventory views: stock levels, low-stock list, movement history, stock-take sheet.
 
 ## 6. API
+Full request and response reference with examples: [API · F05](../api/F05-warehouse-stock-and-pricing.md).
+
 Admin: `GET /admin/warehouses/:id/products` · `PUT /admin/warehouse-products/:id` · `POST /admin/warehouse-products/bulk` · `POST /admin/stock/adjust` · `POST /admin/stock/count` · `GET /admin/stock/movements`.
 
 ## 7. Data

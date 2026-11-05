@@ -90,6 +90,8 @@ A customer's location decides the zone, and the zone decides the catalog, prices
 | | [F24](platform/24-media-storage.md) | Media storage (S3) | 1 |
 | | [F25](platform/25-admin-panel-settings-and-reports.md) | Admin panel, settings & reports | 1–2 |
 
+Endpoints for every feature, with request and response examples: [API reference](api/README.md).
+
 ## 5. Roadmap
 
 1. **Phase 0 – Foundations (1 wk):** monorepo, Express skeleton, Mongo, OTP auth, settings with scope resolution, CI, deploy.

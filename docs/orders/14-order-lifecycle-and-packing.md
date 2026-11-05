@@ -65,6 +65,8 @@ stateDiagram-v2
 New-order bell (polling) · orders list (filters, search, group and child linked) · order detail (items, timeline, notes) · packing view (tick items, mark unavailable) · print bill/slip · force-status dialog.
 
 ## 5. API
+Full request and response reference with examples: [API · F14](../api/F14-order-lifecycle-and-packing.md).
+
 `GET /admin/orders` · `GET /admin/orders/:id` · `GET /admin/orders/changes?since=<cursor>` (polling) · `POST /admin/orders/:id/confirm` · `/start-packing` · `/complete-packing` · `/items/:idx/unavailable` · `/cancel` · `/force-status`.
 
 ## 6. Data

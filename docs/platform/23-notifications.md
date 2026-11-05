@@ -72,6 +72,8 @@ Meta Business account verified · WhatsApp Business Cloud API app · dedicated n
 Templates list and editor (push and WhatsApp text, WhatsApp template name, language) · delivery log (status, error, retry) · broadcast composer.
 
 ## 8. API
+Full request and response reference with examples: [API · F23](../api/F23-notifications.md).
+
 Admin: `GET/PUT /admin/notification-templates` · `GET /admin/notifications` · `POST /admin/notifications/:id/retry` · `POST /admin/broadcast`. Webhooks: `POST /webhooks/whatsapp`. Customer: `PUT /me/notification-prefs`.
 
 ## 9. Data

@@ -28,6 +28,8 @@ When an item is out of stock, the customer taps **Notify Me**. As soon as it is 
 - **Admin:** Demand list (product, zone, count, oldest request).
 
 ## 5. API
+Full request and response reference with examples: [API · F07](../api/F07-notify-me.md).
+
 `POST /notify-me {productId, variantId?}` · `DELETE /notify-me/:id` · admin `GET /admin/notify-demand`.
 
 ## 6. Data
