@@ -100,6 +100,15 @@ export function createMediaService(deps: MediaDeps) {
     return attemptDelete(file.id);
   }
 
+  async function attach(mediaId: string, owner: { type: OwnerType; id: string }): Promise<void> {
+    const file = await store.get(mediaId);
+    if (!file || file.status !== "ready") throw notFound("Media");
+    if (!RULES[file.kind].ownerTypes.includes(owner.type)) throw validation("This file cannot belong to that kind of owner", { field: "mediaId", kind: file.kind });
+    if (file.ownerId !== null && (file.ownerId !== owner.id || file.ownerType !== owner.type)) throw conflict("This file already belongs to something else", { field: "mediaId" });
+    if (file.ownerId === owner.id) return;
+    await store.update(mediaId, { ownerType: owner.type, ownerId: owner.id, attachedAt: now(), updatedAt: now() }, { from: ["ready"] });
+  }
+
   return {
     // ---------- endpoints ----------
     async requestUpload(p: Principal, input: UploadRequest) {
@@ -225,13 +234,25 @@ export function createMediaService(deps: MediaDeps) {
     },
 
     /** Attach a ready file to its owner. Throws when the file is not ready, does not fit the owner, or belongs to another owner. */
-    async attach(mediaId: string, owner: { type: OwnerType; id: string }): Promise<void> {
+    attach,
+
+    /**
+     * Checks that a file is the customer's own, finished, and of the right kind, then attaches it to its owner. Returns the
+     * length of a voice note. For modules that let a customer pick an uploaded file (an address, a refund request).
+     */
+    async claimOwned(input: { mediaId: string; userId: string; kind: MediaKind; owner: { type: OwnerType; id: string } }): Promise<{ durationSec: number | null }> {
+      const file = await store.get(input.mediaId);
+      if (!file || file.status !== "ready" || file.uploadedBy !== input.userId || file.kind !== input.kind) throw notFound("Media");
+      await attach(input.mediaId, input.owner);
+      return { durationSec: file.durationSec };
+    },
+
+    /** Let go of a file an owner had claimed, so it can be used again (for example when saving the owner failed). The file is not deleted. */
+    async detach(mediaId: string, owner: { type: OwnerType; id: string }): Promise<void> {
       const file = await store.get(mediaId);
-      if (!file || file.status !== "ready") throw notFound("Media");
-      if (!RULES[file.kind].ownerTypes.includes(owner.type)) throw validation("This file cannot belong to that kind of owner", { field: "mediaId", kind: file.kind });
-      if (file.ownerId !== null && (file.ownerId !== owner.id || file.ownerType !== owner.type)) throw conflict("This file already belongs to something else", { field: "mediaId" });
-      if (file.ownerId === owner.id) return;
-      await store.update(mediaId, { ownerType: owner.type, ownerId: owner.id, attachedAt: now(), updatedAt: now() }, { from: ["ready"] });
+      if (file && file.status === "ready" && file.ownerType === owner.type && file.ownerId === owner.id) {
+        await store.update(mediaId, { ownerType: null, ownerId: null, attachedAt: null, updatedAt: now() }, { from: ["ready"] });
+      }
     },
 
     /** Copy an address voice note or photo onto an order at placement. The same source and order give the same copy. */

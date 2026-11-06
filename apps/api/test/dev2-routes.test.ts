@@ -56,12 +56,24 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
+  it("registers every endpoint documented for F08 discovery, apart from location resolve which belongs to F03", () => {
+    const expected = documented("F08-discovery-and-location.md");
+    expect(expected).toHaveLength(9);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F09 addresses", () => {
+    const expected = documented("F09-addresses.md");
+    expect(expected).toHaveLength(6);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
   it("registers nothing that the API docs do not describe", () => {
     const expected = new Set(
-      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
+      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
     );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(54);
+    expect(registered).toHaveLength(69);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {
@@ -71,12 +83,21 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("answers 401 with the documented error envelope for every route when nobody is logged in", async () => {
     const app = createApp();
-    for (const route of routes.filter(r => !r.path.startsWith("/webhooks/"))) {
+    const open = ["/webhooks/", "/catalog/", "/store/", "/banners", "/waitlist"];
+    for (const route of routes.filter(r => !open.some(prefix => r.path.startsWith(prefix)))) {
       const url = `/api/v1${route.path.replace(/:[A-Za-z]+/g, "a".repeat(24))}`;
       const res = await request(app)[route.method](url);
       expect(res.status, `${route.method} ${route.path}`).toBe(401);
       expect(res.body.error).toMatchObject({ code: "UNAUTHORIZED", requestId: res.headers["x-request-id"] });
     }
+  });
+
+  it("lets guests browse the catalog: a call with no zone is a 400, never a 401", async () => {
+    const app = createApp();
+    for (const path of ["/catalog/home", "/catalog/categories", "/catalog/products", "/catalog/search?q=tomato", "/catalog/changes?since=0", "/store/status", "/banners"]) {
+      expect((await request(app).get(`/api/v1${path}`)).status, path).toBe(400);
+    }
+    expect((await request(app).post("/api/v1/waitlist").send({})).status).toBe(400);
   });
 
   it("leaves the provider's webhook calls open but refuses a set-up challenge or a signed call without the configured secrets", async () => {

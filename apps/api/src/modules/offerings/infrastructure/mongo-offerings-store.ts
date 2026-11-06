@@ -159,6 +159,15 @@ export function createMongoOfferingsStore(connection: Connection): OfferingsStor
       const docs = await reservations().find({ status: "held", expiresAt: { $lte: now } }, { projection: { key: 1 } }).sort({ expiresAt: 1 }).limit(limit).toArray();
       return docs.map(doc => doc.key);
     },
+    async zoneOfferings({ zoneId, productIds, activeOnly }) {
+      if (productIds && productIds.length === 0) return [];
+      const filter = { zoneId, ...(activeOnly && { status: "active" as const }), ...(productIds && { productId: { $in: [...productIds] } }) };
+      return (await offerings().find(filter).toArray()).map(toOffering);
+    },
+    async changedSince(zoneId, since, limit) {
+      return (await offerings().find({ zoneId, rev: { $gt: since } }).sort({ rev: 1 }).limit(limit).toArray()).map(toOffering);
+    },
+    async currentRevision() { return (await revisions().findOne({ _id: REV_ID }))?.value ?? 0; },
     async savePreview(preview) { const { id, ...rest } = preview; await previews().insertOne({ _id: id, ...rest }); },
     async getPreview(id) { const doc = await previews().findOne({ _id: id }); return doc ? toPreview(doc) : null; },
     countByProduct(productId) { return offerings().countDocuments({ productId }); },
