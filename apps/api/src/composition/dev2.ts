@@ -1,8 +1,11 @@
 ﻿import type { Connection } from "mongoose";
 import mongoose from "mongoose";
+import { noGeography, type Geography } from "../platform/geography.js";
 import type { Route } from "../platform/routes.js";
+import { createAddressesModule } from "../modules/addresses/addresses.public.js";
 import { createAvailabilityModule, notifyProductsFrom, type CustomerResolver } from "../modules/availability/availability.public.js";
 import { createCatalogModule, denyAll, type AuthResolver, type MediaPort, type ProductUsagePort } from "../modules/catalog/catalog.public.js";
+import { createDiscoveryModule, type BannerSource, type DiscoverySettings, type StoreSettings } from "../modules/discovery/discovery.public.js";
 import { createJobsModule } from "../modules/jobs/jobs.public.js";
 import {
   createMediaModule, storageFromEnv, type AccessPolicy, type MediaSettings, type PrincipalResolver, type StorageProvider,
@@ -32,6 +35,10 @@ export interface Dev2Options {
   push?: PushProvider; whatsapp?: WhatsAppProvider; sms?: SmsProvider; webhook?: WebhookConfig;
   /** From the identity and geography modules: phones, push tokens, customers per zone. */
   contacts?: UserContacts; devices?: DeviceRegistry; audience?: AudienceDirectory;
+  /** Zones, localities and warehouse hours (F03, Dev 1). Until it exists there are no zones, so nothing can be browsed or delivered to. */
+  geography?: Geography;
+  /** Home banners (F12) and hours, fees and the ETA (F11, F17, F20), all Dev 1's. */
+  banners?: BannerSource; storeSettings?: StoreSettings; discoverySettings?: Partial<DiscoverySettings>;
   warehouses?: WarehouseDirectory;
   events?: EventPublisher;
   hasOrders?: (productId: string) => Promise<boolean>;
@@ -46,7 +53,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   let indexes: Promise<void> | undefined;
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
-    jobs.store.ensureIndexes(), notifications.ready(),
+    jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -109,6 +116,24 @@ export function createDev2Modules(options: Dev2Options = {}) {
     media: { urls: ids => media.service.urls(ids) },
   });
 
+  const geography = options.geography ?? noGeography;
+  const discovery = createDiscoveryModule({
+    connection, geography, catalog: catalog.store, source: offerings.zoneSource, media: { urls: ids => media.service.urls(ids) },
+    ...(options.banners && { banners: options.banners }), ...(options.storeSettings && { storeSettings: options.storeSettings }),
+    ...(options.contacts && { contacts: options.contacts }), ...(customerThenIndexes && { customer: customerThenIndexes }),
+    ...(options.discoverySettings && { settings: options.discoverySettings }),
+  });
+  const addresses = createAddressesModule({
+    connection, geography, ...(customerThenIndexes && { customer: customerThenIndexes }),
+    // Voice notes and photos are the customer's own uploads; the media module checks that and attaches them to the address.
+    media: {
+      claim: ({ mediaId, userId, kind, addressId }) => media.service.claimOwned({ mediaId, userId, kind, owner: { type: "address", id: addressId } }),
+      unclaim: (mediaId, addressId) => media.service.detach(mediaId, { type: "address", id: addressId }),
+      release: (mediaId, reason) => media.service.removeInternal(mediaId, reason),
+      releaseAll: async (addressId, reason) => { await media.service.removeForOwner({ type: "address", id: addressId }, reason); },
+    },
+  });
+
   /**
    * Starts the background work: the job worker and the recurring sweeps.
    *  - release stock held by an order that never finished (every minute, F05)
@@ -126,8 +151,10 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, stock: offerings.stock,
-    routes: [...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes] satisfies Route[],
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, stock: offerings.stock,
+    routes: [
+      ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
+    ] satisfies Route[],
     ensureIndexes, startBackground,
   };
 }

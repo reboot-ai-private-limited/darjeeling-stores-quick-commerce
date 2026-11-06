@@ -14,7 +14,9 @@ export type { StockService, ReserveLine, ReserveResult, Shortage, LineResolution
 export type { ImportService } from "./application/import-service.js";
 export type { TreeService } from "./application/tree-service.js";
 export type { OfferingsService } from "./application/offerings-service.js";
-export type { EventPublisher, ProductDirectory, StockEvent, WarehouseDirectory } from "./application/ports.js";
+export type { EventPublisher, ProductDirectory, StockEvent, WarehouseDirectory, ZoneOfferingsQuery } from "./application/ports.js";
+export type { Offering, OfferingVariant, ProductInfo } from "./domain/stock.js";
+export { discountAmount, discountPercent, effectivePrice, onSale, unitsAvailable } from "./domain/stock.js";
 export { offeringsRoutes } from "./interface/routes.js";
 
 /** Stand-in until geography exists: no warehouse is known, so nothing can be offered (a safe default). */
@@ -67,5 +69,11 @@ export function createOfferingsModule(options: OfferingsModuleOptions) {
     // Deleting is allowed only when no offering exists AND the orders module confirms no order ever used the product.
     canDelete: async productId => (await offerings.offeringCount(productId)) === 0 && hasOrders !== undefined && (await hasOrders(productId)) === false,
   };
-  return { store, offerings, stock, usage, tree, importer, routes: offeringsRoutes(offerings, auth, { tree, importer }) };
+  /** Reads for the customer catalog: what a zone sells and which revision it is at. */
+  const zoneSource = {
+    zoneOfferings: (query: Parameters<typeof store.zoneOfferings>[0]) => store.zoneOfferings(query),
+    changedSince: (zoneId: string, since: number, limit: number) => store.changedSince(zoneId, since, limit),
+    currentRevision: () => store.currentRevision(),
+  };
+  return { store, zoneSource, offerings, stock, usage, tree, importer, routes: offeringsRoutes(offerings, auth, { tree, importer }) };
 }

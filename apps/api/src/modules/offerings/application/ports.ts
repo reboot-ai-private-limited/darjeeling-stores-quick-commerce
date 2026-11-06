@@ -43,6 +43,12 @@ export interface PriceHistoryQuery {
   warehouseIds: readonly string[] | null; productId?: string; variantId?: string; from?: Date; to?: Date; beforeId?: string; limit: number;
 }
 
+export interface ZoneOfferingsQuery {
+  zoneId: string; productIds?: readonly string[];
+  /** Only offerings that are switched on. Without it, every offering is returned (the delta feed needs the others to report removals). */
+  activeOnly?: boolean;
+}
+
 export interface OfferingsReads {
   getOffering(id: string): Promise<Offering | null>;
   getByWarehouseProduct(warehouseId: string, productId: string): Promise<Offering | null>;
@@ -77,6 +83,12 @@ export class DuplicateRestoreError extends Error { constructor() { super("This r
 
 export interface OfferingsStore extends OfferingsReads {
   ensureIndexes(): Promise<void>;
+  /** Offerings of a zone (all warehouses), optionally narrowed to some products. */
+  zoneOfferings(query: ZoneOfferingsQuery): Promise<Offering[]>;
+  /** Offerings of a zone changed after revision `since`, oldest revision first. */
+  changedSince(zoneId: string, since: number, limit: number): Promise<Offering[]>;
+  /** The latest revision handed out so far (0 before any). */
+  currentRevision(): Promise<number>;
   transaction<T>(fn: (tx: OfferingsTx) => Promise<T>): Promise<T>;
   listMovements(query: MovementQuery): Promise<StockMovement[]>;
   listPriceHistory(query: PriceHistoryQuery): Promise<PriceHistoryRow[]>;

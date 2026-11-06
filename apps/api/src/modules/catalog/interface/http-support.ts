@@ -49,6 +49,37 @@ export function assertWarehouseScope(actor: Actor, warehouseId: string): void {
   if (!actor.scope.all && !actor.scope.warehouseIds.includes(warehouseId)) throw forbidden("This warehouse is outside your scope");
 }
 
+/** Who the logged-in customer is. Supplied by the identity module's session; until then nobody is logged in. */
+export type CustomerResolver = (req: Request) => Promise<{ userId: string } | undefined> | { userId: string } | undefined;
+export const noCustomers: CustomerResolver = () => undefined;
+
+/** Answers 401 unless a customer is logged in, then runs the handler and converts business errors into the documented envelope. */
+export function customerGuarded(
+  resolve: CustomerResolver, handler: (customer: { userId: string }, req: Request, res: Response) => Promise<void> | void,
+): RequestHandler {
+  return async (req, res, next) => {
+    try {
+      const customer = await resolve(req);
+      if (!customer) return sendError(res, new AppError("UNAUTHORIZED", "Authentication required"));
+      await handler(customer, req, res);
+    } catch (error) {
+      if (error instanceof AppError) return sendError(res, error);
+      next(error);
+    }
+  };
+}
+
+/** Runs a handler for anyone (a guest), converting business errors into the documented envelope. */
+export function open(handler: (req: Request, res: Response) => Promise<void> | void): RequestHandler {
+  return async (req, res, next) => {
+    try { await handler(req, res); }
+    catch (error) {
+      if (error instanceof AppError) return sendError(res, error);
+      next(error);
+    }
+  };
+}
+
 /** Authenticates, checks the permission, runs the handler and converts business errors into the documented envelope. */
 export function guarded(
   auth: AuthResolver, permission: string,

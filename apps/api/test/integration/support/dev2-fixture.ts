@@ -2,6 +2,8 @@ import request from "supertest";
 import { expect } from "vitest";
 import { createDev2Modules } from "../../../src/composition/dev2.js";
 import type { StockEvent } from "../../../src/modules/offerings/offerings.public.js";
+import type { Banner, StoreSettingsValue } from "../../../src/modules/discovery/discovery.public.js";
+import { createFakeGeography, type FakeGeography } from "./fake-geography.js";
 import { createFakeMessaging, type FakeMessaging } from "./fake-messaging.js";
 import { createFakeStorage, type FakeStorage } from "./fake-storage.js";
 import { actorFromHeader, api, customerFromHeader, principalFromHeader, startHarness, type Harness } from "./harness.js";
@@ -35,6 +37,11 @@ export interface Fixture {
   storage: FakeStorage;
   /** Fake push, WhatsApp, SMS and identity lookups. */
   msg: FakeMessaging;
+  /** Fake zones, localities and warehouse hours. */
+  geo: FakeGeography;
+  /** Home banners and store settings the catalog shows; tests change them freely. */
+  banners: Banner[];
+  storeValue: StoreSettingsValue;
   /** Runs the job queue until nothing more is due. */
   runJobs(): Promise<number>;
   reset(): Promise<void>;
@@ -54,10 +61,19 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
   const events: StockEvent[] = [];
   const storage = createFakeStorage();
   const msg = createFakeMessaging();
+  const geo = createFakeGeography({ ZONE1, ZONE2, W1, W2, W3 });
+  const banners: Banner[] = [];
+  const defaultStore = (): StoreSettingsValue => ({
+    etaMinMinutes: 15, etaMaxMinutes: 20, minOrder: 10000, freeDeliveryAbove: 60000, smallOrderFee: 0, afterHoursMode: "pre_order", preOrderAvailable: true,
+    opensAt: null, closesAt: new Date("2026-11-05T14:30:00Z"), pauseMessage: "Back at 9 AM", notices: [{ type: "rain", label: "Rain mode: +₹15 delivery fee, +10 min", amount: 1500, extraMinutes: 10 }],
+  });
+  const storeValue = defaultStore();
   const mods = createDev2Modules({
     storage: storage.provider, principal: principalFromHeader, mediaSettings: { maxPendingPerUser: 3 },
     push: msg.push, whatsapp: msg.whatsapp, sms: msg.sms, contacts: msg.contacts, devices: msg.devices, audience: msg.audience,
     webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
+    geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
+    discoverySettings: { maxChanges: 6 },
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
     events: { publish: event => { events.push(event); } },
@@ -70,7 +86,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     return body === undefined ? r : r.send(body as object);
   };
   const fixture: Fixture = {
-    h, mods, app, events, storage, msg, get, send,
+    h, mods, app, events, storage, msg, geo, banners, storeValue, get, send,
     async runJobs() {
       let total = 0;
       for (let pass = 0; pass < 20; pass++) { const ran = await mods.jobs.service.runOnce(); total += ran; if (ran === 0) break; }
@@ -84,8 +100,13 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
       await mods.media.store.ensureIndexes();
       await mods.jobs.store.ensureIndexes();
       await mods.notifications.ready();
+      await mods.discovery.store.ensureIndexes();
+      await mods.addresses.store.ensureIndexes();
       storage.reset();
       msg.reset();
+      geo.reset();
+      banners.length = 0;
+      Object.assign(storeValue, defaultStore());
       events.length = 0;
     },
     async category() {
