@@ -23,6 +23,8 @@ export interface DispatchStore {
   liveForRider(riderId: string): Promise<Assignment[]>;
   /** All the rider's assignments for one order, newest first. */
   forOrderAndRider(orderId: string, riderId: string): Promise<Assignment[]>;
+  /** The most recent assignment of an order, live or not. */
+  latestForOrder(orderId: string): Promise<Assignment | null>;
   /** Saves fields of an assignment, optionally only while it is still live or in a given status. False when the condition no longer holds. */
   updateAssignment(id: string, patch: Partial<Assignment>, when?: { live?: boolean; status?: AssignmentStatus }): Promise<boolean>;
   listAssignments(filters: AssignmentFilters, limit: number): Promise<Assignment[]>;

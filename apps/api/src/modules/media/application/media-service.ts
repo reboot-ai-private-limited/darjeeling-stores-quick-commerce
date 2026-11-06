@@ -185,6 +185,15 @@ export function createMediaService(deps: MediaDeps) {
       return { url: signed.url, expiresAt: signed.expiresAt.toISOString() as string | null };
     },
 
+    /** A link for a file another module has already checked the caller may see (for example the rider's offline bundle). Null when it is gone. */
+    async linkFor(mediaId: string): Promise<{ url: string; expiresAt: string | null } | null> {
+      const file = await store.get(mediaId);
+      if (!file || file.status !== "ready") return null;
+      if (RULES[file.kind].access === "public") return { url: storage.publicUrl(file.storage, WIDTHS[WIDTHS.length - 1]!), expiresAt: null };
+      const signed = await storage.signedReadUrl(file.storage, SIGNED_URL_SECONDS);
+      return { url: signed.url, expiresAt: signed.expiresAt.toISOString() };
+    },
+
     async remove(actor: Actor, mediaId: string): Promise<void> {
       const p = actor.principal;
       const file = await visible(mediaId);

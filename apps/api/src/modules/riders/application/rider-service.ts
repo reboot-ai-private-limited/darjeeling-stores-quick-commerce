@@ -241,11 +241,14 @@ export function createRiderService(deps: {
     markAssigned: (riderId: string, at: Date) => store.update(riderId, { lastAssignedAt: at, updatedAt: at }),
 
     /** A position from the rider's phone. It also brings back a rider the server had marked offline for being silent. */
-    async recordLocation(riderId: string, location: { lat: number; lng: number }, at: Date) {
+    async recordLocation(riderId: string, location: { lat: number; lng: number }, at: Date): Promise<boolean> {
       const rider = await store.get(riderId);
-      if (!rider) return;
+      if (!rider) return false;
+      // A buffered point from a dead spot never replaces a newer position.
+      if (rider.lastLocationAt && at.getTime() <= rider.lastLocationAt.getTime()) return false;
       const back = rider.autoOffline && rider.currentShiftId !== null;
       await store.update(riderId, { lastLocation: location, lastLocationAt: at, updatedAt: at, ...(back && { status: "online" as const, autoOffline: false }) });
+      return true;
     },
 
     /** A rider on shift whose phone has gone quiet is marked offline; returns who, so dispatch can raise an alert. */

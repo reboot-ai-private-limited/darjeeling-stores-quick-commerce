@@ -217,4 +217,4 @@ Riders query: `zoneId`, `warehouseId`, `status`, `q`. Shifts query: `riderId`, `
 - **Order view** never includes the delivery code. A rider sees their own live orders and ones they delivered or failed; anything else is `404`.
 - **History** pages with `cursor`; `deliveredToday` counts from midnight India time.
 - **Profile photo** is a `rider_photo` media upload; failed-delivery photos are `failed_delivery_photo` uploads claimed against the order.
-- **Not built here.** `POST /rider/location` (F20), offline sync and the order bundle (F21), cash endpoints (F22), and the rider app screens.
+- **Elsewhere.** Location pings are in [F20](F20-eta-and-live-tracking.md), the order bundle and offline sync in [F21](F21-offline-and-low-network.md), and cash in [F22](F22-rider-cash-and-settlement.md). The rider app screens are not built here.

@@ -21,6 +21,9 @@ export function createFakeOrders() {
   const log: { orderId: string; to: OrderStatus; by: OrderActor; details?: Record<string, unknown> }[] = [];
   const events: { orderId: string; type: string; by: OrderActor; details?: Record<string, unknown> }[] = [];
   const returns: { orderId: string; goodsCondition: string; note: string | null }[] = [];
+  const timelines = new Map<string, { status: OrderStatus; at: Date }[]>();
+  const collections: { orderId: string; collection: unknown; by: OrderActor; details?: Record<string, unknown> }[] = [];
+  const refunds: { orderId: string; amount: number; reason: string }[] = [];
   let counter = 0;
   let clock = () => new Date();
 
@@ -41,6 +44,8 @@ export function createFakeOrders() {
       if (!order) return { ok: false, reason: "not_found" };
       if (!LEGAL[order.status].includes(to)) return { ok: false, reason: "invalid_transition", from: order.status };
       order.status = to;
+      timelines.set(orderId, [...(timelines.get(orderId) ?? []), { status: to, at: clock() }]);
+      if (to === "DELIVERED" && details?.offline === true) order.deliveredOffline = true;
       if (to === "READY") order.readyAt = clock();
       if (to === "DELIVERED") order.deliveredAt = typeof details?.deliveredAt === "string" ? new Date(details.deliveredAt) : clock();
       if (to === "PICKED_UP" && typeof details?.bagCount === "number") order.bagCount = details.bagCount;
@@ -57,6 +62,26 @@ export function createFakeOrders() {
       entry.wrong++;
       return { valid: false, attemptsLeft: MAX_OTP_TRIES - entry.wrong, locked: entry.wrong >= MAX_OTP_TRIES };
     },
+    async timeline(orderId) { return (timelines.get(orderId) ?? []).map(t => ({ ...t })); },
+    async deliveryCode(orderId) { const order = all.get(orderId); return order?.otpRequired ? codes.get(order.groupId)?.code ?? null : null; },
+    async setCollection(orderId, collection, by, details) {
+      const order = all.get(orderId);
+      if (!order) return { ok: false, reason: "not_found" };
+      Object.assign(order, collection
+        ? { collectionRecorded: true, collectionMethod: collection.method, collectionAmount: collection.amount, paymentStatus: collection.method === "cash" ? "cod_collected" : collection.method }
+        : { collectionRecorded: false, collectionMethod: null, collectionAmount: null, paymentStatus: "cod_pending" });
+      collections.push({ orderId, collection, by, ...(details && { details }) });
+      return { ok: true, order: withGroupStatus(order) };
+    },
+    async reverseDelivery(orderId, by) {
+      const order = all.get(orderId);
+      if (!order) return { ok: false, reason: "not_found" };
+      if (order.status !== "DELIVERED") return { ok: false, reason: "invalid_transition", from: order.status };
+      order.status = "FAILED_DELIVERY"; order.deliveredAt = null;
+      log.push({ orderId, to: "FAILED_DELIVERY", by });
+      return { ok: true, order: withGroupStatus(order) };
+    },
+    async createRefund(orderId, input) { refunds.push({ orderId, ...input }); return { id: `refund-${orderId}`, amount: input.amount }; },
     async cancelFailedAndReturn(orderId, input, by) {
       const order = all.get(orderId);
       if (!order) return { ok: false, reason: "not_found" };
@@ -69,18 +94,18 @@ export function createFakeOrders() {
   };
 
   return {
-    port, log, events, returns,
+    port, log, events, returns, collections, refunds,
     /** Adds an order (ready for dispatch unless told otherwise). Orders of one checkout share a `groupId` and one delivery code. */
     add(seed: OrderSeed): DeliveryOrder {
       counter++;
       const id = seed.id ?? counter.toString(16).padStart(24, "0").replace(/^0{4}/, "b0b0");
       const groupId = seed.groupId ?? `${id.slice(0, 20)}ff${String(counter).padStart(2, "0")}`.slice(0, 24);
       const order: DeliveryOrder = {
-        id, orderNo: `DS-${String(240000 + counter)}-A`, groupId, status: "READY", groupStatus: "ACTIVE",
+        id, orderNo: `DS-${String(240000 + counter)}-A`, groupId, groupNo: `DS-${String(240000 + counter)}`, customerUserId: "c".repeat(24), status: "READY", groupStatus: "ACTIVE",
         customer: { name: "Asha Rai", phone: "+919876543210" }, items: [{ name: "Fresh Tomato (Local)", variantLabel: "500 g", qty: 2, status: "ok" }], itemCount: 2, bagCount: null,
         address: { line1: "Cedar Villa, 2nd floor", landmark: "Opposite Planters Club gate", locality: "Chowrasta", location: { lat: 27.041, lng: 88.2663 }, locationAccuracyM: 18, deliveryNotes: "Ring the bell twice" },
         voiceNote: { mediaId: "a".repeat(24), durationSec: 8, expired: false }, housePhoto: { mediaId: "b".repeat(24) },
-        paymentMethod: "cod", paymentStatus: "cod_pending", amountDue: 8800, alreadyPaid: false, collectionRecorded: false, collectionMethod: null, deliveredOffline: false,
+        paymentMethod: "cod", paymentStatus: "cod_pending", amountDue: 8800, alreadyPaid: false, collectionRecorded: false, collectionMethod: null, collectionAmount: null, deliveredOffline: false,
         otpRequired: true, promisedAt: new Date("2026-11-05T11:05:00Z"), readyAt: clock(), deliveredAt: null, ...seed,
       };
       all.set(id, order);
@@ -91,10 +116,13 @@ export function createFakeOrders() {
     setStatus(id: string, status: OrderStatus) { all.get(id)!.status = status; },
     patch(id: string, patch: Partial<DeliveryOrder>) { Object.assign(all.get(id)!, patch); },
     /** The cash or UPI payment for an order has been recorded (F22). */
-    collect(id: string, method: "cash" | "upi" = "cash") { Object.assign(all.get(id)!, { collectionRecorded: true, collectionMethod: method, paymentStatus: "cod_collected" }); },
+    collect(id: string, method: "cash" | "upi" = "cash") {
+      const order = all.get(id)!;
+      Object.assign(order, { collectionRecorded: true, collectionMethod: method === "cash" ? "cash" : "upi_unverified", collectionAmount: order.amountDue, paymentStatus: "cod_collected" });
+    },
     wrongCodeCount: (groupId: string) => codes.get(groupId)?.wrong ?? 0,
     setClock(fn: () => Date) { clock = fn; },
-    reset() { all.clear(); codes.clear(); log.length = 0; events.length = 0; returns.length = 0; counter = 0; clock = () => new Date(); },
+    reset() { all.clear(); codes.clear(); timelines.clear(); log.length = 0; events.length = 0; returns.length = 0; collections.length = 0; refunds.length = 0; counter = 0; clock = () => new Date(); },
   };
 }
 export type FakeOrders = ReturnType<typeof createFakeOrders>;

@@ -15,6 +15,7 @@ import { createMongoDispatchStore } from "./infrastructure/mongo-dispatch-store.
 import { dispatchRoutes } from "./interface/routes.js";
 
 export type { AssignService } from "./application/assign-service.js";
+export type { FieldService } from "./application/field-service.js";
 export type { EvidenceMedia, RiderDirectory, RiderNotifier } from "./application/ports.js";
 export type { DispatchSettings } from "./domain/dispatch.js";
 export { dispatchRoutes } from "./interface/routes.js";

@@ -161,7 +161,8 @@ export function createFieldService(deps: DispatchDeps) {
       throw new AppError("OTP_MISMATCH", "That code is not right", { attemptsLeft: result.attemptsLeft });
     },
 
-    async deliver(rider: Rider, orderId: string, input: { otp: string | null; deliveredAt: Date | null; location: { lat: number; lng: number } | null; accuracyM: number | null }) {
+    /** `offline`: the delivery happened without signal and is being reported later, so an older `deliveredAt` is allowed. */
+    async deliver(rider: Rider, orderId: string, input: { otp: string | null; deliveredAt: Date | null; location: { lat: number; lng: number } | null; accuracyM: number | null }, opts: { offline?: boolean; skipOtp?: boolean } = {}) {
       const { assignment, order } = await owned(rider, orderId).catch(async error => {
         // A repeat of a delivery that already went through is harmless: say so rather than "not found".
         const mine = await store.forOrderAndRider(orderId, rider.id);
@@ -171,11 +172,11 @@ export function createFieldService(deps: DispatchDeps) {
       if (order.status === "DELIVERED") throw conflict("This order was already delivered", { reason: "already_delivered" });
       if (order.status !== "ARRIVED") throw invalidTransition(order, "Mark yourself arrived before delivering");
       const at = now();
-      if (input.deliveredAt && (input.deliveredAt.getTime() > at.getTime() + 5 * 60_000 || input.deliveredAt.getTime() < at.getTime() - 24 * 3_600_000)) {
+      if (input.deliveredAt && (input.deliveredAt.getTime() > at.getTime() + 5 * 60_000 || input.deliveredAt.getTime() < at.getTime() - (opts.offline ? 7 : 1) * 24 * 3_600_000)) {
         throw validation("deliveredAt must be within the last day and not in the future", { field: "deliveredAt" });
       }
       if (order.paymentMethod === "cod" && !order.alreadyPaid && !order.collectionRecorded) throw conflict("Record the payment before delivering", { reason: "collection_required" });
-      if (order.otpRequired) {
+      if (order.otpRequired && !opts.skipOtp) {
         if (!input.otp) throw validation("The delivery code is required", { field: "otp" });
         const checked = await orders.verifyDeliveryOtp(orderId, input.otp);
         if (!checked.valid) {
@@ -184,7 +185,7 @@ export function createFieldService(deps: DispatchDeps) {
         }
       }
       const deliveredAt = input.deliveredAt ?? at;
-      const details = { deliveredAt: deliveredAt.toISOString(), location: input.location, accuracyM: input.accuracyM };
+      const details = { deliveredAt: deliveredAt.toISOString(), location: input.location, accuracyM: input.accuracyM, ...(opts.offline && { offline: true }) };
       const moved = await orders.transition(orderId, "DELIVERED", by(rider), details);
       if (!moved.ok) throw transitionError(moved, "DELIVERED");
       await finish(assignment, "delivered", null);
@@ -234,6 +235,24 @@ export function createFieldService(deps: DispatchDeps) {
         nextCursor: rows.length > query.limit ? page[page.length - 1]!.id : null,
         deliveredToday: await store.countDeliveredSince(rider.id, startOfIstDay(now())),
       };
+    },
+
+    /** How this rider stands with an order: working it now, finished it, handed it on, or never had it. */
+    async relation(riderId: string, orderId: string): Promise<"live" | "finished" | "ended" | "none"> {
+      const mine = await store.forOrderAndRider(orderId, riderId);
+      if (mine.some(a => a.live)) return "live";
+      if (mine.some(a => a.status === "completed")) return "finished";
+      return mine.length > 0 ? "ended" : "none";
+    },
+    /** The rider who last had the order, whether or not they still do. */
+    async riderOfOrder(orderId: string): Promise<string | null> { return (await store.latestForOrder(orderId))?.riderId ?? null; },
+    /** The orders a rider is working now. */
+    async liveOrderIds(riderId: string): Promise<string[]> { return (await store.liveForRider(riderId)).map(a => a.orderId); },
+    deliveredToday(riderId: string): Promise<number> { return store.countDeliveredSince(riderId, startOfIstDay(now())); },
+    /** The admin rejected an offline delivery: the finished job becomes a failed one so it can be resolved like any other. */
+    async markDeliveryRejected(orderId: string, note: string | null): Promise<void> {
+      const last = await store.latestForOrder(orderId);
+      if (last?.outcome === "delivered") await store.updateAssignment(last.id, { outcome: "failed", endReason: note ?? "delivery_rejected", failedResolvedAt: null, updatedAt: now() }, { live: false });
     },
 
     /** How many of the rider's orders are already out of the warehouse (for ending a shift by force). */

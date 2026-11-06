@@ -81,6 +81,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
     discoverySettings: { maxChanges: 6 },
     orders: orders.port, riderIdentity: accounts.identity, rider: riderFromHeader,
+    trackingTokenSecret: "test-secret", syncSettings: { upi: { vpa: "darjeelingstores@bank", payeeName: "Darjeeling Stores" }, otpIterations: 1000 },
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
     events: { publish: event => { events.push(event); } },
@@ -111,6 +112,9 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
       await mods.addresses.store.ensureIndexes();
       await mods.riders.store.ensureIndexes();
       await mods.dispatch.store.ensureIndexes();
+      await mods.cash.store.ensureIndexes();
+      await mods.tracking.store.ensureIndexes();
+      await mods.sync.store.ensureIndexes();
       orders.reset();
       accounts.reset();
       storage.reset();

@@ -7,7 +7,10 @@ import type { Route } from "../platform/routes.js";
 import { createAddressesModule } from "../modules/addresses/addresses.public.js";
 import { createAvailabilityModule, notifyProductsFrom, type CustomerResolver } from "../modules/availability/availability.public.js";
 import { createCatalogModule, denyAll, type AuthResolver, type MediaPort, type ProductUsagePort } from "../modules/catalog/catalog.public.js";
+import { createCashModule } from "../modules/cash/cash.public.js";
 import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
+import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
+import { createTrackingModule, type EtaProvider, type TrackingSettings } from "../modules/tracking/tracking.public.js";
 import { createDiscoveryModule, type BannerSource, type DiscoverySettings, type StoreSettings } from "../modules/discovery/discovery.public.js";
 import { createJobsModule } from "../modules/jobs/jobs.public.js";
 import {
@@ -50,6 +53,10 @@ export interface Dev2Options {
   /** Who the signed-in rider is. Until the identity session is connected, nobody is signed in (401). */
   rider?: RiderResolver;
   deliverySettings?: Partial<DispatchSettings>;
+  /** Live ETA settings, the routes provider that replaces the straight-line estimate, and the secret that signs public tracking links (F20). */
+  trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; trackingTokenSecret?: string;
+  /** Offline sync: the doorstep UPI details and the offline delivery checks (F21). */
+  syncSettings?: Partial<SyncSettings>;
   warehouses?: WarehouseDirectory;
   events?: EventPublisher;
   hasOrders?: (productId: string) => Promise<boolean>;
@@ -65,6 +72,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
     jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(), riders.store.ensureIndexes(), dispatch.store.ensureIndexes(),
+    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -183,6 +191,35 @@ export function createDev2Modules(options: Dev2Options = {}) {
     },
   });
 
+  // Cash, tracking and offline sync sit on top of dispatch: they ask it how a rider stands with an order.
+  const relations = {
+    relation: (riderId: string, orderId: string) => dispatch.field.relation(riderId, orderId),
+    riderOfOrder: (orderId: string) => dispatch.field.riderOfOrder(orderId),
+    liveOrderIds: (riderId: string) => dispatch.field.liveOrderIds(riderId),
+    deliveredToday: (riderId: string) => dispatch.field.deliveredToday(riderId),
+  };
+  const slim = (r: { id: string; name: string; zoneId: string } | null) => (r ? { id: r.id, name: r.name, zoneId: r.zoneId } : null);
+  const cash = createCashModule({
+    connection, geography, relations, ...(options.orders && { orders: options.orders }), ...(riderThenIndexes && { rider: riderThenIndexes }), auth: authThenIndexes,
+    riders: {
+      forUser: userId => riders.service.forUser(userId),
+      get: async id => slim(await riders.service.byId(id)),
+      getMany: async ids => (await riders.service.getMany(ids)).map(r => ({ id: r.id, name: r.name, zoneId: r.zoneId })),
+    },
+  });
+  const tracking = createTrackingModule({
+    connection, relations, ...(options.orders && { orders: options.orders }), ...(riderThenIndexes && { rider: riderThenIndexes }), ...(customerThenIndexes && { customer: customerThenIndexes }),
+    riders: { forUser: userId => riders.service.forUser(userId), byId: id => riders.service.byId(id), recordLocation: (id, location, at) => riders.service.recordLocation(id, location, at) },
+    settings: { pingOnOrderSeconds: riders.settings.locationPingSecondsOnOrder, pingIdleSeconds: riders.settings.locationPingSecondsIdle, ...options.trackingSettings },
+    ...(options.eta && { eta: options.eta }), ...(options.trackingTokenSecret && { tokenSecret: options.trackingTokenSecret }),
+  });
+  const sync = createSyncModule({
+    connection, ...(options.orders && { orders: options.orders }), ...(riderThenIndexes && { rider: riderThenIndexes }), auth: authThenIndexes,
+    riders: { forUser: userId => riders.service.forUser(userId), byId: id => riders.service.byId(id) },
+    field: dispatch.field, cash: cash.service, tracking: tracking.service, media: { linkFor: id => media.service.linkFor(id) },
+    ...(options.syncSettings && { settings: options.syncSettings }),
+  });
+
   /**
    * Starts the background work: the job worker and the recurring sweeps.
    *  - tell riders (WhatsApp) and the board about orders nobody acknowledged (every 10 seconds, F18)
@@ -206,11 +243,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
       // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
-      ...dispatch.routes, ...riders.routes,
+      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };

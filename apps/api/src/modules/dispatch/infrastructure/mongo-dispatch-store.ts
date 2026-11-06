@@ -54,6 +54,7 @@ export function createMongoDispatchStore(connection: Connection): DispatchStore 
     async liveForOrder(orderId) { const doc = await assignments().findOne({ orderId, live: true }); return doc ? toAssignment(doc) : null; },
     async liveForOrders(orderIds) { return orderIds.length === 0 ? [] : (await assignments().find({ orderId: { $in: [...orderIds] }, live: true }).toArray()).map(toAssignment); },
     async liveForRider(riderId) { return (await assignments().find({ riderId, live: true }).sort({ assignedAt: 1 }).toArray()).map(toAssignment); },
+    async latestForOrder(orderId) { const doc = await assignments().find({ orderId }).sort({ _id: -1 }).limit(1).next(); return doc ? toAssignment(doc) : null; },
     async forOrderAndRider(orderId, riderId) { return (await assignments().find({ orderId, riderId }).sort({ _id: -1 }).toArray()).map(toAssignment); },
 
     async updateAssignment(id, patch, when) {
