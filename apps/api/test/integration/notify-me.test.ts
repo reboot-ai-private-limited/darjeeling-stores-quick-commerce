@@ -16,7 +16,8 @@ const subscribe = (body: Record<string, unknown>, who = A) => f.send("post", "/n
 const mine = async (who = A) => (await f.get("/notify-me", who)).body;
 const restock = (warehouseId: string, productId: string, delta: number) =>
   f.send("post", "/admin/stock/adjust", { warehouseId, productId, variantId: null, delta, reason: delta < 0 ? "wastage" : "purchase" });
-const pending = () => f.mods.availability.notify.pendingMessages(1000);
+/** Every message Notify Me recorded, whether or not it has been handed to delivery yet (a restock hands them over at once). */
+const recorded = async () => (await col("back_in_stock_outbox").find({}).sort({ createdAt: 1, _id: 1 }).toArray()).map(({ _id, ...rest }) => ({ subscriptionId: String(_id), ...rest })) as { subscriptionId: string; status: string; attempts: number; message: Record<string, unknown> & { userId: string }; createdAt: Date }[];
 const status = (id: string) => col("stock_subscriptions").findOne({ _id: id as never });
 
 describe("subscribing", () => {
@@ -176,10 +177,10 @@ describe("telling customers when an item is back", () => {
     for (const id of [farAway.id, elsewhere.id]) expect((await status(id))?.status).toBe("waiting");
     expect((await status(cancelled.id))?.status).toBe("cancelled");
 
-    const queued = await pending();
+    const queued = await recorded();
     expect(queued).toHaveLength(3);
     const byUser = (userId: string) => queued.find(q => q.message.userId === userId)!;
-    expect(byUser(CUSTOMER_A)).toMatchObject({ subscriptionId: a.id, status: "pending", attempts: 0 });
+    expect(byUser(CUSTOMER_A)).toMatchObject({ subscriptionId: a.id, status: "delivered" });
     expect(byUser(CUSTOMER_A).message).toEqual({
       subscriptionId: a.id, userId: CUSTOMER_A, zoneId: ZONE1, productId: p.id, variantId: p.v500, productName: "Fresh Tomato (Local)",
       variantLabel: "500 g", imageMediaId: null, channels: ["push"], deepLink: `product/${p.id}`,
@@ -201,7 +202,7 @@ describe("telling customers when an item is back", () => {
     const results = await Promise.all([1, 2, 3].map(() => f.mods.availability.notify.onZoneAvailabilityChanged(event)));
     expect(results.reduce((sum, r) => sum + r.notified, 0)).toBe(4);
     expect((await f.mods.availability.notify.onZoneAvailabilityChanged(event)).notified).toBe(0);
-    expect(await pending()).toHaveLength(4);
+    expect(await recorded()).toHaveLength(4);
     expect(await col("back_in_stock_outbox").countDocuments({})).toBe(4);
   });
 
@@ -221,7 +222,7 @@ describe("telling customers when an item is back", () => {
     // Another 300 g makes a 500 g pack.
     expect((await restock(W1, p.id, 300)).status).toBe(200);
     expect((await status(waiting.id))?.status).toBe("notified");
-    expect(await pending()).toHaveLength(2);
+    expect(await recorded()).toHaveLength(2);
   });
 
   it("treats the zone as one shop: a restock in either warehouse notifies once, and a second warehouse adds nothing", async () => {
@@ -232,7 +233,7 @@ describe("telling customers when an item is back", () => {
     expect((await restock(W2, p.id, 1000)).status).toBe(200);
     expect((await status(sub.id))?.status).toBe("notified");
     expect((await restock(W1, p.id, 1000)).status).toBe(200);
-    expect(await pending()).toHaveLength(1);
+    expect(await recorded()).toHaveLength(1);
     expect((await subscribe({ zoneId: ZONE1, productId: p.id, variantId: p.v500 }, B)).status).toBe(400);
   });
 
@@ -242,12 +243,12 @@ describe("telling customers when an item is back", () => {
     const body = { zoneId: ZONE1, productId: p.id, variantId: p.v500 };
     await subscribe(body);
     await restock(W1, p.id, 1000);
-    expect(await pending()).toHaveLength(1);
+    expect(await recorded()).toHaveLength(1);
     expect((await subscribe(body)).status).toBe(400);
     await restock(W1, p.id, -1000);
     expect((await subscribe(body)).status).toBe(201);
     await restock(W1, p.id, 1000);
-    expect(await pending()).toHaveLength(2);
+    expect(await recorded()).toHaveLength(2);
     expect(await col("stock_subscriptions").countDocuments({ status: "notified" })).toBe(2);
   });
 
@@ -279,7 +280,7 @@ describe("telling customers when an item is back", () => {
     // An order that took the last stock is cancelled and gives it back.
     expect((await f.mods.stock.release("order-1", "cancel")).released).toBe(true);
     expect((await status(subs[3]!))?.status).toBe("notified");
-    expect(await pending()).toHaveLength(4);
+    expect(await recorded()).toHaveLength(4);
   });
 
   it("works through a large waiting list in pages", async () => {
@@ -303,25 +304,27 @@ describe("telling customers when an item is back", () => {
     await subscribe({ zoneId: ZONE1, productId: p.id });
     await f.mods.availability.onStockEvent({ type: "stock.low", zoneId: ZONE1, productId: p.id, variantId: p.v500 });
     await f.mods.availability.onStockEvent({ type: "stock.zone_availability_changed" });
-    expect(await pending()).toHaveLength(0);
+    expect(await recorded()).toHaveLength(0);
     expect((await f.send("post", `/admin/products/${p.id}/archive`)).status).toBe(200);
     expect(await f.mods.availability.notify.onZoneAvailabilityChanged({ zoneId: ZONE1, productId: p.id, variantId: p.v500 })).toEqual({ notified: 0 });
     expect(await col("stock_subscriptions").countDocuments({ status: "waiting" })).toBe(1);
   });
 
-  it("hands queued messages to the notifications job, which can mark them delivered or failed", async () => {
+  it("holds messages for the notifications job until it takes them, which it can report delivered or failed", async () => {
     const p = await f.pooledProduct();
     await f.pooledOffer(W1, p, 0);
     await subscribe({ zoneId: ZONE1, productId: p.id }, A);
     await subscribe({ zoneId: ZONE1, productId: p.id }, B);
-    await restock(W1, p.id, 1000);
-    const [first, second] = await pending();
+    // Record the messages without the automatic hand-over, as if it had not run yet.
+    await f.mods.availability.notify.onZoneAvailabilityChanged({ zoneId: ZONE1, productId: p.id, variantId: p.v500 });
+    const waiting = () => f.mods.availability.notify.pendingMessages(1000);
+    const [first, second] = await waiting();
     expect(first!.createdAt.getTime()).toBeLessThanOrEqual(second!.createdAt.getTime());
 
     await f.mods.availability.notify.markFailed(first!.subscriptionId, "WhatsApp is down");
-    expect((await pending()).find(e => e.subscriptionId === first!.subscriptionId)).toMatchObject({ status: "pending", attempts: 1, lastError: "WhatsApp is down" });
+    expect((await waiting()).find(e => e.subscriptionId === first!.subscriptionId)).toMatchObject({ status: "pending", attempts: 1, lastError: "WhatsApp is down" });
     await f.mods.availability.notify.markDelivered(first!.subscriptionId);
-    expect((await pending()).map(e => e.subscriptionId)).toEqual([second!.subscriptionId]);
+    expect((await waiting()).map(e => e.subscriptionId)).toEqual([second!.subscriptionId]);
     expect(await col("back_in_stock_outbox").findOne({ _id: first!.subscriptionId as never })).toMatchObject({ status: "delivered", attempts: 2 });
   });
 });
