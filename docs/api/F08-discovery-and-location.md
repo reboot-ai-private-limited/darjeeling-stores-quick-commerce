@@ -32,14 +32,16 @@ Prices are what the customer pays: **`price` already has any sale price applied*
   "tags": ["fresh", "local"],
   "images": [{ "mediaId": "media_1", "alt": "Tomatoes", "urls": { "160": "…/160.webp", "320": "…/320.webp", "640": "…/640.webp", "1080": "…/1080.webp" } }],
   "variants": [
-    { "variantId": "var_1", "label": "250 g", "weightGrams": 250, "price": 1800, "mrp": 2000, "onSale": false, "available": true, "maxQty": 10 },
-    { "variantId": "var_2", "label": "500 g", "weightGrams": 500, "price": 3000, "mrp": 4000, "onSale": true, "available": true, "maxQty": 10 }
+    { "variantId": "var_1", "label": "250 g", "weightGrams": 250, "price": 1800, "mrp": 2000, "discountAmount": 200, "discountPercent": 10, "onSale": false, "saleEndsAt": null, "available": true, "maxQty": 10 },
+    { "variantId": "var_2", "label": "500 g", "weightGrams": 500, "price": 3000, "mrp": 4000, "discountAmount": 1000, "discountPercent": 25, "onSale": true, "saleEndsAt": "2026-11-07T00:00:00Z", "available": true, "maxQty": 10 }
   ],
   "available": true,
   "availability": "in_stock",
   "rev": 18234
 }
 ```
+Money is in paise. `discountAmount` is `mrp - price` (0 or more) and `discountPercent` is the whole-number percentage of `mrp` (0 to 100), both worked out by the server so every app shows the same number. Show a discount badge only when `discountPercent` is above 0. `saleEndsAt` is the end of the active sale (or null) for a "ends soon" label; the server never sends a sale price that has already ended. Stock quantities are never sent to customers, only `available` and `availability`.
+
 `availability`: `in_stock`, `out_of_stock` (show **Notify me**, [F07](F07-notify-me.md)), or `closed` (every warehouse in the zone is closed now). Use the 320 image for cards.
 
 ## GET /catalog/home
@@ -66,7 +68,15 @@ Query: `zoneId`. 200: `{ "data": [{ "id": "cat_1", "name": "Vegetables", "imageU
 Query: `zoneId`, `categoryId`, `limit` (default 40), `cursor`, `inStockOnly=true`. 200: `{ "data": [<zone product>], "meta": { "nextCursor": "c_2" } }`.
 
 ## GET /catalog/products/:id
-Query: `zoneId`. 200: `{ "data": { …zone product…, "description": "Grown on Darjeeling hill farms.", "shelfLife": "5 days" } }`. `404 NOT_FOUND` when the product is not sold in this zone.
+Query: `zoneId`. 200: `{ "data": { …zone product…, "description": "…", "highlights": […], "keyInfo": […], "nutrition": {…} | null, "infoSections": […] } }`. These five fields come from the master product ([F04](F04-master-catalog.md#product-information-fields-all-optional-shown-on-the-customer-product-screen)) and are sent only here, not in lists or search. Always present: empty list or `null` when nothing is set. Example:
+```json
+{ "data": { "id": "prod_1", "name": "Fresh Tomato (Local)", "description": "Grown on Darjeeling hill farms.",
+  "highlights": ["Grown on Darjeeling hill farms"],
+  "keyInfo": [{ "label": "Shelf life", "value": "5 days" }, { "label": "Storage", "value": "Keep in a cool, dry place" }],
+  "nutrition": { "basis": "per_100g", "servingSize": null, "rows": [{ "name": "Energy", "amount": 18, "unit": "kcal", "dailyValuePercent": null }] },
+  "infoSections": [{ "title": "How to store", "body": "Refrigerate after cutting." }] } }
+```
+ `404 NOT_FOUND` when the product is not sold in this zone.
 
 ## GET /catalog/search
 Query: `zoneId`, `q` (≥ 2 characters), `limit` (default 20). Debounce on the client (~250 ms). 200: `{ "data": [<zone product>], "meta": { "count": 3 } }`.
@@ -78,7 +88,7 @@ Query: `zoneId`, `since` (the last `rev` you stored). Returns only what changed 
 ```json
 {
   "data": [
-    { "id": "prod_1", "variants": [{ "variantId": "var_2", "price": 3200, "mrp": 4000, "onSale": false, "available": true, "maxQty": 10 }], "available": true, "availability": "in_stock", "rev": 18240 },
+    { "id": "prod_1", "variants": [{ "variantId": "var_2", "price": 3200, "mrp": 4000, "discountAmount": 800, "discountPercent": 20, "onSale": false, "saleEndsAt": null, "available": true, "maxQty": 10 }], "available": true, "availability": "in_stock", "rev": 18240 },
     { "id": "prod_7", "deleted": true, "rev": 18241 }
   ],
   "meta": { "cursor": 18241, "fullResync": false }

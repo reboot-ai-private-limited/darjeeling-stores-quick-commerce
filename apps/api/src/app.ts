@@ -4,7 +4,7 @@ import { API_PREFIX } from "@darjeeling/shared";
 import { createContainer } from "./container.js";
 import type { Route } from "./platform/routes.js";
 
-type AppOptions = { isReady?: () => boolean; corsOrigins?: string[]; trustProxyHops?: number; additionalRoutes?: Route[] };
+type AppOptions = { isReady?: () => boolean; corsOrigins?: string[]; trustProxyHops?: number; additionalRoutes?: Route[]; dev2Routes?: Route[] };
 const handleError: ErrorRequestHandler = (error: unknown, _req, res, next) => {
   if (res.headersSent) return next(error);
   const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined;
@@ -21,7 +21,7 @@ const handleError: ErrorRequestHandler = (error: unknown, _req, res, next) => {
   res.status(status).json({ error: { code, message, requestId: res.getHeader("X-Request-Id") } });
 };
 
-export function createApp({ isReady = () => false, corsOrigins = [], trustProxyHops = 0, additionalRoutes = [] }: AppOptions = {}) {
+export function createApp({ isReady = () => false, corsOrigins = [], trustProxyHops = 0, additionalRoutes = [], dev2Routes }: AppOptions = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", trustProxyHops);
@@ -47,7 +47,7 @@ export function createApp({ isReady = () => false, corsOrigins = [], trustProxyH
     next();
   });
   app.use(express.json({ limit: "100kb" }));
-  app.use(API_PREFIX, createContainer(isReady, additionalRoutes).router);
+  app.use(API_PREFIX, createContainer(isReady, additionalRoutes, dev2Routes).router);
   app.use((_req, res) => res.status(404).json({ error: { code: "NOT_FOUND", message: "Not found", requestId: res.getHeader("X-Request-Id") } }));
   app.use(handleError);
   return app;

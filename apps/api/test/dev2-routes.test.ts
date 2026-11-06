@@ -1,0 +1,55 @@
+import fs from "node:fs";
+import path from "node:path";
+import request from "supertest";
+import { describe, expect, it } from "vitest";
+import { createApp } from "../src/app.js";
+import { createDev2Modules } from "../src/composition/dev2.js";
+import { assertUniqueRoutes } from "../src/platform/routes.js";
+
+const docsDir = path.resolve(import.meta.dirname, "../../../docs/api");
+/** `GET /admin/x/:id` and `GET /admin/x/:other` are the same route. */
+const normalise = (method: string, p: string) => `${method.toUpperCase()} ${p.replace(/:[A-Za-z]+/g, ":p")}`;
+
+function documented(file: string): string[] {
+  const text = fs.readFileSync(path.join(docsDir, file), "utf8").replace(/\r\n/g, "\n");
+  const rows = [...text.matchAll(/^\| `(GET|POST|PUT|PATCH|DELETE)` \| `([^`]+)` \|/gm)];
+  return rows.map(([, method, route]) => normalise(method!, route!));
+}
+
+describe("Dev 2 routes (catalog and stock)", () => {
+  const { routes } = createDev2Modules();
+  const registered = routes.map(r => normalise(r.method, r.path));
+
+  it("registers every endpoint documented for F04 master catalog", () => {
+    const expected = documented("F04-master-catalog.md");
+    expect(expected).toHaveLength(20);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F05 warehouse stock and pricing", () => {
+    const expected = documented("F05-warehouse-stock-and-pricing.md");
+    expect(expected).toHaveLength(10);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers nothing that the API docs do not describe", () => {
+    const expected = new Set([...documented("F04-master-catalog.md"), ...documented("F05-warehouse-stock-and-pricing.md")]);
+    expect(registered.filter(r => !expected.has(r))).toEqual([]);
+    expect(registered).toHaveLength(30);
+  });
+
+  it("has no duplicate routes of its own and none that clash with the rest of the API", () => {
+    expect(() => assertUniqueRoutes(routes)).not.toThrow();
+    expect(() => createApp()).not.toThrow();
+  });
+
+  it("answers 401 with the documented error envelope for every route when nobody is logged in", async () => {
+    const app = createApp();
+    for (const route of routes) {
+      const url = `/api/v1${route.path.replace(/:[A-Za-z]+/g, "a".repeat(24))}`;
+      const res = await request(app)[route.method](url);
+      expect(res.status, `${route.method} ${route.path}`).toBe(401);
+      expect(res.body.error).toMatchObject({ code: "UNAUTHORIZED", requestId: res.headers["x-request-id"] });
+    }
+  });
+});
