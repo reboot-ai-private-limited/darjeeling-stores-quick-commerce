@@ -43,6 +43,21 @@ The master catalog has **no price and no stock** (those are per warehouse, [F05]
   "categoryId": "cat_1",
   "type": "loose", "stockMode": "pooled_weight",
   "tags": ["fresh", "local"],
+  "highlights": ["Grown on Darjeeling hill farms", "No added colour or wax"],
+  "keyInfo": [
+    { "label": "Shelf life", "value": "5 days" },
+    { "label": "Storage", "value": "Keep in a cool, dry place" },
+    { "label": "Country of origin", "value": "India" }
+  ],
+  "nutrition": {
+    "basis": "per_100g", "servingSize": null,
+    "rows": [
+      { "name": "Energy", "amount": 18, "unit": "kcal", "dailyValuePercent": null },
+      { "name": "Carbohydrates", "amount": 3.9, "unit": "g", "dailyValuePercent": 1 },
+      { "name": "Protein", "amount": 0.9, "unit": "g", "dailyValuePercent": null }
+    ]
+  },
+  "infoSections": [{ "title": "How to store", "body": "Refrigerate after cutting." }],
   "images": [{ "mediaId": "media_1", "alt": "Tomatoes", "sortOrder": 0, "urls": { "320": "https://cdn.example.com/…/320.webp" } }],
   "variants": [
     { "id": "var_1", "label": "250 g", "weightGrams": 250, "sku": "TOM-250", "barcode": null, "isActive": true },
@@ -52,6 +67,21 @@ The master catalog has **no price and no stock** (those are per warehouse, [F05]
   "status": "active", "sortOrder": 1
 }
 ```
+### Product information fields (all optional, shown on the customer product screen)
+
+| Field | Limits | Purpose |
+|---|---|---|
+| `description` | up to 2000 characters | Free-text paragraph |
+| `highlights` | up to 6 items, each up to 120 characters | Short bullet points shown near the top |
+| `keyInfo` | up to 15 rows; `label` up to 40, `value` up to 200 characters; labels must be unique | "Key information" table. Suggested labels: Shelf life, Storage, Country of origin, Ingredients, Manufacturer, FSSAI licence no., Veg / Non-veg |
+| `nutrition` | `null` or an object with `basis` and up to 20 `rows` | Nutrition facts table |
+| `nutrition.basis` | `per_100g`, `per_100ml` or `per_serving` | What the amounts refer to |
+| `nutrition.servingSize` | up to 40 characters, only for `per_serving` | For example "1 piece (30 g)" |
+| `nutrition.rows[]` | `name` up to 60 characters; `amount` a number ≥ 0; `unit` one of `g`, `mg`, `mcg`, `kcal`, `kJ`, `ml`; `dailyValuePercent` optional, 0 to 1000 | One nutrient per row |
+| `infoSections` | up to 6 items; `title` up to 60, `body` up to 1000 characters | Extra titled notes, such as "How to store" or "Disclaimer" |
+
+All of these are plain text: no HTML is accepted or rendered. Sending the field replaces the whole value (for example the full `keyInfo` list); omitting it leaves it unchanged; `null` or an empty list clears it. Empty values are stored as `[]` / `null`, so the apps never receive a missing field. Changing any of them changes the product's `rev`, so delta sync refreshes the customer apps. Customer lists and search do not include these fields; only the product detail endpoint does ([F08](F08-discovery-and-location.md)).
+
 `type`: `loose` or `packaged`. `stockMode`: `pooled_weight` (loose, one gram pool per warehouse) or `per_variant`. `status`: `active`, `inactive`, `archived`.
 
 ## Categories
@@ -75,6 +105,10 @@ Body:
   "type": "loose",
   "stockMode": "pooled_weight",
   "tags": ["fresh"],
+  "highlights": ["Grown on Darjeeling hill farms"],
+  "keyInfo": [{ "label": "Shelf life", "value": "5 days" }],
+  "nutrition": { "basis": "per_100g", "servingSize": null, "rows": [{ "name": "Energy", "amount": 18, "unit": "kcal", "dailyValuePercent": null }] },
+  "infoSections": [],
   "variants": [
     { "label": "250 g", "weightGrams": 250, "sku": "TOM-250" },
     { "label": "500 g", "weightGrams": 500, "sku": "TOM-500" }
@@ -84,7 +118,7 @@ Body:
   "status": "inactive"
 }
 ```
-201: the product (images empty until attached). Errors: `409 CONFLICT` (SKU or slug exists; `details.field`) · `400 VALIDATION_ERROR`. A new product is not sellable until a warehouse adds it ([F05](F05-warehouse-stock-and-pricing.md)).
+201: the product (images empty until attached). Errors: `409 CONFLICT` (SKU or slug exists; `details.field`) · `400 VALIDATION_ERROR` (including a limit above exceeded, a repeated `keyInfo` label, or a repeated nutrient name; `details.field` names the field). A new product is not sellable until a warehouse adds it ([F05](F05-warehouse-stock-and-pricing.md)).
 
 ## PUT /admin/products/:id
 Same fields as create, all optional; `variants` are changed through the variant endpoints. 200: the product.
@@ -114,3 +148,11 @@ Body: `{ "name": "Fresh Tomato", "skus": ["TOM-500"] }` → 200:
 
 ## GET /admin/catalog/export
 Phase 3. Returns `text/csv` of the master catalog. 🔒 audited.
+
+## Implementation notes (backend, D2-4)
+
+- `DELETE /admin/products/:id` is conservative: it is refused with `409 CONFLICT` while any warehouse offers the product, and also whenever the orders module has not confirmed the product was never ordered. Use archive instead.
+- A product's `type` / `stockMode` and a variant's `weightGrams` cannot change once any warehouse offers the product (`409`, `details.reason = "has_offerings"`).
+- Every product change bumps the `rev` of its offerings so apps pick up the change in delta sync.
+- Image attach/remove depends on the media module (D2-3); until it exists, images cannot be attached in the real composition.
+- Slugs support Latin letters and digits only.

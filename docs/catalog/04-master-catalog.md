@@ -10,7 +10,7 @@ Groceries, vegetables, fruits, dairy, staples, household. Loose items are sold a
 
 ## 3. Flows
 
-**Add a product (admin):** choose category → name, description, type (`loose`/`packaged`), stock mode → add variants (label, weight in grams, SKU) → upload images (F24) → GST rate and HSN code → save as `inactive` or `active`. A new product is not sellable until a warehouse adds it (F05/F06).
+**Add a product (admin):** choose category → name, description, type (`loose`/`packaged`), stock mode → add variants (label, weight in grams, SKU) → upload images (F24) → highlights, key information, nutrition table and extra info sections (all optional) → GST rate and HSN code → save as `inactive` or `active`. A new product is not sellable until a warehouse adds it (F05/F06).
 
 **Edit / archive:** edits apply everywhere. Products that were ever ordered are **archived**, never deleted, and keep their images. Never-ordered products can be permanently deleted, which deletes their images from S3 (F24).
 
@@ -28,6 +28,7 @@ Groceries, vegetables, fruits, dairy, staples, household. Loose items are sold a
 | Tax | `gstRate` (percent), `hsnCode`; confirm rates with a CA |
 | Status | `active`, `inactive`, `archived` |
 | Compliance | FSSAI licence number kept in store settings (F25) |
+| Product information | `highlights`, `keyInfo`, `nutrition` and `infoSections` are optional plain text with the limits in [F04 API](../api/F04-master-catalog.md); they are master data, the same in every warehouse, and shown only on the customer product screen |
 
 ## 5. Screens (admin)
 Category tree (create, reorder, toggle) · product list with search and filters · product editor (details, variants, images, tax) · duplicate warning.
@@ -49,6 +50,10 @@ Admin: `GET/POST/PUT /admin/categories` · `GET/POST/PUT/DELETE /admin/products`
 | name, slug (unique), description | | |
 | categoryId | ref | |
 | tags, images[{mediaId, alt, sortOrder}] | | |
+| highlights | string[] | Up to 6 short bullets |
+| keyInfo | embedded[] | `{label, value}`, up to 15, unique labels |
+| nutrition | object? | `{basis, servingSize?, rows[{name, amount, unit, dailyValuePercent?}]}`, up to 20 rows |
+| infoSections | embedded[] | `{title, body}`, up to 6 |
 | type | enum | `loose`, `packaged` |
 | stockMode | enum | `pooled_weight`, `per_variant` |
 | variants | embedded[] | `{_id, label, weightGrams, sku (unique), barcode?, isActive}` |

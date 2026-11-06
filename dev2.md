@@ -15,7 +15,7 @@ Own what is for sale and where its stock is, how an order reaches the door and c
 | Area | You own |
 |---|---|
 | API modules | `catalog`, `offerings`, `availability`, `discovery`, `addresses`, `media`, `notifications`, `jobs`, `riders`, `dispatch`, `delivery`, `cash`, `tracking`, `offline-sync` under `apps/api/src/modules/`, plus `composition/dev2.ts` |
-| Collections | `categories`, `products`, `warehouse_products`, `stock_movements`, `price_history`, `catalog_revisions`, `stock_subscriptions`, `waitlist`, `addresses`, `media_files`, `notification_templates`, `notifications`, `jobs`, `riders`, `rider_shifts`, `assignments`, `delivery_batches`, `offline_events`, `cash_ledger`, `rider_location_trail` |
+| Collections | `categories`, `products`, `warehouse_products`, `stock_movements`, `price_history`, `stock_reservations`, `catalog_revisions`, `stock_subscriptions`, `waitlist`, `addresses`, `media_files`, `notification_templates`, `notifications`, `jobs`, `riders`, `rider_shifts`, `assignments`, `delivery_batches`, `offline_events`, `cash_ledger`, `rider_location_trail` |
 | Mobile | `apps/customer-app` (Android and iOS), `apps/rider-app` (Android only), `packages/mobile-kit` (API client, secure session, offline outbox, UI kit) |
 | Web pages | Under `apps/web/src/app/(admin)/admin/`: `catalog`, `inventory`, `media`, `notifications`, `riders`, `dispatch`, `cash`, `reconciliation`, `offline-reviews`; and the public `apps/web/src/app/track/` page; menu in `dev2.nav.ts` |
 | Contracts | `packages/contracts/mock-api`; fixtures for your features; `packages/shared/src/dev2` |

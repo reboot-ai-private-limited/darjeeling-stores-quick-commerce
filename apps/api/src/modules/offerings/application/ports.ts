@@ -1,0 +1,85 @@
+import type { Ctx } from "../../catalog/catalog.public.js";
+import type { Offering, OfferingStatus, ProductInfo, StockThresholds } from "../domain/stock.js";
+
+export type MovementReason = "order" | "cancel" | "return" | "purchase" | "correction" | "wastage" | "count" | "import";
+export interface StockMovement {
+  id: string; warehouseId: string; productId: string; variantId: string | null; mode: "grams" | "units";
+  delta: number; balanceAfter: number; reason: MovementReason; orderKey: string | null; restoreKey: string | null;
+  note: string | null; by: string | null; createdAt: Date;
+}
+export interface PriceHistoryRow {
+  id: string; warehouseId: string; productId: string; variantId: string; oldPrice: number; newPrice: number;
+  oldMrp: number; newMrp: number; by: string | null; at: Date;
+}
+
+/** One stock deduction made for a reservation. `amount` is grams (pooled) or units; `restored` counts quantity given back. */
+export interface ReservationLine { warehouseId: string; productId: string; variantId: string; qty: number; amount: number; mode: "grams" | "units"; restored: number }
+export interface Reservation {
+  id: string; key: string; status: "held" | "confirmed" | "released"; expiresAt: Date | null; lines: ReservationLine[];
+  createdAt: Date; updatedAt: Date; releasedAt: Date | null;
+}
+
+export type StockEvent =
+  | { type: "stock.zone_availability_changed"; zoneId: string; productId: string; variantId: string }
+  | { type: "stock.low"; warehouseId: string; productId: string; variantId: string | null; stock: number; threshold: number };
+
+export interface WarehouseDirectory { get(warehouseId: string): Promise<{ id: string; zoneId: string; isEnabled: boolean } | null> }
+export interface ProductDirectory {
+  getMany(ids: readonly string[]): Promise<ProductInfo[]>;
+  /** Ids of products matching a name or SKU search and category, for filtering offering lists. */
+  searchIds(params: { q?: string; categoryId?: string }): Promise<string[]>;
+}
+export interface EventPublisher { publish(event: StockEvent): void | Promise<void> }
+
+export interface OfferingListQuery {
+  warehouseIds: readonly string[] | null; status?: OfferingStatus; productIds?: readonly string[]; afterId?: string; limit: number;
+}
+export interface MovementQuery {
+  warehouseIds: readonly string[] | null; productId?: string; reason?: MovementReason; from?: Date; to?: Date; beforeId?: string; limit: number;
+}
+export interface PriceHistoryQuery {
+  warehouseIds: readonly string[] | null; productId?: string; variantId?: string; from?: Date; to?: Date; beforeId?: string; limit: number;
+}
+
+export interface OfferingsReads {
+  getOffering(id: string): Promise<Offering | null>;
+  getByWarehouseProduct(warehouseId: string, productId: string): Promise<Offering | null>;
+  listOfferings(query: OfferingListQuery): Promise<Offering[]>;
+  listByZoneProduct(zoneId: string, productId: string): Promise<Offering[]>;
+  listByProduct(productId: string): Promise<Offering[]>;
+}
+
+/** Everything a stock or price change needs, run atomically. Duplicate keys surface as CONFLICT or DuplicateRestoreError. */
+export interface OfferingsTx extends OfferingsReads {
+  /** Forces concurrent price writers for one zone and product to serialise, so the same-price rule cannot be bypassed. */
+  lockZoneProduct(zoneId: string, productId: string): Promise<void>;
+  nextRevision(): Promise<number>;
+  insertOffering(offering: Offering): Promise<void>;
+  replaceOffering(offering: Offering): Promise<void>;
+  /** Conditional atomic change of one stock figure. Returns null when a decrease would go below zero or, with `requireSellable`, the offering is not sellable. */
+  applyStockDelta(change: { offeringId: string; variantId: string | null; delta: number; requireSellable: boolean; at: Date }): Promise<{ before: number; after: number } | null>;
+  setRev(offeringId: string, rev: number): Promise<void>;
+  insertMovements(rows: readonly StockMovement[]): Promise<void>;
+  hasRestore(restoreKey: string): Promise<boolean>;
+  insertPriceHistory(rows: readonly PriceHistoryRow[]): Promise<void>;
+  getReservation(key: string): Promise<Reservation | null>;
+  insertReservation(reservation: Reservation): Promise<void>;
+  saveReservation(reservation: Reservation): Promise<void>;
+  audit(ctx: Ctx, entry: { action: string; entityType: string; entityId: string; warehouseId?: string }): Promise<void>;
+}
+
+export class DuplicateRestoreError extends Error { constructor() { super("This restore was already applied"); this.name = "DuplicateRestoreError"; } }
+
+export interface OfferingsStore extends OfferingsReads {
+  ensureIndexes(): Promise<void>;
+  transaction<T>(fn: (tx: OfferingsTx) => Promise<T>): Promise<T>;
+  listMovements(query: MovementQuery): Promise<StockMovement[]>;
+  listPriceHistory(query: PriceHistoryQuery): Promise<PriceHistoryRow[]>;
+  expiredHoldKeys(now: Date, limit: number): Promise<string[]>;
+  countByProduct(productId: string): Promise<number>;
+}
+
+export interface OfferingsDeps {
+  store: OfferingsStore; warehouses: WarehouseDirectory; products: ProductDirectory; events: EventPublisher;
+  now: () => Date; newId: () => string; thresholds: StockThresholds;
+}

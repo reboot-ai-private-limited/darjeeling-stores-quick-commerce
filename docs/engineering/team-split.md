@@ -56,7 +56,7 @@ Only the owning module reads or writes its collections. Everyone else uses its `
 | Dev 1 | Dev 2 |
 |---|---|
 | `users`, `refresh_tokens`, `device_tokens`, `otps`, `roles` | `categories`, `products`, `warehouse_products` |
-| `audit_log`, `settings`, `settings_history`, `sequences` | `stock_movements`, `price_history`, `catalog_revisions`, `stock_subscriptions`, `waitlist` |
+| `audit_log`, `settings`, `settings_history`, `sequences` | `stock_movements`, `price_history`, `stock_reservations`, `catalog_revisions`, `stock_subscriptions`, `waitlist` |
 | `cities`, `localities`, `zones`, `warehouses` | `addresses`, `media_files` |
 | `delivery_rules`, `coupons`, `coupon_redemptions`, `banners` | `notification_templates`, `notifications`, `jobs` |
 | `carts`, `quotes`, `order_groups`, `orders`, `order_events` | `riders`, `rider_shifts`, `assignments`, `delivery_batches` |

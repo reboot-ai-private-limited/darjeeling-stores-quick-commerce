@@ -65,7 +65,7 @@ Admin: `GET /admin/warehouses/:id/products` · `PUT /admin/warehouse-products/:i
 | zoneId | ref | Denormalised for zone catalog queries |
 | status | enum | `active, inactive, archived` (also the delta-sync tombstone) |
 | stockGrams | int? | Pool when `pooled_weight` |
-| variants | embedded[] | `{variantId, price, mrp, salePrice?, saleStart?, saleEnd?, stock? (units), maxQtyPerOrder?, isActive}` |
+| variants | embedded[] | `{variantId, price, mrp, salePrice?, saleStart?, saleEnd?, stock? (units), maxQtyPerOrder?, isActive}`. The effective price, discount amount and discount percentage are computed when read, never stored (see the [F05 API](../api/F05-warehouse-stock-and-pricing.md)) |
 | isOutOfStockOverride | bool | Manual out-of-stock |
 | rev | int | Delta-sync cursor |
 | importedFrom | {warehouseId, at, by}? | Audit only, no ongoing link |

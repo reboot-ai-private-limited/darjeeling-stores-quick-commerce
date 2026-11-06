@@ -33,8 +33,8 @@ The tree view and import live in [F06](F06-product-import-and-admin-tree.md).
   "status": "active",
   "stockGrams": 24000,
   "variants": [
-    { "variantId": "var_1", "label": "250 g", "weightGrams": 250, "price": 1800, "mrp": 2000, "salePrice": null, "saleStart": null, "saleEnd": null, "stock": null, "maxQtyPerOrder": 10, "isActive": true },
-    { "variantId": "var_2", "label": "500 g", "weightGrams": 500, "price": 3200, "mrp": 4000, "salePrice": 3000, "saleStart": "2026-11-05T00:00:00Z", "saleEnd": "2026-11-07T00:00:00Z", "stock": null, "maxQtyPerOrder": 10, "isActive": true }
+    { "variantId": "var_1", "label": "250 g", "weightGrams": 250, "price": 1800, "mrp": 2000, "salePrice": null, "saleStart": null, "saleEnd": null, "effectivePrice": 1800, "onSale": false, "discountAmount": 200, "discountPercent": 10, "stock": null, "maxQtyPerOrder": 10, "isActive": true },
+    { "variantId": "var_2", "label": "500 g", "weightGrams": 500, "price": 3200, "mrp": 4000, "salePrice": 3000, "saleStart": "2026-11-05T00:00:00Z", "saleEnd": "2026-11-07T00:00:00Z", "effectivePrice": 3000, "onSale": true, "discountAmount": 1000, "discountPercent": 25, "stock": null, "maxQtyPerOrder": 10, "isActive": true }
   ],
   "isOutOfStockOverride": false,
   "rev": 18234,
@@ -42,6 +42,25 @@ The tree view and import live in [F06](F06-product-import-and-admin-tree.md).
 }
 ```
 Loose products use `stockGrams` (pooled); packaged products use `variants[].stock` (units). `rev` is the optimistic-lock counter: send it back on every edit.
+
+### Price and discount fields
+
+All money is a whole number in paise (1800 = ₹18.00). You only ever write `price`, `mrp`, `salePrice`, `saleStart` and `saleEnd`. The other four are computed on every read and cannot be sent:
+
+| Field | Rule |
+|---|---|
+| `price` | Regular selling price. Must be a whole number above 0. |
+| `mrp` | Maximum retail price. Must be at least `price`. |
+| `salePrice` | Optional temporary price. Must be above 0 and below `price`. |
+| `saleStart`, `saleEnd` | Optional window for the sale; they need a `salePrice`. With no window the sale price applies until it is removed. |
+| `onSale` (computed) | `true` when `salePrice` is set and now is inside its window. |
+| `effectivePrice` (computed) | `salePrice` while `onSale`, otherwise `price`. This is what the customer pays, and what the same-zone price rule compares. |
+| `discountAmount` (computed) | `mrp - effectivePrice`, never below 0. |
+| `discountPercent` (computed) | `round(discountAmount / mrp × 100)`, a whole number from 0 to 100. 0 when there is no discount. |
+
+Example: price 3200, mrp 4000, sale price 3000 during the sale gives `effectivePrice` 3000, `discountAmount` 1000, `discountPercent` 25. After the sale ends: `effectivePrice` 3200, `discountAmount` 800, `discountPercent` 20.
+
+Bulk price actions (`set_price`, `price_percent`) change `price`, never `salePrice`, and are rejected per item if the result would be above `mrp` or at or below an active `salePrice`.
 
 ## GET /admin/warehouses/:id/products
 Query: `?q=&categoryId=&status=&lowStock=true&limit=50&cursor=`. 200: `{ "data": [<offering>], "meta": { "nextCursor": null } }`. Scoped staff get `403 FORBIDDEN` for warehouses outside their scope.
@@ -125,3 +144,12 @@ Query: `?warehouseId=&productId=&reason=&from=&to=&limit&cursor`. 200:
 
 ## GET /admin/price-history
 Query: `?warehouseId=&productId=&variantId=&from=&to=`. 200 items: `{ "warehouseId", "productId", "variantId", "oldPrice", "newPrice", "oldMrp", "newMrp", "by", "at" }`.
+
+## Implementation notes (backend, D2-4)
+
+- **Atomic stock.** Every deduction is a conditional update (`stock >= amount`) inside a MongoDB transaction, so concurrent orders can never drive stock below zero. Orders use the `stock` port: `reserve` (all-or-nothing, idempotent by `key`), `confirm`, `release`, `restore` (idempotent by `restoreKey`) and `releaseExpiredHolds`.
+- **Reservations.** Each reserve is saved in `stock_reservations` (`held` → `confirmed` or `released`, with an expiry). If the orders module crashes between reserving and confirming, the sweeper `releaseExpiredHolds` gives the stock back. Dev 2 owns this collection; Dev 1 only calls the port.
+- **Same-zone price rule** supports only `block` mode. `warn` mode is not implemented. The comparison uses today's effective price (sale price applied). Two price writers in one zone are serialised with a per-zone/product lock document, so the rule cannot be bypassed by simultaneous edits.
+- **Revisions.** `rev` is the delta-sync revision. It also changes when a variant flips between available and unavailable, and when the master product changes.
+- **Events.** `stock.zone_availability_changed` fires only when a variant goes from 0 to available in the whole zone (feeds Notify Me). `stock.low` fires when stock crosses the low-stock threshold downwards.
+- **Known shortcuts.** The `lowStock` filter on the offerings list applies per page. Product search by name matches at most 500 products.
