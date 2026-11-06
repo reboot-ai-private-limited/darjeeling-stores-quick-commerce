@@ -83,7 +83,12 @@ describe("API process lifecycle", () => {
       for (const path of ["/admin/staff", "/admin/roles", "/admin/permissions"]) {
         expect((await fetch(`http://127.0.0.1:${port}/api/v1${path}`)).status).toBe(401);
       }
-      expect((await fetch(`http://127.0.0.1:${port}/api/v1/auth/request-otp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "9000000001" }) })).status).toBe(404);
+      expect((await fetch(`http://127.0.0.1:${port}/api/v1/app/config?app=customer&platform=android&version=1.0.0`)).status).toBe(200);
+      for (const path of ["request-otp", "verify-otp"]) {
+        const response = await fetch(`http://127.0.0.1:${port}/api/v1/auth/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "9000000001", ...(path === "verify-otp" && { otp: "000000" }) }) });
+        expect(response.status).toBe(503);
+        expect((await response.json() as { error: { code: string } }).error.code).toBe("OTP_DELIVERY_UNAVAILABLE");
+      }
     } finally {
       if (api.child.exitCode === null && api.child.signalCode === null) api.child.kill("SIGKILL");
       await api.exit;

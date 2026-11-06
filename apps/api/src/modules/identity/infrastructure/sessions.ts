@@ -28,8 +28,9 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
   async function credentialsReady(userId: Types.ObjectId, session?: ClientSession) {
     const options = session ? { session } : {};
     const user = await connection.collection("users").findOne({ _id: userId }, options);
-    if (!user || user.kind !== "staff" || user.devMockAccount) return true;
+    if (!user) return true;
     if (user.status !== "active") return false;
+    if (user.kind !== "staff" || user.devMockAccount) return true;
     const role = await connection.collection("roles").findOne({ _id: user.roleId }, options);
     return !!role && !nextStaffAction({ ...user, kind: "staff" }, role.name);
   }
@@ -41,12 +42,12 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
       await sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
       await sessions.createIndex({ userId: 1, revokedAt: 1 });
     },
-    async issue(userId: Types.ObjectId, session?: ClientSession) {
+    async issue(userId: Types.ObjectId, session?: ClientSession, deviceInfo?: string) {
       const accessToken = await signAccess(userId);
       const refreshToken = secret();
       const expiresAt = new Date(Date.now() + refreshLifetime);
       await sessions.insertOne({ _id: new Types.ObjectId(), userId, accessHash: hash(accessToken), refreshHash: hash(refreshToken),
-        usedRefreshHashes: [], accessExpiresAt: new Date(Date.now() + accessLifetime), expiresAt, revokedAt: null }, session ? { session } : {});
+        usedRefreshHashes: [], accessExpiresAt: new Date(Date.now() + accessLifetime), expiresAt, revokedAt: null, ...(deviceInfo && { deviceInfo }) }, session ? { session } : {});
       return { accessToken, refreshToken, userId, accessTokenExpiresInSeconds: accessLifetime / 1000, refreshExpiresAt: expiresAt };
     },
     async authenticate(token: string, transaction?: ClientSession) {
@@ -80,7 +81,10 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
       }, { returnDocument: "after" }) : null;
       if (!session) {
         const replay = await sessions.findOneAndUpdate({ usedRefreshHashes: previousHash, revokedAt: null, expiresAt: { $gt: new Date() } }, { $set: { revokedAt: new Date() } });
-        if (replay) return { error: "REFRESH_REUSED" as const };
+        if (replay) {
+          await sessions.updateMany({ userId: replay.userId, revokedAt: null }, { $set: { revokedAt: new Date() } });
+          return { error: "REFRESH_REUSED" as const };
+        }
         await sessions.updateOne({ refreshHash: previousHash }, { $set: { revokedAt: new Date() } });
         return { error: "UNAUTHORIZED" as const };
       }
@@ -94,6 +98,9 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
     },
     async revokeUser(userId: Types.ObjectId, session: ClientSession) {
       await sessions.updateMany({ userId, revokedAt: null }, { $set: { revokedAt: new Date() } }, { session });
+    },
+    async revokeOtherSessions(userId: Types.ObjectId, accessToken: string, session: ClientSession) {
+      await sessions.updateMany({ userId, accessHash: { $ne: hash(accessToken) }, revokedAt: null }, { $set: { revokedAt: new Date() } }, { session });
     },
   };
 }

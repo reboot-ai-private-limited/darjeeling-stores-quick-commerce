@@ -1,5 +1,7 @@
 ﻿import { z } from "zod";
 
+import { publicAppPolicy } from "../modules/settings/app-config.public.js";
+
 export function durationSeconds(value: string): number {
   const match = /^([1-9]\d*)(s|m|h|d)$/.exec(value);
   if (!match) return NaN;
@@ -24,6 +26,10 @@ const schema = sessionSettings.extend({
   mockOTP: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
   JWT_SECRET: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
   STAFF_TOTP_KEY: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  PUBLIC_APP_CONFIG_JSON: z.string().default("{}").transform((value, context) => {
+    try { return JSON.parse(value) as unknown; }
+    catch { context.addIssue({ code: "custom", message: "Must be valid JSON" }); return z.NEVER; }
+  }).pipe(publicAppPolicy),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   MONGODB_URI: z.string().regex(/^mongodb(?:\+srv)?:\/\/\S+$/, "must be a MongoDB URI"),
   CORS_ORIGINS: z.string().default("").transform(value => value.split(",").map(origin => origin.trim()).filter(Boolean)).refine(origins => origins.every(origin => {

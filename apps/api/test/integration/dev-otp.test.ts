@@ -79,8 +79,9 @@ describe("development mock OTP", () => {
   });
   it("rejects wrong codes and exhausts the challenge after five attempts", async () => {
     await request(app).post("/api/v1/auth/request-otp").send({ phone: "9000000004" });
-    for (let i = 0; i < 5; i++) expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "123456" })).status).toBe(401);
-    expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "000000" })).status).toBe(401);
+    for (let i = 0; i < 4; i++) expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "123456" })).status).toBe(401);
+    expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "123456" })).status).toBe(429);
+    expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "000000" })).status).toBe(429);
   });
   it("never promotes an existing account into the development owner", async () => {
     await db.collection("users").updateOne({ phone: "+919000000001" }, { $unset: { devMockAccount: "" } });

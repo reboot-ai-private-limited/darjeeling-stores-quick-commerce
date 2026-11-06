@@ -23,6 +23,12 @@ const userSchema = new Schema({
   mustChangePassword: { type: Boolean, default: false },
   credentialRevision: { type: Number, default: 0 },
   lastLoginAt: { type: Date },
+  defaultAddressId: { type: Schema.Types.ObjectId, default: null },
+  codAllowed: { type: Boolean, default: true },
+  notificationPrefs: {
+    promoPush: { type: Boolean, default: false }, promoWhatsApp: { type: Boolean, default: false }, cartReminders: { type: Boolean, default: false },
+  },
+  deletionRequest: { reason: { type: String, maxlength: 1000 }, requestedAt: { type: Date } },
   twoFactor: {
     enabled: { type: Boolean, default: false },
     requiresEnrollment: { type: Boolean, default: false },
