@@ -9,6 +9,7 @@ import { createAvailabilityModule, notifyProductsFrom, type CustomerResolver } f
 import { createCatalogModule, denyAll, type AuthResolver, type MediaPort, type ProductUsagePort } from "../modules/catalog/catalog.public.js";
 import { createCashModule } from "../modules/cash/cash.public.js";
 import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
+import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
 import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
 import { createTrackingModule, type EtaProvider, type TrackingSettings } from "../modules/tracking/tracking.public.js";
 import { createDiscoveryModule, type BannerSource, type DiscoverySettings, type StoreSettings } from "../modules/discovery/discovery.public.js";
@@ -53,6 +54,8 @@ export interface Dev2Options {
   /** Who the signed-in rider is. Until the identity session is connected, nobody is signed in (401). */
   rider?: RiderResolver;
   deliverySettings?: Partial<DispatchSettings>;
+  /** Fee, surcharge and coupon settings (F11, F12) and how many orders a customer has placed (for first-order coupons). */
+  pricingSettings?: Partial<PricingSettings>; orderHistory?: OrderHistory; customerNames?: (userIds: readonly string[]) => Promise<Map<string, string>>;
   /** Live ETA settings, the routes provider that replaces the straight-line estimate, and the secret that signs public tracking links (F20). */
   trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; trackingTokenSecret?: string;
   /** Offline sync: the doorstep UPI details and the offline delivery checks (F21). */
@@ -72,7 +75,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
     jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(), riders.store.ensureIndexes(), dispatch.store.ensureIndexes(),
-    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(),
+    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -141,9 +144,18 @@ export function createDev2Modules(options: Dev2Options = {}) {
   });
 
   const geography = options.geography ?? noGeography;
+  const pricing = createPricingModule({
+    connection, geography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }),
+    ...(options.pricingSettings && { settings: options.pricingSettings }), ...(options.orderHistory && { orders: options.orderHistory }),
+    ...(options.customerNames && { customerNames: options.customerNames }),
+    media: {
+      claim: async ({ mediaId, userId, bannerId }) => { await media.service.claimOwned({ mediaId, userId, kind: "banner", owner: { type: "banner", id: bannerId } }); },
+      release: (mediaId, reason) => media.service.removeInternal(mediaId, reason),
+    },
+  });
   const discovery = createDiscoveryModule({
     connection, geography, catalog: catalog.store, source: offerings.zoneSource, media: { urls: ids => media.service.urls(ids) },
-    ...(options.banners && { banners: options.banners }), ...(options.storeSettings && { storeSettings: options.storeSettings }),
+    banners: options.banners ?? pricing.bannerSource, ...(options.storeSettings && { storeSettings: options.storeSettings }),
     ...(options.contacts && { contacts: options.contacts }), ...(customerThenIndexes && { customer: customerThenIndexes }),
     ...(options.discoverySettings && { settings: options.discoverySettings }),
   });
@@ -235,6 +247,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
     await jobs.service.every("stock.release_expired_holds", 60_000, () => offerings.stock.releaseExpiredHolds());
     await jobs.service.every("notifications.drain_back_in_stock", 60_000, () => notifications.campaigns.drainBackInStock());
     await jobs.service.every("media.sweep", 3_600_000, () => media.service.sweep());
+    await jobs.service.every("pricing.expire_rain", 60_000, () => pricing.service.expireRain());
     await jobs.service.every("dispatch.ack_sweep", 10_000, () => dispatch.assign.sweepAcks());
     await jobs.service.every("dispatch.auto_assign", 15_000, () => dispatch.assign.autoAssignPending());
     await jobs.service.every("riders.silent_sweep", 60_000, () => riders.service.sweepSilent());
@@ -243,11 +256,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
       // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
-      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes,
+      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };

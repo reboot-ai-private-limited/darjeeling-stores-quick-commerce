@@ -82,3 +82,13 @@ Query: `limit`, `cursor`. 200:
 
 ## Product and category offers
 There is no separate offer endpoint. A sale is a `salePrice` with `saleStart`/`saleEnd` on a warehouse offering ([F05](F05-warehouse-stock-and-pricing.md)); customers see it as a lower `price` with `onSale: true`.
+
+## Implementation notes (backend, pricing module)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. Codes are 3 to 20 letters, digits, `-` or `_`, stored in capitals. `description` is optional; without one it reads "₹50 off", "10% off up to ₹15" or "Free delivery".
+- **Customer list** marks each coupon `applicable` or greyed with `min_order`, `first_order_only`, `limit_reached` or `not_applicable`. Coupons that are off or past their end are not listed. A customer who has used up their own limit sees `limit_reached`.
+- **Limits are atomic.** `pricing.service.hold(userId, couponId, groupId, discount)` takes one use for an order in a database transaction: the total limit and the per-customer limit can never be passed, even by simultaneous orders, and a repeat for the same order group takes nothing. `release(groupId)` gives it back (a cancelled order) and is safe to repeat. `check(userId, code, ...)` is used by the cart and quote and throws `COUPON_INVALID` (`422`) with the reason.
+- **Deactivating** stops new use only; an order that already holds the coupon keeps it.
+- **Usage** lists newest first with `totalDiscount`; `customerName` is filled when the identity module's names are connected (`customerNames` option), otherwise `null`.
+- **Banners.** The image is a `banner` upload ([F24](F24-media-storage.md)) attached on save; replacing it deletes the old one, and so does deleting the banner. `link.type: url` must be HTTPS. Customers see a zone's banners through `GET /banners` ([F08](F08-discovery-and-location.md)): active, in date, for that zone or all zones, ordered by `sortOrder`.
+- **First-order coupons** need the order count of a customer: pass `orderHistory` to `createDev2Modules`; until orders exist every customer counts as new.
