@@ -2,7 +2,7 @@
 
 ## Development mock OTP exception
 
-With explicit `NODE_ENV=development`, `mockOTP=true` and a private `JWT_SECRET`, local-only mock request/verify OTP, refresh, profile and logout routes are available. Phone `9000000001` uses `000000` as the development super-admin OTP; other customer phones use that code without admin privileges. Access is a signed JWT (default `30m`) and refresh is a rotating random secret with a configurable family lifetime (default `15d`), both delivered in HTTP-only browser cookies. Session hashes persist in MongoDB; logout/replay revokes the family. Production password/2FA authentication remains pending. See [development authentication](../engineering/development-auth.md) for cookie/CSRF contracts, startup and limits. Mock routes remain absent when mock mode is disabled.
+With explicit `NODE_ENV=development`, `mockOTP=true` and a private `JWT_SECRET`, local-only mock request/verify OTP, refresh, profile and logout routes are available. Phone `9000000001` uses `000000` as the development super-admin OTP; other customer phones use that code without admin privileges. Access is a signed JWT (default `30m`) and refresh is a rotating random secret with a configurable family lifetime (default `15d`), both delivered in HTTP-only browser cookies. Session hashes persist in MongoDB; logout/replay revokes the family. Production staff password/2FA authentication and owner bootstrap are implemented; see [staff authentication](../engineering/staff-authentication.md). See [development authentication](../engineering/development-auth.md) for cookie/CSRF contracts, startup and limits. Mock routes remain absent when mock mode is disabled.
 
 Status: Implemented foundation endpoints.
 Owner: Backend maintainers
@@ -17,7 +17,7 @@ The upstream [proposed endpoint catalog](planned-endpoints.md) and [business API
 
 Current routes are defined by [health.public.ts](../../apps/api/src/modules/health/health.public.ts); middleware and errors by [app.ts](../../apps/api/src/app.ts). [Shared exports](../../packages/shared/src/index.ts) define the prefix and error TypeScript type. No OpenAPI generator or schema validation pipeline exists. The examples below describe source behavior; they are not generated contracts.
 
-The default local base URL is `http://localhost:4000/api/v1`. All currently implemented routes are public. No authentication, session, pagination, idempotency or business mutation endpoint exists.
+The default local base URL is `http://localhost:4000/api/v1`. Health routes are public. F02 administration requires persisted staff sessions and current permissions/scope; staff lists are paginated and mutations are audited. Staff login and 2FA enrolment are implemented in the staff F01 slice.
 
 ## Health endpoints
 
@@ -76,4 +76,4 @@ Finished requests log event, request ID, method, status and duration. They omit 
 
 The `/api/v1` prefix is the existing compatibility boundary. Before business endpoints land, choose an authoritative machine-readable schema source and validate examples against it. Update consumers and examples alongside contract changes, accounting for native clients that may remain installed on older versions. Do not promise generated documentation before generation actually runs.
 
-Development-only role listing: `GET /admin/roles` requires a valid mock staff session, `roles:manage`, and all-warehouse scope. It returns `{data: [{id, name, permissions, isSystem}], meta: {count}}`, sorted by name. `GET /admin/permissions` returns the registered admin permission keys under `data.admin`. Both routes are absent unless development mock OTP is enabled; role mutations and staff APIs remain unimplemented.
+F02 administration: all 15 role, permission and staff endpoints are implemented. They register when `JWT_SECRET` is configured, independently of mock OTP. Development owner accounts are rejected outside mock composition. Role administration requires `roles:manage` and all-warehouse scope. Staff administration requires `staff:manage`, filters whole accounts by warehouse scope, and blocks stronger/protected targets. Cookie mutations require trusted Origin and `X-CSRF-Token: 1`. Mutations and audit records commit together; deactivate, credential resets and force logout revoke all target sessions. See [F02](F02-roles-and-permissions.md) for validation, pagination, credential transitions and safeguards.

@@ -2,6 +2,10 @@
 
 Spec: [F01](../foundation/01-authentication.md) · Conventions: [00](00-conventions.md)
 
+Implementation status (2026-11-06): all 16 endpoint handlers below are implemented, including customer/rider authentication, own-account mutations, device registration and public app configuration. Staff password/TOTP flows and the explicit owner-bootstrap CLI remain in place. Live WhatsApp/SMS delivery is deferred: development accepts `000000` only with `mockOTP=true`, `NODE_ENV=development` and a database ending in `_dev` or `_test`; without a configured delivery transport, nonmock OTP request/verify returns `503 OTP_DELIVERY_UNAVAILABLE`. See [staff authentication](../engineering/staff-authentication.md) and [development authentication](../engineering/development-auth.md).
+
+Transport: native login sends `X-Client: customer-app` or `rider-app`, without Origin/cookies, to receive access and refresh credentials in JSON. Native refresh/logout accepts a 64-character hexadecimal refresh token in JSON. Browser clients send `X-Client: web` or `admin`, use HTTP-only cookies, and receive no credentials in JSON. Any Origin/cookie mutation requires an exact trusted Origin and `X-CSRF-Token: 1`; a native header cannot bypass this. Browser refresh/logout uses cookies, without a JSON refresh token.
+
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
@@ -24,7 +28,7 @@ Spec: [F01](../foundation/01-authentication.md) · Conventions: [00](00-conventi
 | `GET` | `/app/config` | Public | Force-update, maintenance and support info |
 
 ## POST /auth/request-otp
-Auth: Public · Rate limit: `otpMaxPerHour` per phone and per IP.
+Auth: Public · Rate limit: five requests per hour per phone and per IP, persisted in MongoDB. An active code cannot be replaced before its five-minute expiry. Five incorrect attempts lock verification and resend for 15 minutes. Codes are hashed and consumed once transactionally. The local seeded mock owner is exempt from request quotas.
 
 Body:
 ```json
@@ -36,7 +40,7 @@ Body:
 ```json
 { "data": { "expiresInSeconds": 300, "channel": "whatsapp" } }
 ```
-`channel` is the channel actually used (it can become `sms` after a fallback). The OTP itself is never returned.
+`channel` is the channel actually used (it can become `sms` after a fallback). The OTP itself is never returned. Guarded mock mode returns `channel: "mock"` and `mockOTP: true`; use the fixed development code `000000`.
 
 Errors: `400 VALIDATION_ERROR` · `403 OTP_REQUEST_REJECTED` (unknown rider, blocked or wrong-role number; deliberately generic) · `429 RATE_LIMITED` · `502 OTP_DELIVERY_FAILED`.
 
@@ -80,6 +84,8 @@ Body:
 
 200: a Session whose `user.role` is `admin` or `super_admin`.
 
+Implemented staff roles also include custom staff roles. Browser sessions use HTTP-only cookies and omit tokens from JSON when `X-Client: admin`. Accounts with a temporary password or required 2FA enrolment receive only `{ "data": { "nextAction": "change_password", "expiresInSeconds": 600 } }` (or `enrol_2fa`) and an expiring restricted cookie; they have no normal session yet. Complete `POST /admin/auth/change-password` with `{ "newPassword": "…" }`, then setup/enable if required. `GET /admin/auth/status` restores the pending step; `POST /admin/auth/cancel` invalidates it. The password-change endpoint rejects reusing the temporary password. Owners must enrol 2FA before normal access.
+
 Errors: `401 INVALID_CREDENTIALS` · `401 TOTP_REQUIRED` (resend with `totpCode`) · `429 ACCOUNT_LOCKED` (`details.retryAfterSeconds`) · `429 RATE_LIMITED`.
 
 ## POST /admin/auth/2fa/setup · POST /admin/auth/2fa/enable
@@ -89,6 +95,8 @@ Setup 200:
 ```
 Enable body: `{ "code": "123456" }` · 200: `{ "data": { "ok": true } }` · Errors: `401 INVALID_OTP`.
 
+Implemented enable returns a completed cookie Session instead of the proposed `ok` envelope, revoking earlier sessions. Setup accepts a restricted enrolment challenge or a staff session logged in within ten minutes; enable requires the resulting challenge cookie. Already-enabled authenticators cannot be replaced here. Replayed codes fail. See the engineering reference for expiry, throttling, encryption and reset rules.
+
 ## GET /me
 200:
 ```json
@@ -97,16 +105,16 @@ Enable body: `{ "code": "123456" }` · 200: `{ "data": { "ok": true } }` · Erro
     "id": "user_1", "name": "Asha Rai", "phone": "+919876543210", "email": null,
     "role": "customer", "status": "active",
     "defaultAddressId": "addr_1", "codAllowed": true,
-    "notificationPrefs": { "promoPush": true, "promoWhatsApp": false, "cartReminders": false }
+    "notificationPrefs": { "promoPush": false, "promoWhatsApp": false, "cartReminders": false }
   }
 }
 ```
 
 ## PUT /me
-Body: `{ "name": "Asha Rai", "email": "asha@example.com" }` (both optional, at least one). 200: the updated profile (same shape as `GET /me`). Phone cannot be changed here.
+Body: `{ "name": "Asha Rai", "email": "asha@example.com" }` (both optional, at least one). 200: the updated profile (same shape as `GET /me`). Phone cannot be changed here. Unknown fields are rejected; email is normalized and unique. Email changes invalidate pending staff challenges and revoke other sessions. New profiles default promotional notification preferences to false.
 
 ## POST /me/phone/request-otp · POST /me/phone/verify
-Request body `{ "phone": "+919800000000" }` → 200 `{ "data": { "expiresInSeconds": 300 } }`. Verify body `{ "phone": "+919800000000", "otp": "482913" }` → 200 the updated profile. Errors: `409 CONFLICT` (number already used) · OTP errors as above.
+Request body `{ "phone": "+919800000000" }` → 200 `{ "data": { "expiresInSeconds": 300 } }`. Verify body `{ "phone": "+919800000000", "otp": "482913" }` → 200 the updated profile. Errors: `409 CONFLICT` (number already used) · OTP errors as above. Codes are bound to the customer, purpose, source phone and credential revision. Success revokes other sessions and retains the current one.
 
 ## GET /me/access
 200:
@@ -122,10 +130,10 @@ Request body `{ "phone": "+919800000000" }` → 200 `{ "data": { "expiresInSecon
 Use it to hide UI the user cannot use. The server still enforces every check.
 
 ## POST /me/delete-request
-Body: `{ "reason": "Moving away" }` (optional). 200: `{ "data": { "status": "deletion_requested" } }`. An admin finalises it later (F25).
+Body: `{ "reason": "Moving away" }` (optional). 200: `{ "data": { "status": "deletion_requested" } }`. The request immediately revokes all sessions, removes device tokens and invalidates pending OTPs. An admin finalises deletion later (F25).
 
 ## POST /devices · DELETE /devices/:fcmToken
-Body: `{ "fcmToken": "fcm_abc…", "platform": "android", "app": "rider", "appVersion": "1.4.2" }` → 200 `{ "data": { "ok": true } }`. `app`: `customer` or `rider`. Call after every login and when FCM rotates the token. Call `DELETE` on logout.
+Body: `{ "fcmToken": "fcm_abc…", "platform": "android", "app": "rider", "appVersion": "1.4.2" }` → 200 `{ "data": { "ok": true } }`. `app`: `customer` or `rider`. Call after every login and when FCM rotates the token. Call `DELETE` on logout. Account kind must match the app; rider devices support Android only. A token owned by another account returns 409; removal only affects caller-owned tokens. Versions must use numeric `major.minor.patch`.
 
 ## GET /app/config
 Query: `app=customer|rider&platform=android|ios&version=1.4.2`
@@ -143,4 +151,6 @@ Query: `app=customer|rider&platform=android|ios&version=1.4.2`
   }
 }
 ```
-Call on every app launch. If `forceUpdate` is true or `maintenance.active` is true, block the app with the matching screen. `503 SERVICE_UNAVAILABLE` is returned by all other endpoints during maintenance.
+Call on every app launch. If `forceUpdate` is true or `maintenance.active` is true, block the app with the matching screen. `503 SERVICE_UNAVAILABLE` is returned by business endpoints during maintenance; health, readiness and app config stay available.
+
+The validated `PUBLIC_APP_CONFIG_JSON` environment value supplies `customer.android`, `customer.ios`, `rider.android` release objects (`minSupportedVersion`, `latestVersion`, `downloadUrl`), plus `maintenance` and `supportNumber`. Defaults are versions `0.0.0`, null download/support values and maintenance off. Unknown fields, invalid versions and minimum versions above latest are rejected at startup. URLs must use HTTPS. Restart after changes; dynamic scoped settings administration remains D1-3.

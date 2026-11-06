@@ -11,9 +11,9 @@ async function freePort(): Promise<number> {
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   return address.port;
 }
-function start(uri: string, port: number) {
+function start(uri: string, port: number, env: NodeJS.ProcessEnv = {}) {
   const child = spawn(process.execPath, ["dist/server.js"], {
-    cwd: process.cwd(), env: { ...process.env, MONGODB_URI: uri, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"],
+    cwd: process.cwd(), env: { ...process.env, MONGODB_URI: uri, PORT: String(port), ...env }, stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
   child.stdout!.on("data", chunk => { output += chunk.toString(); });
@@ -71,6 +71,29 @@ describe("API process lifecycle", () => {
       await expect(fetch(`http://127.0.0.1:${port}/api/v1/health`)).rejects.toThrow();
     } finally {
       if (api.child.exitCode === null && api.child.signalCode === null) api.child.kill("SIGKILL");
+    }
+  }, 120000);
+
+  it("registers guarded F02 routes in production without exposing mock login", async () => {
+    mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+    const port = await freePort();
+    const api = start(mongo.getUri("administration_test"), port, { NODE_ENV: "production", mockOTP: "false", JWT_SECRET: "b".repeat(64), STAFF_TOTP_KEY: "c".repeat(64) });
+    try {
+      await waitForReady(api.child, port);
+      for (const path of ["/admin/staff", "/admin/roles", "/admin/permissions"]) {
+        expect((await fetch(`http://127.0.0.1:${port}/api/v1${path}`)).status).toBe(401);
+      }
+      expect((await fetch(`http://127.0.0.1:${port}/api/v1/app/config?app=customer&platform=android&version=1.0.0`)).status).toBe(200);
+      for (const path of ["request-otp", "verify-otp"]) {
+        const response = await fetch(`http://127.0.0.1:${port}/api/v1/auth/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "9000000001", ...(path === "verify-otp" && { otp: "000000" }) }) });
+        expect(response.status).toBe(503);
+        expect((await response.json() as { error: { code: string } }).error.code).toBe("OTP_DELIVERY_UNAVAILABLE");
+      }
+    } finally {
+      if (api.child.exitCode === null && api.child.signalCode === null) api.child.kill("SIGKILL");
+      await api.exit;
+      await mongo.stop();
+      mongo = undefined;
     }
   }, 120000);
 });

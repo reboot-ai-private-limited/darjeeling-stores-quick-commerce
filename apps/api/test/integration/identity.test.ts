@@ -13,6 +13,7 @@ beforeAll(async () => {
   connection = await mongoose.createConnection(replica.getUri("identity_integration_test")).asPromise();
   store = createIdentityStore(connection);
   await store.initialize();
+  await connection.collection("roles").insertOne({ _id: new mongoose.Types.ObjectId(roleId), name: "identity_fixture", permissions: [], isSystem: false });
 }, 120000);
 afterAll(async () => { await connection?.close(); await replica?.stop(); });
 

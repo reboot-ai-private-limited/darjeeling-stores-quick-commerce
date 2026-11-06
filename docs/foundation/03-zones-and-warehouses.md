@@ -32,12 +32,14 @@ City (label, locality dropdown)
 
 | Rule | Detail |
 |---|---|
-| One zone per warehouse | `warehouses.zoneId` is a single value |
+| One zone per warehouse | `warehouses.zoneId` is a single value; immutable after creation |
 | Rider zone | `riders.zoneId` single; `riders.warehouseIds` must all be in that zone |
-| Polygon overlap | Rejected on save |
-| Locality | Belongs to a city (optional zone link); used for the address dropdown and ETA default |
+| Polygon overlap | Rejected on save across all enabled zones; shared edges and vertices allowed |
+| Border tie-breaking | Lowest hexadecimal zone ObjectId string wins deterministically before pause evaluation |
+| Locality resolution | Linked locality with explicit `zoneId` checks that zone (disabled zone returns not deliverable); unlinked locality resolves stored Point |
 | Allocation | Only enabled, open warehouses are candidates (F13) |
-| Disabling | A warehouse with active orders cannot be disabled until they finish |
+| Disabling | A warehouse with active orders cannot be disabled (409 CONFLICT with activeOrders); fail closed if dependency check unavailable |
+| Pause authority | Modifying `pause` on zone or warehouse requires `ops_mode:manage` in addition to management permission |
 
 ## 5. Screens (admin)
 Zones map editor · zone list · warehouse list · warehouse editor (hours, slots, timers, priority) · cities and localities.
@@ -68,7 +70,7 @@ Full request and response reference with examples: [API · F03](../api/F03-zones
 | name, code, vendorId | | vendorId defaults to owner |
 | zoneId | ref | Exactly one zone |
 | location | Point | 2dsphere |
-| address | embedded | |
+| address | string | Bounded string (3–500 chars), reconciled with API spec |
 | isEnabled, priority | | Lower priority number wins ties |
 | hours, lastOrderMinutesBeforeClose, afterHoursMode, preOrder | | F17 |
 | packMinutes, riderArrivalMinutes, defaultTravelMinutes | int? | F20 |
@@ -81,8 +83,12 @@ Indexes: `zoneId`; `location` 2dsphere; zones `polygon` 2dsphere.
 ## 8. Settings
 `punchInRadiusMeters` (warehouse) · hours and timers live on the warehouse record.
 
-## 9. Permissions
-`zones:manage`, `warehouses:view`, `warehouses:manage`, `ops_mode:manage`; customer `location:resolve_zone` (guest), `zone:check`.
+## 9. Permissions & Scope Authority
+- `zones:manage`: City, locality, and zone management. Requires `all: true` scope (warehouse-level grants confer no zone authority).
+- `warehouses:view`: Read warehouse lists and details. Filters by actor's assigned `scope.warehouseIds` (foreign warehouse detail returns `403 FORBIDDEN`).
+- `warehouses:manage`: Warehouse mutations. Requires `all: true` scope for creation (`POST /admin/warehouses`), and target warehouse in scope for updates (`PUT /admin/warehouses/:id`).
+- `ops_mode:manage`: Required in addition to management permissions when setting or modifying `pause` on zones or warehouses.
+- Customer: `location:resolve_zone` (guest), `zone:check`.
 
 ## 10. Open questions
 1. Should localities be per zone instead of per city once zones exist? Default per city with optional zone link.

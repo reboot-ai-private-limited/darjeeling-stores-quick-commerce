@@ -4,7 +4,7 @@ import { API_PREFIX } from "@darjeeling/shared";
 import { createContainer } from "./container.js";
 import type { Route } from "./platform/routes.js";
 
-type AppOptions = { isReady?: () => boolean; corsOrigins?: string[]; trustProxyHops?: number; additionalRoutes?: Route[]; dev2Routes?: Route[] };
+type AppOptions = { isReady?: () => boolean; corsOrigins?: string[]; trustProxyHops?: number; additionalRoutes?: Route[]; dev2Routes?: Route[]; maintenance?: { active: boolean; message: string | null } };
 const handleError: ErrorRequestHandler = (error: unknown, _req, res, next) => {
   if (res.headersSent) return next(error);
   const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined;
@@ -21,7 +21,7 @@ const handleError: ErrorRequestHandler = (error: unknown, _req, res, next) => {
   res.status(status).json({ error: { code, message, requestId: res.getHeader("X-Request-Id") } });
 };
 
-export function createApp({ isReady = () => false, corsOrigins = [], trustProxyHops = 0, additionalRoutes = [], dev2Routes }: AppOptions = {}) {
+export function createApp({ isReady = () => false, corsOrigins = [], trustProxyHops = 0, additionalRoutes = [], dev2Routes, maintenance }: AppOptions = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", trustProxyHops);
@@ -43,6 +43,14 @@ export function createApp({ isReady = () => false, corsOrigins = [], trustProxyH
         res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Client");
         return res.sendStatus(204);
       }
+    }
+    next();
+  });
+  app.use(API_PREFIX, (req, res, next) => {
+    if (maintenance?.active && !["/health", "/ready", "/app/config"].includes(req.path)) {
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Retry-After", "60");
+      return res.status(503).json({ error: { code: "SERVICE_UNAVAILABLE", message: maintenance.message ?? "The service is temporarily unavailable", requestId: res.getHeader("X-Request-Id") } });
     }
     next();
   });

@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Types, type Connection } from "mongoose";
+import { Types, type ClientSession, type Connection } from "mongoose";
 import { SignJWT, jwtVerify } from "jose";
 import { durationSeconds, sessionSettings } from "../../../config/env.js";
+import { nextStaffAction } from "../domain/staff-auth-policy.js";
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 const secret = () => randomBytes(32).toString("hex");
@@ -24,22 +25,32 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
     .setSubject(userId.toHexString()).setJti(secret()).setIssuedAt().setExpirationTime(`${accessSeconds}s`).sign(key);
   if (!connection.db) throw new Error("Session store requires a connected database");
   const sessions = connection.db.collection<Session>("auth_sessions");
+  async function credentialsReady(userId: Types.ObjectId, session?: ClientSession) {
+    const options = session ? { session } : {};
+    const user = await connection.collection("users").findOne({ _id: userId }, options);
+    if (!user) return true;
+    if (user.status !== "active") return false;
+    if (user.kind !== "staff" || user.devMockAccount) return true;
+    const role = await connection.collection("roles").findOne({ _id: user.roleId }, options);
+    return !!role && !nextStaffAction({ ...user, kind: "staff" }, role.name);
+  }
   return {
     async initialize() {
       await sessions.createIndex({ accessHash: 1 }, { unique: true });
       await sessions.createIndex({ refreshHash: 1 }, { unique: true });
       await sessions.createIndex({ usedRefreshHashes: 1 });
       await sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+      await sessions.createIndex({ userId: 1, revokedAt: 1 });
     },
-    async issue(userId: Types.ObjectId) {
+    async issue(userId: Types.ObjectId, session?: ClientSession, deviceInfo?: string) {
       const accessToken = await signAccess(userId);
       const refreshToken = secret();
       const expiresAt = new Date(Date.now() + refreshLifetime);
       await sessions.insertOne({ _id: new Types.ObjectId(), userId, accessHash: hash(accessToken), refreshHash: hash(refreshToken),
-        usedRefreshHashes: [], accessExpiresAt: new Date(Date.now() + accessLifetime), expiresAt, revokedAt: null });
+        usedRefreshHashes: [], accessExpiresAt: new Date(Date.now() + accessLifetime), expiresAt, revokedAt: null, ...(deviceInfo && { deviceInfo }) }, session ? { session } : {});
       return { accessToken, refreshToken, userId, accessTokenExpiresInSeconds: accessLifetime / 1000, refreshExpiresAt: expiresAt };
     },
-    async authenticate(token: string) {
+    async authenticate(token: string, transaction?: ClientSession) {
       if (token.length > 2048) return null;
       let subject: string;
       try {
@@ -47,13 +58,20 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
         if (!payload.sub || !/^[a-f0-9]{24}$/.test(payload.sub)) return null;
         subject = payload.sub;
       } catch { return null; }
-      const session = await sessions.findOne({ userId: new Types.ObjectId(subject), accessHash: hash(token), revokedAt: null, accessExpiresAt: { $gt: new Date() }, expiresAt: { $gt: new Date() } });
-      return session?.userId ?? null;
+      const filter = { userId: new Types.ObjectId(subject), accessHash: hash(token), revokedAt: null, accessExpiresAt: { $gt: new Date() }, expiresAt: { $gt: new Date() } };
+      const session = transaction
+        ? await sessions.findOneAndUpdate(filter, { $inc: { authorizationRevision: 1 } }, { session: transaction, returnDocument: "after" })
+        : await sessions.findOne(filter);
+      return session && await credentialsReady(session.userId, transaction) ? session.userId : null;
     },
     async rotate(token: string) {
       if (!/^[a-f0-9]{64}$/.test(token)) return { error: "UNAUTHORIZED" as const };
       const previousHash = hash(token);
       const candidate = await sessions.findOne({ refreshHash: previousHash });
+      if (candidate && !await credentialsReady(candidate.userId)) {
+        await sessions.updateOne({ _id: candidate._id }, { $set: { revokedAt: new Date() } });
+        return { error: "UNAUTHORIZED" as const };
+      }
       const accessToken = candidate ? await signAccess(candidate.userId) : "";
       const refreshToken = secret();
       // Bound replay history; after 500 rotations the family requires a fresh login.
@@ -63,7 +81,10 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
       }, { returnDocument: "after" }) : null;
       if (!session) {
         const replay = await sessions.findOneAndUpdate({ usedRefreshHashes: previousHash, revokedAt: null, expiresAt: { $gt: new Date() } }, { $set: { revokedAt: new Date() } });
-        if (replay) return { error: "REFRESH_REUSED" as const };
+        if (replay) {
+          await sessions.updateMany({ userId: replay.userId, revokedAt: null }, { $set: { revokedAt: new Date() } });
+          return { error: "REFRESH_REUSED" as const };
+        }
         await sessions.updateOne({ refreshHash: previousHash }, { $set: { revokedAt: new Date() } });
         return { error: "UNAUTHORIZED" as const };
       }
@@ -74,6 +95,12 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
       if (accessToken) filters.push({ accessHash: hash(accessToken) });
       if (refreshToken) filters.push({ refreshHash: hash(refreshToken) }, { usedRefreshHashes: hash(refreshToken) });
       if (filters.length) await sessions.updateMany({ $or: filters }, { $set: { revokedAt: new Date() } });
+    },
+    async revokeUser(userId: Types.ObjectId, session: ClientSession) {
+      await sessions.updateMany({ userId, revokedAt: null }, { $set: { revokedAt: new Date() } }, { session });
+    },
+    async revokeOtherSessions(userId: Types.ObjectId, accessToken: string, session: ClientSession) {
+      await sessions.updateMany({ userId, accessHash: { $ne: hash(accessToken) }, revokedAt: null }, { $set: { revokedAt: new Date() } }, { session });
     },
   };
 }

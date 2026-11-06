@@ -184,6 +184,9 @@ importers:
       mongoose:
         specifier: ^9.11.4
         version: 9.11.4
+      s2js:
+        specifier: 1.44.0
+        version: 1.44.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -983,6 +986,9 @@ packages:
   bare-url@2.5.5:
     resolution: {integrity: sha512-iM9qJCruvpt2rPaLsrumVDru9pogI7PHziHIa9kTNRFt8C8HuSa+kI9kFezK+NvHEFnnz71rKGZ1EAilq/3V/Q==}
 
+  bigfloat@0.1.1:
+    resolution: {integrity: sha512-kKEqZxc86qgQ6xe8+sN1qQ4XzgksND5QKn6CPrFyQcq/oih+Xk7CaqOD0PKjqar8oO7v4ont5bOHox+LYxD6sQ==}
+
   body-parser@2.4.0:
     resolution: {integrity: sha512-Ifk1KcLrxaGt1occQagQNFNNOqRt1LFuehEnHHzB8Z6cRgIxRU1TBaiIsUiCdA+gy5PL7Y1IX31DNKkRmxtXjQ==}
     engines: {node: '>=18'}
@@ -1613,6 +1619,9 @@ packages:
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
     engines: {node: '>= 18'}
+
+  s2js@1.44.0:
+    resolution: {integrity: sha512-EbdfCD1hu1zPOWpS5PMq5tA5kJnreRoggkahXyBfJHJyOvOQtath60tuBLkyooOa+V0dtkPz8WQkQ1THriIXyQ==}
 
   safe-regex@2.1.1:
     resolution: {integrity: sha512-rx+x8AMzKb5Q5lQ95Zoi6ZbJqwCLkqi3XuJXp5P3rT8OEc6sZCJG5AE5dU3lsgRr/F4Bs31jSlVN+j5KrsGu9A==}
@@ -2417,6 +2426,8 @@ snapshots:
     dependencies:
       bare-path: 3.1.2
 
+  bigfloat@0.1.1: {}
+
   body-parser@2.4.0(supports-color@7.2.0):
     dependencies:
       bytes: 3.1.2
@@ -3079,6 +3090,10 @@ snapshots:
       path-to-regexp: 8.4.2
     transitivePeerDependencies:
       - supports-color
+
+  s2js@1.44.0:
+    dependencies:
+      bigfloat: 0.1.1
 
   safe-regex@2.1.1:
     dependencies:

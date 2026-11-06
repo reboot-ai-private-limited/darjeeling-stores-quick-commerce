@@ -56,6 +56,15 @@ describe("development mock OTP", () => {
     expect(roleList.status).toBe(200);
     expect(roleList.body.data).toEqual(expect.arrayContaining([expect.objectContaining({ name: "super_admin", permissions: ["*"], isSystem: true })]));
     expect(Object.keys(roleList.body.data[0]).sort()).toEqual(["id", "isSystem", "name", "permissions"]);
+    const id = roleList.body.data.find((role: { name: string }) => role.name === "super_admin").id;
+    const detail = await request(app).get(`/api/v1/admin/roles/${id}`).set("Authorization", auth);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data).toMatchObject({ id, name: "super_admin", isSystem: true });
+    expect(Object.keys(detail.body.data).sort()).toEqual(["id", "isSystem", "name", "permissions"]);
+    expect(detail.headers["cache-control"]).toBe("no-store");
+    expect((await request(app).get("/api/v1/admin/roles/invalid").set("Authorization", auth)).status).toBe(404);
+    expect((await request(app).get("/api/v1/admin/roles/000000000000000000000000").set("Authorization", auth)).status).toBe(404);
+    expect((await request(app).get(`/api/v1/admin/roles/${id}`)).status).toBe(401);
     await db.collection("roles").updateOne({ name: "super_admin" }, { $set: { permissions: [] } });
     expect((await request(app).get("/api/v1/admin/permissions").set("Authorization", auth)).status).toBe(403);
     expect((await request(app).get("/api/v1/admin/roles").set("Authorization", auth)).status).toBe(403);
@@ -70,8 +79,9 @@ describe("development mock OTP", () => {
   });
   it("rejects wrong codes and exhausts the challenge after five attempts", async () => {
     await request(app).post("/api/v1/auth/request-otp").send({ phone: "9000000004" });
-    for (let i = 0; i < 5; i++) expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "123456" })).status).toBe(401);
-    expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "000000" })).status).toBe(401);
+    for (let i = 0; i < 4; i++) expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "123456" })).status).toBe(401);
+    expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "123456" })).status).toBe(429);
+    expect((await request(app).post("/api/v1/auth/verify-otp").send({ phone: "9000000004", otp: "000000" })).status).toBe(429);
   });
   it("never promotes an existing account into the development owner", async () => {
     await db.collection("users").updateOne({ phone: "+919000000001" }, { $unset: { devMockAccount: "" } });
