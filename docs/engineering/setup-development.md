@@ -69,6 +69,7 @@ Expected: a `server_listening` JSON event after the database connects. If Mongo 
 | `PORT` | 4000 | Server runtime | Integer 1–65535 |
 | `CORS_ORIGINS` | Empty | Server runtime | Comma-separated exact HTTP(S) origins; no paths or trailing slash |
 | `TRUST_PROXY_HOPS` | 0 | Server runtime | Nonnegative proxy-hop count; match the actual trusted network topology |
+| `JWT_SECRET` | Required with mock OTP | Server-only runtime secret | Random 32-byte hex signing key; generate privately using the [development auth setup](development-auth.md) |
 
 There are no implemented application-specific public web variables. Future `NEXT_PUBLIC_` values are publicly compiled configuration and must never contain secrets.
 

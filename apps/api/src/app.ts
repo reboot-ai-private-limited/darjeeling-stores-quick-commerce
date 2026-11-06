@@ -40,7 +40,7 @@ export function createApp({ isReady = () => false, corsOrigins = [], trustProxyH
       res.setHeader("Access-Control-Allow-Credentials", "true");
       if (req.method === "OPTIONS" && req.get("Access-Control-Request-Method")) {
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Client");
         return res.sendStatus(204);
       }
     }
