@@ -2,7 +2,9 @@ import request from "supertest";
 import { expect } from "vitest";
 import { createDev2Modules } from "../../../src/composition/dev2.js";
 import type { StockEvent } from "../../../src/modules/offerings/offerings.public.js";
-import { actorFromHeader, api, startHarness, type Harness } from "./harness.js";
+import { createFakeMessaging, type FakeMessaging } from "./fake-messaging.js";
+import { createFakeStorage, type FakeStorage } from "./fake-storage.js";
+import { actorFromHeader, api, customerFromHeader, principalFromHeader, startHarness, type Harness } from "./harness.js";
 
 export const ZONE1 = "1".repeat(24);
 export const ZONE2 = "2".repeat(24);
@@ -17,6 +19,12 @@ const WAREHOUSES: Record<string, { id: string; zoneId: string; isEnabled: boolea
 
 export const admin = { "X-Test-Actor": "admin" };
 export const viewer = { "X-Test-Actor": "viewer" };
+export const customer = (userId: string) => ({ "X-Test-Customer": userId });
+export const CUSTOMER_A = "c1".repeat(12);
+export const CUSTOMER_B = "c2".repeat(12);
+export const CUSTOMER_C = "c3".repeat(12);
+/** Logins for the media routes. Catalog routes use the `X-Test-Actor` header, so a test that needs both sends both. */
+export const asPrincipal = (who: string) => ({ "X-Test-Principal": who });
 export const scoped = (warehouseId: string) => ({ "X-Test-Actor": `scoped:${warehouseId}` });
 
 export interface Fixture {
@@ -24,6 +32,11 @@ export interface Fixture {
   mods: ReturnType<typeof createDev2Modules>;
   app: ReturnType<Harness["appWith"]>;
   events: StockEvent[];
+  storage: FakeStorage;
+  /** Fake push, WhatsApp, SMS and identity lookups. */
+  msg: FakeMessaging;
+  /** Runs the job queue until nothing more is due. */
+  runJobs(): Promise<number>;
   reset(): Promise<void>;
   get(path: string, who?: Record<string, string>): request.Test;
   send(method: "post" | "put" | "delete", path: string, body?: unknown, who?: Record<string, string>): request.Test;
@@ -39,8 +52,13 @@ export interface Fixture {
 export async function startFixture(databaseName: string): Promise<Fixture> {
   const h = await startHarness(databaseName);
   const events: StockEvent[] = [];
+  const storage = createFakeStorage();
+  const msg = createFakeMessaging();
   const mods = createDev2Modules({
-    connection: h.connection, auth: actorFromHeader,
+    storage: storage.provider, principal: principalFromHeader, mediaSettings: { maxPendingPerUser: 3 },
+    push: msg.push, whatsapp: msg.whatsapp, sms: msg.sms, contacts: msg.contacts, devices: msg.devices, audience: msg.audience,
+    webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
+    connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
     events: { publish: event => { events.push(event); } },
   });
@@ -52,11 +70,22 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     return body === undefined ? r : r.send(body as object);
   };
   const fixture: Fixture = {
-    h, mods, app, events, get, send,
+    h, mods, app, events, storage, msg, get, send,
+    async runJobs() {
+      let total = 0;
+      for (let pass = 0; pass < 20; pass++) { const ran = await mods.jobs.service.runOnce(); total += ran; if (ran === 0) break; }
+      return total;
+    },
     async reset() {
       await h.reset();
       await mods.catalog.store.ensureIndexes();
       await mods.offerings.store.ensureIndexes();
+      await mods.availability.store.ensureIndexes();
+      await mods.media.store.ensureIndexes();
+      await mods.jobs.store.ensureIndexes();
+      await mods.notifications.ready();
+      storage.reset();
+      msg.reset();
       events.length = 0;
     },
     async category() {

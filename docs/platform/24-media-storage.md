@@ -1,6 +1,8 @@
-# F24 – Media Storage (AWS S3)
+# F24 – Media Storage (Cloudinary now, AWS S3 later)
 
 Status: draft v3 · Folder: platform · Depends on: F04, F09 · See also: F13 (order media copies), F21 (uploads on weak network)
+
+Storage provider: files currently live in **Cloudinary** behind a provider interface; this document describes the target on **S3 + CloudFront**, and the API reference lists what differs today. Moving over replaces the provider only.
 
 Goals: all images, voice notes and photos live in S3; **a file removed in the app is removed from S3**; **voice notes are deleted 7 days after the order is delivered**; no orphaned files.
 

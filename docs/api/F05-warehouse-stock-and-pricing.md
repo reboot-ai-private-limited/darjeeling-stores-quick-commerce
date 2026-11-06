@@ -130,17 +130,17 @@ Errors: `409 INSUFFICIENT_STOCK` (would go below zero). If stock goes from 0 to 
 Body: `{ "warehouseId": "wh_1", "counts": [{ "productId": "prod_1", "variantId": null, "counted": 21500 }] }`. 200: `{ "data": { "adjusted": [{ "productId": "prod_1", "before": 22000, "after": 21500, "delta": -500 }] } }`. Reason is recorded as `count`.
 
 ## GET /admin/stock/levels
-Query: `?warehouseId=&lowStock=true&limit&cursor`. 200:
+Query: `?warehouseId=&lowStock=true&limit&cursor`. Pooled (loose) products give one row with `variantId: null`; per-variant products give one row per active size, with `variantId` and `variantLabel` set and `unit: "units"`. 200:
 ```json
-{ "data": [{ "warehouseId": "wh_1", "productId": "prod_1", "name": "Fresh Tomato (Local)", "unit": "grams", "stock": 21500, "lowStockThreshold": 5000, "isLow": false }], "meta": { "nextCursor": null } }
+{ "data": [{ "warehouseId": "wh_1", "productId": "prod_1", "name": "Fresh Tomato (Local)", "variantId": null, "variantLabel": null, "unit": "grams", "stock": 21500, "lowStockThreshold": 5000, "isLow": false }], "meta": { "nextCursor": null } }
 ```
 
 ## GET /admin/stock/movements
 Query: `?warehouseId=&productId=&reason=&from=&to=&limit&cursor`. 200:
 ```json
-{ "data": [{ "id": "mv_1", "warehouseId": "wh_1", "productId": "prod_1", "variantId": null, "mode": "grams", "delta": -1000, "balanceAfter": 21500, "reason": "order", "orderId": "ord_1", "note": null, "by": null, "createdAt": "2026-11-05T10:31:00Z" }], "meta": { "nextCursor": null } }
+{ "data": [{ "id": "mv_1", "warehouseId": "wh_1", "productId": "prod_1", "variantId": null, "mode": "grams", "delta": -1000, "balanceAfter": 21500, "reason": "order", "orderKey": "order-key-1", "restoreKey": null, "note": null, "by": null, "createdAt": "2026-11-05T10:31:00Z" }], "meta": { "nextCursor": null } }
 ```
-`reason`: `order`, `cancel`, `return`, `purchase`, `correction`, `wastage`, `count`, `import`. `by` is null for system actions.
+`reason`: `order`, `cancel`, `return`, `purchase`, `correction`, `wastage`, `count`, `import`. `by` is null for system actions. `orderKey` is the reservation key the orders module passed to the `stock` port (the order's idempotency key); `restoreKey` is set on stock given back by a partial restore.
 
 ## GET /admin/price-history
 Query: `?warehouseId=&productId=&variantId=&from=&to=`. 200 items: `{ "warehouseId", "productId", "variantId", "oldPrice", "newPrice", "oldMrp", "newMrp", "by", "at" }`.
@@ -148,7 +148,7 @@ Query: `?warehouseId=&productId=&variantId=&from=&to=`. 200 items: `{ "warehouse
 ## Implementation notes (backend, D2-4)
 
 - **Atomic stock.** Every deduction is a conditional update (`stock >= amount`) inside a MongoDB transaction, so concurrent orders can never drive stock below zero. Orders use the `stock` port: `reserve` (all-or-nothing, idempotent by `key`), `confirm`, `release`, `restore` (idempotent by `restoreKey`) and `releaseExpiredHolds`.
-- **Reservations.** Each reserve is saved in `stock_reservations` (`held` → `confirmed` or `released`, with an expiry). If the orders module crashes between reserving and confirming, the sweeper `releaseExpiredHolds` gives the stock back. Dev 2 owns this collection; Dev 1 only calls the port.
+- **Reservations.** Each reserve is saved in `stock_reservations` (`held` → `confirmed` or `released`, with an expiry). If the orders module crashes between reserving and confirming, the sweeper `releaseExpiredHolds` gives the stock back; the jobs module runs it every minute once the server calls `startBackground()` ([F23](F23-notifications.md#implementation-notes-backend-d2-2)). Dev 2 owns this collection; Dev 1 only calls the port.
 - **Same-zone price rule** supports only `block` mode. `warn` mode is not implemented. The comparison uses today's effective price (sale price applied). Two price writers in one zone are serialised with a per-zone/product lock document, so the rule cannot be bypassed by simultaneous edits.
 - **Revisions.** `rev` is the delta-sync revision. It also changes when a variant flips between available and unavailable, and when the master product changes.
 - **Events.** `stock.zone_availability_changed` fires only when a variant goes from 0 to available in the whole zone (feeds Notify Me). `stock.low` fires when stock crosses the low-stock threshold downwards.

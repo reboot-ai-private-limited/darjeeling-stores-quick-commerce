@@ -240,8 +240,10 @@ export function createCatalogService(deps: CatalogDeps) {
 
     // ---------- images ----------
     async attachImage(id: string, input: { mediaId: string; alt: string }): Promise<ProductImage & { urls: Record<string, string> }> {
+      requireProduct(await store.getProduct(id));
       const described = await media.describe(input.mediaId);
       if (!described) throw notFound("Media");
+      await media.claim?.(input.mediaId, { type: "product", id });
       let image!: ProductImage;
       await changeProduct(id, product => {
         if (product.images.some(i => i.mediaId === input.mediaId)) throw conflict("This image is already attached", { field: "mediaId" });

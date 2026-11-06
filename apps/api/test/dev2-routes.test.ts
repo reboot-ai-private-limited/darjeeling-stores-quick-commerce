@@ -16,7 +16,7 @@ function documented(file: string): string[] {
   return rows.map(([, method, route]) => normalise(method!, route!));
 }
 
-describe("Dev 2 routes (catalog and stock)", () => {
+describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
   const { routes } = createDev2Modules();
   const registered = routes.map(r => normalise(r.method, r.path));
 
@@ -32,10 +32,36 @@ describe("Dev 2 routes (catalog and stock)", () => {
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
+  it("registers every endpoint documented for F06 product import and the admin tree", () => {
+    const expected = documented("F06-product-import-and-admin-tree.md");
+    expect(expected).toHaveLength(3);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F07 Notify Me", () => {
+    const expected = documented("F07-notify-me.md");
+    expect(expected).toHaveLength(4);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F24 media storage", () => {
+    const expected = documented("F24-media-storage.md");
+    expect(expected).toHaveLength(7);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F23 notifications", () => {
+    const expected = documented("F23-notifications.md");
+    expect(expected).toHaveLength(10);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
   it("registers nothing that the API docs do not describe", () => {
-    const expected = new Set([...documented("F04-master-catalog.md"), ...documented("F05-warehouse-stock-and-pricing.md")]);
+    const expected = new Set(
+      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
+    );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(30);
+    expect(registered).toHaveLength(54);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {
@@ -45,11 +71,18 @@ describe("Dev 2 routes (catalog and stock)", () => {
 
   it("answers 401 with the documented error envelope for every route when nobody is logged in", async () => {
     const app = createApp();
-    for (const route of routes) {
+    for (const route of routes.filter(r => !r.path.startsWith("/webhooks/"))) {
       const url = `/api/v1${route.path.replace(/:[A-Za-z]+/g, "a".repeat(24))}`;
       const res = await request(app)[route.method](url);
       expect(res.status, `${route.method} ${route.path}`).toBe(401);
       expect(res.body.error).toMatchObject({ code: "UNAUTHORIZED", requestId: res.headers["x-request-id"] });
     }
+  });
+
+  it("leaves the provider's webhook calls open but refuses a set-up challenge or a signed call without the configured secrets", async () => {
+    const app = createApp();
+    expect((await request(app).get("/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=x&hub.challenge=1")).status).toBe(403);
+    const post = await request(app).post("/api/v1/webhooks/whatsapp").send({ entry: [] });
+    expect(post.status).toBe(200);
   });
 });

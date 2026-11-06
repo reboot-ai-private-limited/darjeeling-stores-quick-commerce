@@ -46,7 +46,8 @@ export function createApp({ isReady = () => false, corsOrigins = [], trustProxyH
     }
     next();
   });
-  app.use(express.json({ limit: "100kb" }));
+  // The exact bytes are kept on the request so webhook signatures (which sign the raw body) can be checked.
+  app.use(express.json({ limit: "100kb", verify: (req, _res, buffer) => { (req as { rawBody?: Buffer }).rawBody = buffer; } }));
   app.use(API_PREFIX, createContainer(isReady, additionalRoutes, dev2Routes).router);
   app.use((_req, res) => res.status(404).json({ error: { code: "NOT_FOUND", message: "Not found", requestId: res.getHeader("X-Request-Id") } }));
   app.use(handleError);

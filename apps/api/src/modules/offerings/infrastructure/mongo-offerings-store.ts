@@ -2,7 +2,7 @@ import type { ClientSession, Connection } from "mongoose";
 import { createAuditWriter } from "../../audit/audit.public.js";
 import { conflict } from "../../catalog/catalog.public.js";
 import {
-  DuplicateRestoreError, type MovementQuery, type OfferingListQuery, type OfferingsReads, type OfferingsStore, type OfferingsTx,
+  DuplicateRestoreError, type ImportPreview, type MovementQuery, type OfferingListQuery, type OfferingsReads, type OfferingsStore, type OfferingsTx,
   type PriceHistoryQuery, type PriceHistoryRow, type Reservation, type StockMovement,
 } from "../application/ports.js";
 import type { Offering } from "../domain/stock.js";
@@ -12,6 +12,8 @@ type OfferingDoc = Omit<Offering, "id"> & { _id: string };
 type MovementDoc = Omit<StockMovement, "id"> & { _id: string };
 type HistoryDoc = Omit<PriceHistoryRow, "id"> & { _id: string };
 type ReservationDoc = Omit<Reservation, "id"> & { _id: string };
+type PreviewDoc = Omit<ImportPreview, "id"> & { _id: string };
+const toPreview = ({ _id, ...rest }: PreviewDoc): ImportPreview => ({ id: _id, ...rest });
 interface RevisionDoc { _id: string; value: number }
 
 const REV_ID = "catalogRev";
@@ -32,6 +34,7 @@ export function createMongoOfferingsStore(connection: Connection): OfferingsStor
   const history = () => connection.collection<HistoryDoc>("price_history");
   const reservations = () => connection.collection<ReservationDoc>("stock_reservations");
   // Revision counters and per zone/product locks share one small collection.
+  const previews = () => connection.collection<PreviewDoc>("import_previews");
   const revisions = () => connection.collection<RevisionDoc>("catalog_revisions");
   const writeAudit = createAuditWriter(connection);
 
@@ -93,6 +96,8 @@ export function createMongoOfferingsStore(connection: Connection): OfferingsStor
       },
       async hasRestore(restoreKey) { return (await movements().countDocuments({ restoreKey }, { session, limit: 1 })) > 0; },
       async insertPriceHistory(rows) { if (rows.length > 0) await history().insertMany(rows.map(toHistoryDoc), { session }); },
+      async getPreview(id) { const doc = await previews().findOne({ _id: id }, { session }); return doc ? toPreview(doc) : null; },
+      async deletePreview(id) { return (await previews().deleteOne({ _id: id }, { session })).deletedCount === 1; },
       async getReservation(key) { const doc = await reservations().findOne({ key }, { session }); return doc ? toReservation(doc) : null; },
       async insertReservation(reservation) {
         try { await reservations().insertOne(toReservationDoc(reservation), { session }); }
@@ -121,6 +126,8 @@ export function createMongoOfferingsStore(connection: Connection): OfferingsStor
       await history().createIndex({ warehouseId: 1, productId: 1, at: -1 });
       await reservations().createIndex({ key: 1 }, { unique: true });
       await reservations().createIndex({ status: 1, expiresAt: 1 });
+      // Previews are short-lived: Mongo removes them once `expiresAt` has passed.
+      await previews().createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     },
     async transaction<T>(fn: (t: OfferingsTx) => Promise<T>): Promise<T> {
       const session = await connection.startSession();
@@ -152,6 +159,8 @@ export function createMongoOfferingsStore(connection: Connection): OfferingsStor
       const docs = await reservations().find({ status: "held", expiresAt: { $lte: now } }, { projection: { key: 1 } }).sort({ expiresAt: 1 }).limit(limit).toArray();
       return docs.map(doc => doc.key);
     },
+    async savePreview(preview) { const { id, ...rest } = preview; await previews().insertOne({ _id: id, ...rest }); },
+    async getPreview(id) { const doc = await previews().findOne({ _id: id }); return doc ? toPreview(doc) : null; },
     countByProduct(productId) { return offerings().countDocuments({ productId }); },
   };
 }
