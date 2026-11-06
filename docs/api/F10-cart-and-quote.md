@@ -152,3 +152,14 @@ Errors:
 2. Customer opens the checkout sheet: create an `Idempotency-Key` (store it) and `POST /quotes`.
 3. Customer taps **Place order**: `POST /orders { "quoteId": "quote_1" }` with that key (F13).
 4. If `409 QUOTE_CHANGED`: show the new total from `details.quote` and ask the customer to accept, then place again with the new `quoteId`.
+
+## Implementation notes (backend, cart module)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. `OUT_OF_ZONE`, `MIN_ORDER_NOT_MET`, `COUPON_INVALID` and `COD_NOT_ALLOWED` are `422`; `ZONE_PAUSED`, `STORE_CLOSED`, `ITEM_UNAVAILABLE` and `ZONE_CHANGE_UNCONFIRMED` are `409`; `QUOTE_EXPIRED` is `410`.
+- **`PUT /cart`** needs a place to price the cart: `addressId` (a deliverable address of the customer) or `zoneId`; otherwise `400`. A lower `clientRev` than the one held is ignored and the server cart is returned. More than 40 different items is `400`. Repeats of one variant are added together. `corrections[]` reasons: `max_qty` (10 per line, or the offering's own cap), `out_of_stock` (qty becomes what is in stock), `not_sold_in_zone`. `price_changed` is not reported because prices are never stored in the cart. `imageUrl` is `null` for now.
+- **`GET /cart`** prices live and marks a line `available: false` when it cannot be supplied now; it changes nothing.
+- **Zone change.** An address in another zone re-prices the lines there; `zoneChange` lists what was removed and re-priced and stays on the cart until `POST /quotes` is sent with `acceptZoneChange: true`. Until then a quote answers `409 ZONE_CHANGE_UNCONFIRMED` with the same `zoneChange`.
+- **Allocation.** One warehouse with every line wins (nearest first); otherwise the warehouse covering the most remaining lines goes first, up to `maxSplitsPerOrder` (2). A line is never split. Failing that, `409 ITEM_UNAVAILABLE` lists the lines that cannot be supplied together. Only enabled warehouses that are open now take part.
+- **The bill.** One delivery fee for the group, split between the deliveries pro-rata (kept on the stored quote as `allocatedDiscount` and `allocatedCharges`, which add up to the totals). ETA per delivery is pack 5 + rider arrival 5 + travel + the extra minutes of any surcharge. The minimum order is the zone's fee rule `minOrder`.
+- **Quote** is kept for 300 s and for a day afterwards (so a late order is told it expired). It is private to the customer (`404` for anyone else). `scheduledWindow` is stored but pre-order slots are checked by the hours module (F17).
+- **For Dev 1 (orders).** Place an order from `cart.quotes.get(userId, quoteId)`, re-run `cart.quotes.build(...)` and compare to detect `QUOTE_CHANGED`, hold the coupon with `pricing.service.hold`, and take the quote with the store's `claimQuote`. `POST /orders/:id/reorder` uses `cart.cart.reorder`.

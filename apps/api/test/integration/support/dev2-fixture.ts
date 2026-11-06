@@ -116,6 +116,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
       await mods.tracking.store.ensureIndexes();
       await mods.sync.store.ensureIndexes();
       await mods.pricing.store.ensureIndexes();
+      await mods.cart.store.ensureIndexes();
       orders.reset();
       accounts.reset();
       storage.reset();

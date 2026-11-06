@@ -7,6 +7,7 @@ import type { Route } from "../platform/routes.js";
 import { createAddressesModule } from "../modules/addresses/addresses.public.js";
 import { createAvailabilityModule, notifyProductsFrom, type CustomerResolver } from "../modules/availability/availability.public.js";
 import { createCatalogModule, denyAll, type AuthResolver, type MediaPort, type ProductUsagePort } from "../modules/catalog/catalog.public.js";
+import { createCartModule, type CartSettings, type CustomerPolicy, type HoursSource } from "../modules/cart/cart.public.js";
 import { createCashModule } from "../modules/cash/cash.public.js";
 import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
 import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
@@ -55,6 +56,8 @@ export interface Dev2Options {
   rider?: RiderResolver;
   deliverySettings?: Partial<DispatchSettings>;
   /** Fee, surcharge and coupon settings (F11, F12) and how many orders a customer has placed (for first-order coupons). */
+  /** Cart and quote settings, whether a customer may pay cash, and hours/pre-order rules (F10, F17). */
+  cartSettings?: Partial<CartSettings>; customerPolicy?: CustomerPolicy; hours?: HoursSource;
   pricingSettings?: Partial<PricingSettings>; orderHistory?: OrderHistory; customerNames?: (userIds: readonly string[]) => Promise<Map<string, string>>;
   /** Live ETA settings, the routes provider that replaces the straight-line estimate, and the secret that signs public tracking links (F20). */
   trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; trackingTokenSecret?: string;
@@ -75,7 +78,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
     jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(), riders.store.ensureIndexes(), dispatch.store.ensureIndexes(),
-    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(),
+    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(), cart.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -225,6 +228,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
     settings: { pingOnOrderSeconds: riders.settings.locationPingSecondsOnOrder, pingIdleSeconds: riders.settings.locationPingSecondsIdle, ...options.trackingSettings },
     ...(options.eta && { eta: options.eta }), ...(options.trackingTokenSecret && { tokenSecret: options.trackingTokenSecret }),
   });
+  const cart = createCartModule({
+    connection, geography, lines: offerings.stock, addresses: addresses.reader, pricing: pricing.service, travel: tracking.eta,
+    ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.cartSettings && { settings: options.cartSettings }),
+    ...(options.customerPolicy && { customers: options.customerPolicy }), ...(options.hours && { hours: options.hours }),
+  });
   const sync = createSyncModule({
     connection, ...(options.orders && { orders: options.orders }), ...(riderThenIndexes && { rider: riderThenIndexes }), auth: authThenIndexes,
     riders: { forUser: userId => riders.service.forUser(userId), byId: id => riders.service.byId(id) },
@@ -256,11 +264,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
       // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
-      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes,
+      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };
