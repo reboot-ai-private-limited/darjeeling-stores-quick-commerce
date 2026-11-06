@@ -1,4 +1,4 @@
-export type AdminSession = { user: { name: string; phone: string; role: string } };
+export type AdminSession = { user: { id: string; kind: "staff"; name: string; phone: string | null; email: string | null; role: string; permissions: string[]; scope: { all: boolean; warehouseIds: string[] } } };
 
 let refreshing: Promise<boolean> | null = null;
 async function refreshCookies(): Promise<boolean> {
@@ -31,6 +31,6 @@ export async function readAdminSession(): Promise<AdminSession | null> {
   if (response.status === 401) return null;
   if (!response.ok) throw new Error("Unable to check your session. Please try again.");
   const { data: user } = await response.json();
-  if (!["super_admin", "admin"].includes(user?.role)) return null;
+  if (user?.kind !== "staff") return null;
   return { user };
 }

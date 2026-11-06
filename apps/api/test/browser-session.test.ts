@@ -31,4 +31,10 @@ describe("browser cookie session client", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 503 })));
     await expect(readAdminSession()).rejects.toThrow("Unable to check");
   });
+  it("restores custom staff roles without accepting a customer as staff", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ data: { id: "staff-id", kind: "staff", role: "warehouse_manager", name: "Manager", permissions: ["staff:manage"] } }), { status: 200 })));
+    expect((await readAdminSession())?.user.role).toBe("warehouse_manager");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ data: { kind: "customer", role: "admin" } }), { status: 200 })));
+    expect(await readAdminSession()).toBeNull();
+  });
 });
