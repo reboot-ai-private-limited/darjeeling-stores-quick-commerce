@@ -6,6 +6,7 @@ import type { Banner, StoreSettingsValue } from "../../../src/modules/discovery/
 import { createFakeGeography, type FakeGeography } from "./fake-geography.js";
 import { createFakeOrders, createFakeRiderIdentity, type FakeOrders, type FakeRiderIdentity } from "./fake-orders.js";
 import { createFakeMessaging, type FakeMessaging } from "./fake-messaging.js";
+import { createFakeMoney, type FakeMoney } from "./fake-money.js";
 import { createFakeStorage, type FakeStorage } from "./fake-storage.js";
 import { actorFromHeader, api, customerFromHeader, principalFromHeader, riderFromHeader, startHarness, type Harness } from "./harness.js";
 
@@ -43,6 +44,8 @@ export interface Fixture {
   /** Fake orders with the real status rules, and fake rider login accounts. */
   orders: FakeOrders;
   accounts: FakeRiderIdentity;
+  /** Refunds the orders module asked for. */
+  money: FakeMoney;
   /** Home banners and store settings the catalog shows; tests change them freely. */
   banners: Banner[];
   storeValue: StoreSettingsValue;
@@ -60,7 +63,8 @@ export interface Fixture {
   packagedOffer(warehouseId: string, product: { id: string; v1: string; v2: string }, stock: [number, number]): Promise<{ id: string; rev: number }>;
 }
 
-export async function startFixture(databaseName: string): Promise<Fixture> {
+/** `realOrders`: use the real orders module instead of the in-memory fake (the cart, order and delivery tests that run the whole journey). */
+export async function startFixture(databaseName: string, options: { realOrders?: boolean } = {}): Promise<Fixture> {
   const h = await startHarness(databaseName);
   const events: StockEvent[] = [];
   const storage = createFakeStorage();
@@ -68,6 +72,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
   const geo = createFakeGeography({ ZONE1, ZONE2, W1, W2, W3 });
   const orders = createFakeOrders();
   const accounts = createFakeRiderIdentity();
+  const money = createFakeMoney();
   const banners: Banner[] = [];
   const defaultStore = (): StoreSettingsValue => ({
     etaMinMinutes: 15, etaMaxMinutes: 20, minOrder: 10000, freeDeliveryAbove: 60000, smallOrderFee: 0, afterHoursMode: "pre_order", preOrderAvailable: true,
@@ -80,7 +85,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
     geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
     discoverySettings: { maxChanges: 6 },
-    orders: orders.port, riderIdentity: accounts.identity, rider: riderFromHeader,
+    ...(options.realOrders ? {} : { orders: orders.port }), money: money.port, riderIdentity: accounts.identity, rider: riderFromHeader,
     trackingTokenSecret: "test-secret", syncSettings: { upi: { vpa: "darjeelingstores@bank", payeeName: "Darjeeling Stores" }, otpIterations: 1000 },
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
@@ -94,7 +99,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     return body === undefined ? r : r.send(body as object);
   };
   const fixture: Fixture = {
-    h, mods, app, events, storage, msg, geo, orders, accounts, banners, storeValue, get, send,
+    h, mods, app, events, storage, msg, geo, orders, accounts, money, banners, storeValue, get, send,
     async runJobs() {
       let total = 0;
       for (let pass = 0; pass < 20; pass++) { const ran = await mods.jobs.service.runOnce(); total += ran; if (ran === 0) break; }
@@ -117,6 +122,8 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
       await mods.sync.store.ensureIndexes();
       await mods.pricing.store.ensureIndexes();
       await mods.cart.store.ensureIndexes();
+      await mods.orders.store.ensureIndexes();
+      money.reset();
       orders.reset();
       accounts.reset();
       storage.reset();

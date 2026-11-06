@@ -291,6 +291,12 @@ export function createMediaService(deps: MediaDeps) {
       return { mediaId: id, kind: destKind };
     },
 
+    /** True once a file has been deleted or is being deleted. */
+    async isGone(mediaId: string): Promise<boolean> {
+      const file = await store.get(mediaId);
+      return !file || file.status === "deleting" || file.status === "deleted";
+    },
+
     /** Start the clock on an order's voice note and house photo: deleted `orderMediaRetentionDays` after the order ends. */
     async scheduleOrderMediaExpiry(orderId: string, endedAt: Date): Promise<number> {
       return store.setDeleteAfter("order", orderId, ORDER_COPY_KINDS, addDays(endedAt, settings.orderMediaRetentionDays));

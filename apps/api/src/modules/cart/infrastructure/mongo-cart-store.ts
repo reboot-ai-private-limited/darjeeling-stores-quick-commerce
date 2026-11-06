@@ -17,7 +17,8 @@ export function createMongoCartStore(connection: Connection): CartStore {
     },
     async getCart(userId) { const doc = await carts().findOne({ _id: userId }); if (!doc) return null; const { _id, ...rest } = doc; return { userId: _id, ...rest }; },
     async saveCart(cart) { const { userId, ...rest } = cart; await carts().replaceOne({ _id: userId }, rest as never, { upsert: true }); },
-    async clearCart(userId) { await carts().deleteOne({ _id: userId }); },
+    /** After an order the lines go but the cart keeps its zone and address, so the next order starts from the same place. */
+    async clearCart(userId) { await carts().updateOne({ _id: userId }, { $set: { items: [], couponCode: null, zoneChange: null, updatedAt: new Date() } }); },
     async insertQuote(quote) { const { id, ...rest } = quote; await quotes().insertOne({ _id: id, ...rest }); },
     async getQuote(id) { const doc = await quotes().findOne({ _id: id }); if (!doc) return null; const { _id, ...rest } = doc; return { id: _id, ...rest }; },
     async claimQuote(id, groupId) {
