@@ -18,7 +18,7 @@ export function actorFromHeader(req: Request): Actor | undefined {
   if (who.startsWith("scoped:")) {
     return {
       userId: "000000000000000000000003", role: "manager", scope: { all: false, warehouseIds: [who.slice("scoped:".length)] },
-      permissions: ["catalog:view", "warehouse_catalog:view", "warehouse_catalog:manage", "stock:view", "stock:manage"],
+      permissions: ["catalog:view", "warehouse_catalog:view", "warehouse_catalog:manage", "catalog:import", "stock:view", "stock:manage", "notify_demand:view"],
     };
   }
   return undefined;
@@ -45,3 +45,9 @@ export async function startHarness(databaseName: string): Promise<Harness> {
 }
 
 export const api = "/api/v1";
+
+/** Test-only customer login: the `X-Test-Customer` header carries the customer id. Never used outside tests. */
+export function customerFromHeader(req: Request): { userId: string } | undefined {
+  const userId = req.get("X-Test-Customer");
+  return userId ? { userId } : undefined;
+}

@@ -2,7 +2,7 @@ import {
   AppError, assertWarehouseScope, conflict, notFound, validation, type Ctx,
 } from "../../catalog/catalog.public.js";
 import {
-  bulkPrice, discountAmount, discountPercent, effectivePrice, findPriceConflicts, isLow, onSale, pricingProblems, type Offering, type OfferingVariant, type PriceConflict, type ProductInfo,
+  bulkPrice, discountAmount, discountPercent, effectivePrice, findPriceConflicts, isLow, onSale, pricingProblems, unitsAvailable, type Offering, type OfferingVariant, type PriceConflict, type ProductInfo,
 } from "../domain/stock.js";
 import type { OfferingsDeps, OfferingsTx, PriceHistoryRow, StockEvent, StockMovement } from "./ports.js";
 import { stockSideEffects, withZeroStock } from "./stock-effects.js";
@@ -406,6 +406,18 @@ export function createOfferingsService(deps: OfferingsDeps) {
       });
       const page = rows.slice(0, filters.limit);
       return { items: page.map(({ id: _id, at, ...rest }) => ({ ...rest, at: at.toISOString() })), nextCursor: rows.length > filters.limit ? encodeCursor(page[page.length - 1]!.id) : null };
+    },
+
+    /** Whole units each size of a product can be sold in a zone right now. Used by Notify Me (F07). */
+    async zoneAvailability(zoneId: string, productId: string): Promise<{ sold: boolean; unitsByVariant: Record<string, number> }> {
+      const [product] = await products.getMany([productId]);
+      if (!product || product.status !== "active") return { sold: false, unitsByVariant: {} };
+      const sellers = (await store.listByZoneProduct(zoneId, productId)).filter(o => o.status === "active");
+      const unitsByVariant: Record<string, number> = {};
+      for (const variant of product.variants.filter(v => v.isActive)) {
+        unitsByVariant[variant.id] = sellers.reduce((sum, o) => sum + (o.variants.some(l => l.variantId === variant.id) ? unitsAvailable(product, o, variant.id) : 0), 0);
+      }
+      return { sold: sellers.length > 0, unitsByVariant };
     },
 
     // ---------- for the catalog module (ProductUsagePort) ----------

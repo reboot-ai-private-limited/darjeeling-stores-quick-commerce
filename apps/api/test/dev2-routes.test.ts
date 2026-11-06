@@ -16,7 +16,7 @@ function documented(file: string): string[] {
   return rows.map(([, method, route]) => normalise(method!, route!));
 }
 
-describe("Dev 2 routes (catalog and stock)", () => {
+describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
   const { routes } = createDev2Modules();
   const registered = routes.map(r => normalise(r.method, r.path));
 
@@ -32,10 +32,24 @@ describe("Dev 2 routes (catalog and stock)", () => {
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
+  it("registers every endpoint documented for F06 product import and the admin tree", () => {
+    const expected = documented("F06-product-import-and-admin-tree.md");
+    expect(expected).toHaveLength(3);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F07 Notify Me", () => {
+    const expected = documented("F07-notify-me.md");
+    expect(expected).toHaveLength(4);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
   it("registers nothing that the API docs do not describe", () => {
-    const expected = new Set([...documented("F04-master-catalog.md"), ...documented("F05-warehouse-stock-and-pricing.md")]);
+    const expected = new Set(
+      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md"].flatMap(documented),
+    );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(30);
+    expect(registered).toHaveLength(37);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {

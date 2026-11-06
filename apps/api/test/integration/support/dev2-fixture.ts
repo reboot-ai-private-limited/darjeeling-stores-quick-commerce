@@ -2,7 +2,7 @@ import request from "supertest";
 import { expect } from "vitest";
 import { createDev2Modules } from "../../../src/composition/dev2.js";
 import type { StockEvent } from "../../../src/modules/offerings/offerings.public.js";
-import { actorFromHeader, api, startHarness, type Harness } from "./harness.js";
+import { actorFromHeader, api, customerFromHeader, startHarness, type Harness } from "./harness.js";
 
 export const ZONE1 = "1".repeat(24);
 export const ZONE2 = "2".repeat(24);
@@ -17,6 +17,10 @@ const WAREHOUSES: Record<string, { id: string; zoneId: string; isEnabled: boolea
 
 export const admin = { "X-Test-Actor": "admin" };
 export const viewer = { "X-Test-Actor": "viewer" };
+export const customer = (userId: string) => ({ "X-Test-Customer": userId });
+export const CUSTOMER_A = "c1".repeat(12);
+export const CUSTOMER_B = "c2".repeat(12);
+export const CUSTOMER_C = "c3".repeat(12);
 export const scoped = (warehouseId: string) => ({ "X-Test-Actor": `scoped:${warehouseId}` });
 
 export interface Fixture {
@@ -40,7 +44,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
   const h = await startHarness(databaseName);
   const events: StockEvent[] = [];
   const mods = createDev2Modules({
-    connection: h.connection, auth: actorFromHeader,
+    connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
     events: { publish: event => { events.push(event); } },
   });
@@ -57,6 +61,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
       await h.reset();
       await mods.catalog.store.ensureIndexes();
       await mods.offerings.store.ensureIndexes();
+      await mods.availability.store.ensureIndexes();
       events.length = 0;
     },
     async category() {
