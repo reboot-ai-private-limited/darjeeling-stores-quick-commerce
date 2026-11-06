@@ -9,6 +9,7 @@ import CitiesLocalities from "./cities-localities";
 import ZonesEditor from "./zones-editor";
 import Warehouses from "./warehouses";
 import Catalog from "./catalog";
+import Inventory from "./inventory";
 import { readAdminSession, type AdminSession } from "./session-client";
 import "./admin.css";
 
@@ -16,6 +17,7 @@ const groups = [
   { label: "Workspace", items: ["Overview", "Orders"] },
   { label: "Organization", items: ["Warehouses", "Zones & localities", "Staff", "Roles & permissions"] },
   { label: "Catalog", items: ["Products & categories"] },
+  { label: "Inventory", items: ["Offerings & stock"] },
   { label: "Administration", items: ["Security", "Settings", "Audit log"] },
 ];
 const iconPaths: Record<string, string> = {
@@ -26,6 +28,7 @@ const iconPaths: Record<string, string> = {
   Staff: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M18 8a3 3 0 0 1 0 6 M22 21v-2a4 4 0 0 0-3-3.87",
   "Roles & permissions": "M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M8 12l3 3 5-6",
   "Products & categories": "M4 6h16 M4 10h16 M4 14h10 M4 18h6",
+  "Offerings & stock": "M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z M4 13h2v-2H4z M18 13h2v-2h-2z M7 13h10v-2H7z",
   Security: "M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2",
   Settings: "M4 7h16 M4 17h16 M8 4v6 M16 14v6",
   "Audit log": "M6 3h12v18H6z M9 7h6 M9 11h6 M9 15h4",
@@ -77,7 +80,8 @@ export default function AdminPage() {
     (item === "Roles & permissions" && can("roles:manage") && session.user.scope.all) ||
     (item === "Zones & localities" && can("zones:manage") && session.user.scope.all) ||
     (item === "Warehouses" && (can("warehouses:view") || can("warehouses:manage"))) ||
-    (item === "Products & categories" && (can("catalog:manage") || can("catalog:view")));
+    (item === "Products & categories" && (can("catalog:manage") || can("catalog:view"))) ||
+    (item === "Offerings & stock" && (can("inventory:manage") || can("inventory:view") || can("warehouses:view") || can("warehouses:manage")));
   return <div className="admin-shell">
     <a className="admin-skip" href="#admin-main">Skip to content</a>
     <aside id="admin-navigation" className={`admin-sidebar ${menuOpen ? "is-open" : ""}`} aria-label="Admin navigation">
@@ -110,7 +114,7 @@ export default function AdminPage() {
             </button>
           </div>
           {geoTab === "zones" ? <ZonesEditor session={session} /> : <CitiesLocalities />}
-        </div> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : <>
+        </div> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : section === "Offerings & stock" ? <Inventory session={session} /> : <>
         <div className="admin-heading"><div><h1>Overview</h1><p>Your store operations, in one place.</p></div><label className="admin-warehouse"><Icon name="Warehouses" /><select disabled aria-label="Warehouse selection unavailable"><option>Warehouses unavailable</option></select></label></div>
         <section className="admin-panel" aria-labelledby="admin-unavailable">
           <div className="admin-panel-toolbar"><h2>Workspace activity</h2><span>Awaiting connection</span></div>
