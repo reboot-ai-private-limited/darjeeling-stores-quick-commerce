@@ -66,3 +66,37 @@ export const historyQuery = z.object({
   warehouseId: id.optional(), productId: id.optional(), variantId: id.optional(),
   from: z.coerce.date().optional(), to: z.coerce.date().optional(), limit, cursor,
 });
+
+// ---------- F06: warehouse tree and import ----------
+export const treeQuery = z.object({ q: z.string().trim().min(1).max(100).optional(), status: offeringStatus.optional(), lowStock: flag.optional() });
+
+export const previewBody = z.object({
+  sourceWarehouseId: id, targetWarehouseId: id,
+  productIds: z.array(id).max(500).nullable().optional(), categoryId: id.nullable().optional(), selectAll: z.boolean().default(false),
+  options: z.object({
+    quantityMode: z.enum(["copy", "zero", "fixed"]).default("copy"), onConflict: z.enum(["skip", "overwrite"]).default("skip"),
+    markupPercent: z.number().min(-90).max(500).default(0), fixedQuantity: stockAmount.nullable().default(null),
+  }).strict().prefault({}),
+}).strict().superRefine((body, ctx) => {
+  const selectors = [(body.productIds?.length ?? 0) > 0, body.categoryId != null, body.selectAll].filter(Boolean).length;
+  if (selectors !== 1) ctx.addIssue({ code: "custom", path: ["productIds"], message: "Use exactly one of productIds, categoryId or selectAll" });
+  if (body.options.quantityMode === "fixed" && body.options.fixedQuantity === null) {
+    ctx.addIssue({ code: "custom", path: ["options", "fixedQuantity"], message: "fixedQuantity is required when quantityMode is fixed" });
+  }
+}).transform(body => ({
+  sourceWarehouseId: body.sourceWarehouseId, targetWarehouseId: body.targetWarehouseId,
+  productIds: (body.productIds?.length ?? 0) > 0 ? (body.productIds as string[]) : null, categoryId: body.categoryId ?? null, selectAll: body.selectAll, options: body.options,
+}));
+
+/** Rows and variants are the preview rows sent back, so fields the server only displays (name, warnings, label...) are ignored. */
+const commitVariant = z.object({
+  variantId: id, price: paise, mrp: paise, salePrice: paise.nullable().optional(), saleStart: instant.nullable().optional(),
+  saleEnd: instant.nullable().optional(), stock: stockAmount.nullable().optional(), maxQtyPerOrder: z.number().int().min(1).max(1000).nullable().optional(),
+});
+export const commitBody = z.object({
+  previewId: id, confirmQuantities: z.boolean().default(false),
+  rows: z.array(z.object({
+    productId: id, action: z.enum(["create", "overwrite", "skip"]), stockGrams: stockAmount.nullable().optional(),
+    variants: z.array(commitVariant).max(20).optional(),
+  })).max(500),
+}).strict();

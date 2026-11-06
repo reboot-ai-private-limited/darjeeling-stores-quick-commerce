@@ -46,6 +46,8 @@ export interface MediaPort {
   urls(mediaIds: readonly string[]): Promise<Record<string, Record<string, string>>>;
   /** Ask for every stored size of the file to be deleted. */
   remove(mediaId: string, reason: string): Promise<void>;
+  /** Record that the file now belongs to this owner (it then stops being "unattached"). Throws if the file cannot be used for it. */
+  claim?(mediaId: string, owner: { type: "product" | "category" | "banner"; id: string }): Promise<void>;
 }
 
 /** Implemented by the offerings module so the catalog can protect products that are already for sale. */

@@ -2,7 +2,12 @@ import request from "supertest";
 import { expect } from "vitest";
 import { createDev2Modules } from "../../../src/composition/dev2.js";
 import type { StockEvent } from "../../../src/modules/offerings/offerings.public.js";
-import { actorFromHeader, api, startHarness, type Harness } from "./harness.js";
+import type { Banner, StoreSettingsValue } from "../../../src/modules/discovery/discovery.public.js";
+import { createFakeGeography, type FakeGeography } from "./fake-geography.js";
+import { createFakeOrders, createFakeRiderIdentity, type FakeOrders, type FakeRiderIdentity } from "./fake-orders.js";
+import { createFakeMessaging, type FakeMessaging } from "./fake-messaging.js";
+import { createFakeStorage, type FakeStorage } from "./fake-storage.js";
+import { actorFromHeader, api, customerFromHeader, principalFromHeader, riderFromHeader, startHarness, type Harness } from "./harness.js";
 
 export const ZONE1 = "1".repeat(24);
 export const ZONE2 = "2".repeat(24);
@@ -17,6 +22,12 @@ const WAREHOUSES: Record<string, { id: string; zoneId: string; isEnabled: boolea
 
 export const admin = { "X-Test-Actor": "admin" };
 export const viewer = { "X-Test-Actor": "viewer" };
+export const customer = (userId: string) => ({ "X-Test-Customer": userId });
+export const CUSTOMER_A = "c1".repeat(12);
+export const CUSTOMER_B = "c2".repeat(12);
+export const CUSTOMER_C = "c3".repeat(12);
+/** Logins for the media routes. Catalog routes use the `X-Test-Actor` header, so a test that needs both sends both. */
+export const asPrincipal = (who: string) => ({ "X-Test-Principal": who });
 export const scoped = (warehouseId: string) => ({ "X-Test-Actor": `scoped:${warehouseId}` });
 
 export interface Fixture {
@@ -24,6 +35,19 @@ export interface Fixture {
   mods: ReturnType<typeof createDev2Modules>;
   app: ReturnType<Harness["appWith"]>;
   events: StockEvent[];
+  storage: FakeStorage;
+  /** Fake push, WhatsApp, SMS and identity lookups. */
+  msg: FakeMessaging;
+  /** Fake zones, localities and warehouse hours. */
+  geo: FakeGeography;
+  /** Fake orders with the real status rules, and fake rider login accounts. */
+  orders: FakeOrders;
+  accounts: FakeRiderIdentity;
+  /** Home banners and store settings the catalog shows; tests change them freely. */
+  banners: Banner[];
+  storeValue: StoreSettingsValue;
+  /** Runs the job queue until nothing more is due. */
+  runJobs(): Promise<number>;
   reset(): Promise<void>;
   get(path: string, who?: Record<string, string>): request.Test;
   send(method: "post" | "put" | "delete", path: string, body?: unknown, who?: Record<string, string>): request.Test;
@@ -39,8 +63,26 @@ export interface Fixture {
 export async function startFixture(databaseName: string): Promise<Fixture> {
   const h = await startHarness(databaseName);
   const events: StockEvent[] = [];
+  const storage = createFakeStorage();
+  const msg = createFakeMessaging();
+  const geo = createFakeGeography({ ZONE1, ZONE2, W1, W2, W3 });
+  const orders = createFakeOrders();
+  const accounts = createFakeRiderIdentity();
+  const banners: Banner[] = [];
+  const defaultStore = (): StoreSettingsValue => ({
+    etaMinMinutes: 15, etaMaxMinutes: 20, minOrder: 10000, freeDeliveryAbove: 60000, smallOrderFee: 0, afterHoursMode: "pre_order", preOrderAvailable: true,
+    opensAt: null, closesAt: new Date("2026-11-05T14:30:00Z"), pauseMessage: "Back at 9 AM", notices: [{ type: "rain", label: "Rain mode: +₹15 delivery fee, +10 min", amount: 1500, extraMinutes: 10 }],
+  });
+  const storeValue = defaultStore();
   const mods = createDev2Modules({
-    connection: h.connection, auth: actorFromHeader,
+    storage: storage.provider, principal: principalFromHeader, mediaSettings: { maxPendingPerUser: 3 },
+    push: msg.push, whatsapp: msg.whatsapp, sms: msg.sms, contacts: msg.contacts, devices: msg.devices, audience: msg.audience,
+    webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
+    geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
+    discoverySettings: { maxChanges: 6 },
+    orders: orders.port, riderIdentity: accounts.identity, rider: riderFromHeader,
+    trackingTokenSecret: "test-secret", syncSettings: { upi: { vpa: "darjeelingstores@bank", payeeName: "Darjeeling Stores" }, otpIterations: 1000 },
+    connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
     events: { publish: event => { events.push(event); } },
   });
@@ -52,11 +94,34 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     return body === undefined ? r : r.send(body as object);
   };
   const fixture: Fixture = {
-    h, mods, app, events, get, send,
+    h, mods, app, events, storage, msg, geo, orders, accounts, banners, storeValue, get, send,
+    async runJobs() {
+      let total = 0;
+      for (let pass = 0; pass < 20; pass++) { const ran = await mods.jobs.service.runOnce(); total += ran; if (ran === 0) break; }
+      return total;
+    },
     async reset() {
       await h.reset();
       await mods.catalog.store.ensureIndexes();
       await mods.offerings.store.ensureIndexes();
+      await mods.availability.store.ensureIndexes();
+      await mods.media.store.ensureIndexes();
+      await mods.jobs.store.ensureIndexes();
+      await mods.notifications.ready();
+      await mods.discovery.store.ensureIndexes();
+      await mods.addresses.store.ensureIndexes();
+      await mods.riders.store.ensureIndexes();
+      await mods.dispatch.store.ensureIndexes();
+      await mods.cash.store.ensureIndexes();
+      await mods.tracking.store.ensureIndexes();
+      await mods.sync.store.ensureIndexes();
+      orders.reset();
+      accounts.reset();
+      storage.reset();
+      msg.reset();
+      geo.reset();
+      banners.length = 0;
+      Object.assign(storeValue, defaultStore());
       events.length = 0;
     },
     async category() {

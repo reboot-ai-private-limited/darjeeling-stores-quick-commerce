@@ -115,3 +115,14 @@ Body: `{ "outcome": "accepted", "note": "Customer confirmed by phone" }`. `outco
 - Cart taps work offline; `PUT /cart` syncs when back online.
 - Place order needs a network and a valid quote: disable the button offline. Retry the **same** `Idempotency-Key` after a timeout.
 - Tracking: keep the last response and show "Updated N min ago" ([F20](F20-eta-and-live-tracking.md)).
+
+## Implementation notes (backend, D2-10)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. A malformed event rejects the whole request before anything is applied; a duplicate `clientEventId` inside one request is also `400`. At most 50 events per call.
+- **Bundle.** Only for a rider's own order that is picked up or later (`409 INVALID_TRANSITION` before that). The code is sent only as `pbkdf2-sha256` (100 000 iterations, a fresh 16-byte salt each time); `otp` is `null` when the order needs no code. `voiceNote` and `housePhoto` are signed links (`null` when the file is gone or expired). `upi` is `null` until `syncSettings.upi` is set.
+- **Idempotency.** Each `(rider, clientEventId)` is handled once and its result kept for 90 days; a resend answers `duplicate` without touching the order. Two simultaneous sends of one batch are handled as one. A step the order has already reached (for example pickup done online) is also `duplicate`.
+- **Order.** Events are applied in `seq` order; results come back in the order received. A conflict on one event does not stop the rest.
+- **Delivering offline.** The server re-checks the code. A wrong or missing code leaves the order at `ARRIVED`, answers `conflict` / `otp_mismatch` and opens a review with `deliveryPending: true`: accepting it completes the delivery, rejecting it sends the order to `FAILED_DELIVERY`. A correct code delivers, then flags the delivery if the position is more than `geofenceMeters` (300) from the address (`far_from_address`), or the device time is more than 5 minutes ahead, older than 7 days or before the order was ready (`time_skew`, and the server time is used instead). A flagged delivery stays delivered; rejecting it later moves it to `FAILED_DELIVERY` and into the failed-delivery list ([F18](F18-dispatch-and-assignment.md)). Pay-on-delivery orders need the `collect_cash` event before `deliver`, or the delivery is a conflict (`invalid_transition`).
+- **Cash from the queue** is never dropped: it is always written to the cash ledger. See [F22](F22-rider-cash-and-settlement.md) for how the unexpected cases are recorded (`overpaid`, `unmatched`).
+- **Not enforced here.** "A rider cannot end a shift while the outbox is not empty" is a phone rule; the server cannot see the outbox.
+- **`GET /admin/offline-reviews`** also returns `deliveryPending`, and once resolved `outcome`, `note` and `resolvedAt`. It needs `orders:manage` and is limited to the admin's warehouses.

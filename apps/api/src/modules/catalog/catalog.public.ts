@@ -11,7 +11,7 @@ export type { ProductView } from "./application/types.js";
 export type { CatalogService } from "./application/catalog-service.js";
 export type { Product, Variant, Category, ProductType, StockMode, ProductStatus, Nutrition, KeyInfoRow, InfoSection } from "./domain/product.js";
 export { AppError, conflict, forbidden, notFound, validation, type ErrorCode } from "./domain/errors.js";
-export { assertWarehouseScope, denyAll, guarded, parse, pathId, sendData, sendError, type AuthResolver } from "./interface/http-support.js";
+export { assertWarehouseScope, denyAll, customerGuarded, guarded, noCustomers, open, parse, pathId, requestIdOf, sendData, sendError, type AuthResolver, type CustomerResolver } from "./interface/http-support.js";
 export { catalogRoutes } from "./interface/routes.js";
 export { createCatalogService } from "./application/catalog-service.js";
 export { createMongoCatalogStore } from "./infrastructure/mongo-catalog-store.js";

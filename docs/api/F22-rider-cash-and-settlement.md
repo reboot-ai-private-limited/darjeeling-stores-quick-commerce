@@ -72,7 +72,7 @@ Query: `riderId`, `warehouseId`, `type=collected|deposit|adjustment`, `from`, `t
 Collected entries are positive and deposits negative. `flags` may be `overpaid` or `unmatched`.
 
 ## POST /admin/cash/deposit
-Body: `{ "riderId": "rider_1", "warehouseId": "wh_1", "amount": 15800, "note": "Evening handover" }`. A warehouse manager can only deposit for their own warehouse; the owner can do any. 201: the ledger entry with the rider's new `balanceAfter`. Errors: `422 VALIDATION_ERROR` (`amount` larger than the cash held for that warehouse) · `403 FORBIDDEN` (scope).
+Body: `{ "riderId": "rider_1", "warehouseId": "wh_1", "amount": 15800, "note": "Evening handover" }`. A warehouse manager can only deposit for their own warehouse; the owner can do any. 201: the ledger entry with the rider's new `balanceAfter`. Errors: `400 VALIDATION_ERROR` (`amount` larger than the cash held for that warehouse) · `403 FORBIDDEN` (scope).
 
 ## POST /admin/cash/adjust
 Body: `{ "riderId": "rider_1", "warehouseId": "wh_1", "amount": -200, "note": "Short by ₹200, rider will repay" }`. `note` is **required**. 201: the ledger entry (`type: "adjustment"`). Entries are never edited or deleted.
@@ -103,3 +103,15 @@ Body depends on `type`:
 
 ## POST /admin/orders/:id/fix-collection
 Corrects a mistaken collection record. Body: `{ "method": "cash", "amount": 8800, "reason": "Rider entered the wrong order" }`. 200: the order. The ledger gets a matching adjustment, never an edit. Audited.
+
+## Implementation notes (backend, D2-8)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422 (a deposit larger than the cash held is `400` with `details: { field: "amount", held }`). `PAYMENT_MISMATCH` is `422`. Amounts are whole paise.
+- **Ledger.** Append-only, in `cash_ledger`; `balanceAfter` is the rider's total across warehouses right after the entry. Each warehouse balance and the rider's total are moved in the same database transaction as the entry, so a deposit can never take out more than the warehouse balance even if two arrive together. Cash for an order is written once (a unique index), so a repeated call, or three at the same moment, adds it once. Adjustments may leave a balance below zero (the rider owes cash).
+- **Collecting.** The rider must hold the order and be at `ARRIVED`; `already_paid` is refused. A repeat, after delivery too, returns the first result with `duplicate: true`. If the ledger was written but the order was not marked, the repeat finishes the job. `collect-upi` writes no ledger line; it opens a `upi_unverified` item for the admin and marks the order `upi_unverified`.
+- **Resolving.** `verified` marks the order `upi_verified`. `not_received` adds a `discrepancy` adjustment of the amount to the rider's cash in hand (they now owe it in cash) and marks the order as cash. `refund` asks the orders module for a refund and returns it as `refund`. `keep` changes nothing. `adjust` adds an adjustment of `amount` (default: minus the item's amount). Only one admin can close an item; if the follow-up fails the item is reopened.
+- **fix-collection** compares what the ledger holds for the order with the new cash amount and writes an adjustment for the difference (nothing if equal). Changing to `upi` takes the cash out and opens a UPI item. It needs a rider on the order (`409`, `reason: no_rider`, otherwise).
+- **Scope.** A warehouse manager sees and acts on their own warehouses only; owners see all. Needs `cash:manage` (`orders:manage` for fix-collection).
+- **Offline.** Cash from `POST /rider/sync` ([F21](F21-offline-and-low-network.md)) is recorded even when the order was cancelled (`unmatched`), moved to another rider (`unmatched`), already paid online (`overpaid`), or for a different amount (`unmatched`).
+- **For Dev 1.** `OrdersPort` gained `setCollection` (record, replace or clear the payment taken at the door and set the payment status), `createRefund` and `reverseDelivery`; see `apps/api/src/platform/orders.ts`.
+- **Not built.** Cash reports (F25) and warehouse-manager screens.

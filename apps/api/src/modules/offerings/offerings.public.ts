@@ -3,14 +3,20 @@ import { Types } from "mongoose";
 import { denyAll, type AuthResolver, type CatalogStore, type ProductUsagePort } from "../catalog/catalog.public.js";
 import { createOfferingsService } from "./application/offerings-service.js";
 import type { EventPublisher, ProductDirectory, WarehouseDirectory } from "./application/ports.js";
+import { createImportService } from "./application/import-service.js";
+import { createTreeService } from "./application/tree-service.js";
 import { createStockService } from "./application/stock-service.js";
 import { createMongoOfferingsStore } from "./infrastructure/mongo-offerings-store.js";
 import { offeringsRoutes } from "./interface/routes.js";
 import type { StockThresholds } from "./domain/stock.js";
 
 export type { StockService, ReserveLine, ReserveResult, Shortage, LineResolution, ReservationView } from "./application/stock-service.js";
+export type { ImportService } from "./application/import-service.js";
+export type { TreeService } from "./application/tree-service.js";
 export type { OfferingsService } from "./application/offerings-service.js";
-export type { EventPublisher, ProductDirectory, StockEvent, WarehouseDirectory } from "./application/ports.js";
+export type { EventPublisher, ProductDirectory, StockEvent, WarehouseDirectory, ZoneOfferingsQuery } from "./application/ports.js";
+export type { Offering, OfferingVariant, ProductInfo } from "./domain/stock.js";
+export { discountAmount, discountPercent, effectivePrice, onSale, unitsAvailable } from "./domain/stock.js";
 export { offeringsRoutes } from "./interface/routes.js";
 
 /** Stand-in until geography exists: no warehouse is known, so nothing can be offered (a safe default). */
@@ -25,6 +31,9 @@ export function productDirectoryFrom(catalog: { store: CatalogStore }): ProductD
         id: p.id, name: p.name, type: p.type, stockMode: p.stockMode, categoryId: p.categoryId, status: p.status,
         variants: p.variants.map(v => ({ id: v.id, label: v.label, weightGrams: v.weightGrams, isActive: v.isActive })),
       }));
+    },
+    async categories() {
+      return (await catalog.store.listCategories()).map(c => ({ id: c.id, name: c.name, parentId: c.parentId, sortOrder: c.sortOrder }));
     },
     // shortcut: a search matches at most 500 products; add a store-side join if a catalog ever grows past that.
     async searchIds({ q, categoryId }) {
@@ -52,11 +61,19 @@ export function createOfferingsModule(options: OfferingsModuleOptions) {
   const deps = { store, warehouses, products, events, thresholds, now: () => new Date(), newId: () => new Types.ObjectId().toHexString() };
   const offerings = createOfferingsService(deps);
   const stock = createStockService(deps);
+  const tree = createTreeService(deps);
+  const importer = createImportService(deps);
   const usage: ProductUsagePort = {
     offeringCount: productId => offerings.offeringCount(productId),
     touchOfferings: productId => offerings.touchOfferings(productId),
     // Deleting is allowed only when no offering exists AND the orders module confirms no order ever used the product.
     canDelete: async productId => (await offerings.offeringCount(productId)) === 0 && hasOrders !== undefined && (await hasOrders(productId)) === false,
   };
-  return { store, offerings, stock, usage, routes: offeringsRoutes(offerings, auth) };
+  /** Reads for the customer catalog: what a zone sells and which revision it is at. */
+  const zoneSource = {
+    zoneOfferings: (query: Parameters<typeof store.zoneOfferings>[0]) => store.zoneOfferings(query),
+    changedSince: (zoneId: string, since: number, limit: number) => store.changedSince(zoneId, since, limit),
+    currentRevision: () => store.currentRevision(),
+  };
+  return { store, zoneSource, offerings, stock, usage, tree, importer, routes: offeringsRoutes(offerings, auth, { tree, importer }) };
 }
