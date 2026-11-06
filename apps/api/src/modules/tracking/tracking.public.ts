@@ -32,8 +32,9 @@ export function createTrackingModule(options: TrackingModuleOptions) {
   const { connection, riders, relations, orders = noOrders, rider = noRiders, customer = noCustomers } = options;
   const settings: TrackingSettings = { ...DEFAULT_TRACKING_SETTINGS, ...options.settings };
   const store = createMongoTrackingStore(connection);
+  const eta = options.eta ?? baselineEta(settings);
   const service = createTrackingService({
-    store, orders, settings, eta: options.eta ?? baselineEta(settings), signer: createTokenSigner(options.tokenSecret), now: () => new Date(), riders, relations,
+    store, orders, settings, eta, signer: createTokenSigner(options.tokenSecret), now: () => new Date(), riders, relations,
   });
-  return { store, service, settings, routes: trackingRoutes(service, riders, rider, customer) };
+  return { store, service, settings, eta, routes: trackingRoutes(service, riders, rider, customer) };
 }

@@ -3,7 +3,7 @@ import { W1, W2, W3, ZONE2, admin, scoped, startFixture, viewer, type Fixture } 
 
 let f: Fixture;
 beforeAll(async () => { f = await startFixture("import_integration_test"); }, 180_000);
-afterAll(async () => { await f?.h.stop(); });
+afterAll(async () => { await f?.h.stop(); }, 60_000);
 beforeEach(async () => { await f.reset(); });
 
 const count = (collection: string, filter: Record<string, unknown> = {}) => f.h.connection.collection(collection).countDocuments(filter);

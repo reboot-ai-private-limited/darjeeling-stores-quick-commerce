@@ -133,3 +133,15 @@ Query: `status=active|past`, `limit`, `cursor`. 200:
 
 ## POST /orders/:id/reorder
 200: `{ "data": { "cart": <cart>, "corrections": [{ "productId": "prod_3", "variantId": "var_9", "reason": "out_of_stock", "qty": 0 }] } }`. Items are added to the cart at today's prices and stock; nothing is ordered.
+
+## Implementation notes (backend, orders module)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. `IDEMPOTENCY_KEY_REUSED`, `COD_NOT_ALLOWED` are `422`; `QUOTE_CHANGED`, `ITEM_UNAVAILABLE`, `INSUFFICIENT_STOCK`, `STORE_CLOSED`, `ZONE_PAUSED` are `409`; `QUOTE_EXPIRED` is `410`. A missing `Idempotency-Key` is `400`.
+- **Response.** `POST /orders` always answers `201 { group, payment }`; `payment` is `null` for cash and the checkout data for online orders (from the payments module, F15).
+- **Placing.** The quote is worked out again from its own lines. If the total, the charges or the allocation differ, a new quote is saved and returned in `409 QUOTE_CHANGED` (`details.quote`); nothing is taken. Otherwise, in order: the coupon is held (atomic against its limits), the stock is reserved for the whole group in one go (all or nothing), the quote is marked used, and the group and its children are saved in one transaction. Any failure gives the coupon and the stock back. A quote can be used once (`409`, `details.reason: quote_used`).
+- **Idempotency.** `(customer, Idempotency-Key)` is unique in the database, so a repeat, or three taps at once, returns the same group and takes stock once. The same key with a different body is `422 IDEMPOTENCY_KEY_REUSED`.
+- **Children** are `PLACED` (`CONFIRMED` when `confirmMode` is `auto`, the default) for cash, `PENDING_PAYMENT` with an expiry (`paymentWindowMinutes`, 15) for online. Cash orders confirm their stock hold at once; online holds expire on their own. Order numbers are `DS-<n>` for a single order and `DS-<n>-A`, `-B` when split. `amountDue` is the child's share of items, discount and fees for cash orders and 0 for prepaid ones.
+- **Delivery code.** One 4-digit code per group, kept encrypted (AES-256-GCM, key from `orderSettings.otpKeyHex`; a fixed development key is used only if none is set, so set it in production). Customers see it only while the group is active. A wrong try is counted per group and locks at 5.
+- **Files.** The address's voice note and photo are copied onto each child (F24) and scheduled for deletion after the order ends. `trackingUrl` is set when a tracking secret and `orderSettings.trackingBaseUrl` are configured.
+- **Reading.** `GET /orders?status=active|past` pages newest first (`status` is about whether any child is still in progress). Another customer's group or order is `404`. `reorder` adds the order's items back at today's prices (the cart keeps its address after an order, so this works at once).
+- **For the payments module (F15/F16).** Pass `money` to `createDev2Modules`: `refund(...)` is called for cancellations and removed items, and `startPayment(group)` for online orders. Until then nothing is refunded and `payment` is `null`.

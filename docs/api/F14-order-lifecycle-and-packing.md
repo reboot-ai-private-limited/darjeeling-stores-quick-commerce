@@ -116,3 +116,14 @@ Body: `{ "text": "Customer wants ripe tomatoes" }`. 201: the note.
 
 ## GET /admin/orders/:id/print
 Query: `type=bill|slip`. 200: `Content-Type: text/html` — a printable 80 mm thermal bill, or a packing slip with a checklist. Open it in a new tab and call `window.print()`. (GST invoice format is not specified yet; see the open questions in F13.)
+
+## Implementation notes (backend, orders module)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. A path id that is not an id, or an `itemIndex` that is not a number, is `404` / `400`.
+- **One writer.** Every status change goes through one function that checks the move against the state machine, updates the order only if it is still in the status it was read in (a concurrent change is retried once, then `409`), and writes the order event and the change-feed entry in the same transaction. The same function is behind the delivery modules' order port, so a rider's pickup and an admin's confirm follow the same rules. `409 INVALID_TRANSITION` carries `from`, `to` and `allowed[]`.
+- **Cancelling** (`CANCELLED`): the stock goes back, the coupon is given back when the whole group is cancelled, a rider assigned to the order is released and told, a prepaid customer is refunded (items less their discount, plus the fees only when every other order of the group is cancelled too), and the customer is notified. After pickup it is `409 ORDER_NOT_CANCELLABLE`.
+- **Missing items.** `unavailable` and the quantity edit take quantity off a line only while the order is `PLACED` to `READY`. The refunded or deducted amount is the line value less its pro-rata discount; cash orders' `amountDue` drops, prepaid orders get a refund, the stock for the removed quantity is restored once (a repeat does nothing), and the delivery fee and surcharges never change. An order with no lines left is cancelled.
+- **Changes feed.** `GET /admin/orders/changes` returns the position of the feed on the first call (no `since`) and no orders. After that, one entry per changed order since the cursor (`created` if it was created in that window). The cursor is `c_<n>`, numbered in the same transaction as the change so none is skipped. `ackStatus` is `null` for now; `delayed` is true when an order has waited longer than `slaMinutes` (confirm 5, pack 15, assign 5).
+- **List.** `q` matches order number, customer name or phone; `status` takes a comma list; `riderId` matches orders the rider is working now; `flagged` matches offline deliveries. Scoped staff see only their warehouses (`403` for another warehouse).
+- **Print** returns an 80 mm HTML page (`type=bill` by default, or `slip`); every value is escaped. **GST invoice format is not built.**
+- **Force status** accepts any status, records `forced: true` in the event and the audit log, and runs the usual effects (a forced `CANCELLED` restocks and refunds like a normal cancel).

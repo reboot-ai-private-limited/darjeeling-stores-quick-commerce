@@ -85,3 +85,14 @@ Query: `date=2026-11-06`, `warehouseId`, `slotStart`. 200:
 ## Pre-order rules the apps must show
 - Pre-orders are priced at placement; delivery-time surcharges are **not** re-applied (tell the customer at checkout).
 - Online payment is taken at order time. Cancel is allowed until the slot cutoff (`POST /orders/:id/cancel`).
+
+## Implementation notes (backend, hours module)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. Hours and slots are stored by the hours module (collections `warehouse_hours`, `ops_pauses`), not on the geography warehouse, so they can be changed without touching F03.
+- **Open or closed.** A warehouse takes orders on a day inside `open` to `close` minus `lastOrderMinutesBeforeClose`, in Indian time. A warehouse with no hours set follows the geography module's own open flag. A zone takes orders when any of its warehouses is open and not paused. Every module reads the geography port through this check, so `/store/status`, quotes and allocation agree.
+- **Pauses** are per warehouse or zone, with a message and an optional end time that ends them on its own. They are checked together with a pause set in the geography module (F03). If every warehouse of a zone is paused, or the zone is, a quote answers `409 ZONE_PAUSED` with `details.message` and `details.until`; browsing is unaffected. A manager can pause a zone only if every warehouse of it is in their scope. Pause and resume are audited.
+- **Closed.** `409 STORE_CLOSED` carries `opensAt` (next opening, null if no hours are set) and `preOrderAvailable`.
+- **Slots.** `GET /preorder/slots` lists today's and tomorrow's configured slots whose booking cutoff has not passed (the earliest day that has any), with `remaining` (the most any warehouse has left). `available` is false when the zone is open, paused, or no warehouse offers pre-orders. A requested window must match a configured slot exactly (start time and length) on today or tomorrow. `label` reads "Today 7–9 AM" or "Tomorrow 9–11 AM". Pre-order settings can be saved before hours and are kept when hours change.
+- **Placing.** A quote for a window is priced at once with the slot end as `promisedAt`; it uses only the warehouses that offer that slot and have room. At placement each child takes one place in the slot atomically, so capacity can never be passed: the loser gets `409 CONFLICT` (`details.reason: slot_full`) and nothing is taken. A passed cutoff is `409` / `cutoff_passed`. Cancelling an order gives its place back. A pre-order while the store is open is `400`.
+- **Packing list.** `GET /admin/preorders` defaults to tomorrow (`date=YYYY-MM-DD`); `packingStartsAt` is the slot start minus `packLeadMinutes`; `bySlot` counts places booked and capacity for the date. Cancelled orders are left out. Nothing moves an order automatically at that time; the order stays `CONFIRMED` until packing starts.
+- **Rain mode** is in the pricing module ([F11](F11-delivery-fees-and-surcharges.md)).

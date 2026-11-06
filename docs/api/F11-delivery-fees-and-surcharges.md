@@ -97,3 +97,12 @@ Body: `{ "on": true, "until": "2026-11-05T18:00:00Z", "zoneIds": ["zone_1"] }` â
 ## What clients see
 - Quote line: `{ "type": "surcharge_rain", "label": "Rain surcharge", "amount": 1500 }` inside `pricing.charges[]`.
 - Fees never increase after an order is placed, even if an item is later removed ([F14](F14-order-lifecycle-and-packing.md)).
+
+## Implementation notes (backend, pricing module)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. `403` for a zone outside the caller's grant means every warehouse of the zone must be in the admin's scope; a rule for all zones (empty `zoneIds`, surcharges only) needs an owner.
+- **One active fee rule per zone** is enforced by a unique database index, so two admins cannot both create one. The `409` carries the `ruleId` in the way. A fee rule must name its zones.
+- **The bill** is a pure function (`computeBill`): the fee comes from the tier the amount falls in (after or before discount, as the rule says); a free-delivery coupon or `alwaysFree` makes it 0; surcharges that are on (active, before `activeUntil`, inside their window) are added unless waived by free delivery; all surcharges together are cut to `surchargeCap` (default 5000 paise), the later ones first. Late-night windows are read in India time, may cross midnight, and the listed days are the days the window starts on.
+- **Preview** also returns `feeShares`: the delivery fee split between the deliveries of a split order (first one takes any odd paise). Rule `type` cannot be changed by PUT.
+- **Rain mode** creates or updates one rain rule per set of zones (default 1500 paise and 10 extra minutes, from `pricingSettings.rainDefaults`). A background job (`pricing.expire_rain`, every minute) switches rules off after `activeUntil`; the surcharge also stops at that moment even before the job runs.
+- **For quotes (F10)** use `pricing.service.bill(...)`, `minOrderFor(zoneId)` and `freeDeliveryThreshold(zoneId)`. **Known shortcut:** `surchargeCap` is a module option, not yet a stored setting.
