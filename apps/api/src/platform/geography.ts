@@ -6,7 +6,7 @@
 export interface GeoZone { id: string; name: string; cityId: string; isEnabled: boolean; isPaused: boolean }
 
 export interface GeoWarehouse {
-  id: string; zoneId: string; isEnabled: boolean;
+  id: string; zoneId: string; name: string; location: { lat: number; lng: number }; isEnabled: boolean;
   /** Taking orders right now: inside its opening hours and not paused. */
   isOpenNow: boolean;
 }
@@ -20,6 +20,7 @@ export interface Geography {
   /** The enabled zone containing the point (a point on the border counts as inside), or null when it is outside every zone. */
   zoneAt(point: { lat: number; lng: number }): Promise<GeoZone | null>;
   warehousesOfZone(zoneId: string): Promise<GeoWarehouse[]>;
+  warehouse(warehouseId: string): Promise<GeoWarehouse | null>;
   locality(localityId: string): Promise<GeoLocality | null>;
 }
 
@@ -28,5 +29,6 @@ export const noGeography: Geography = {
   zone: async () => null,
   zoneAt: async () => null,
   warehousesOfZone: async () => [],
+  warehouse: async () => null,
   locality: async () => null,
 };

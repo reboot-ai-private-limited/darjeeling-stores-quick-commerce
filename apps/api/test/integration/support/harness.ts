@@ -19,7 +19,7 @@ export function actorFromHeader(req: Request): Actor | undefined {
   if (who.startsWith("scoped:")) {
     return {
       userId: "000000000000000000000003", role: "manager", scope: { all: false, warehouseIds: [who.slice("scoped:".length)] },
-      permissions: ["catalog:view", "warehouse_catalog:view", "warehouse_catalog:manage", "catalog:import", "stock:view", "stock:manage", "notify_demand:view"],
+      permissions: ["catalog:view", "warehouse_catalog:view", "warehouse_catalog:manage", "catalog:import", "stock:view", "stock:manage", "notify_demand:view", "riders:view", "riders:manage", "dispatch:manage", "orders:manage", "cash:manage"],
     };
   }
   return undefined;
@@ -67,4 +67,10 @@ export function principalFromHeader(req: Request): Principal | undefined {
   if (kind === "orders") return staff(["orders:view"], { all: true, warehouseIds: [] }, "000000000000000000000004");
   if (kind === "scoped" && id) return staff(["orders:view", "catalog:manage"], { all: false, warehouseIds: [id] }, "000000000000000000000003");
   return undefined;
+}
+
+/** Test-only rider login: the `X-Test-Rider` header carries the rider's login id. Never used outside tests. */
+export function riderFromHeader(req: Request): { userId: string } | undefined {
+  const userId = req.get("X-Test-Rider");
+  return userId ? { userId } : undefined;
 }

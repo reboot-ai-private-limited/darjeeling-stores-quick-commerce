@@ -87,7 +87,7 @@ One group OTP completes the delivery for the same-rider case; separate riders ea
 ```
 `status`: `planned`, `active`, `done`, `cancelled`. `stops[].status`: `pending`, `arrived`, `done`. A batch holds up to `maxActiveOrders` orders (default 2, max 3) and may include pickups from several warehouses of the zone.
 
-- `POST /admin/batches` body `{ "riderId": "rider_1", "orderIds": ["ord_1", "ord_2"], "stops": [ … optional explicit order … ] }` → 201 batch. All orders must be `READY` and in the rider's zone. Errors: `409 RIDER_NOT_ELIGIBLE` · `422 VALIDATION_ERROR` (over the batch limit).
+- `POST /admin/batches` body `{ "riderId": "rider_1", "orderIds": ["ord_1", "ord_2"], "stops": [ … optional explicit order … ] }` → 201 batch. All orders must be `READY` and in the rider's zone. Errors: `409 RIDER_NOT_ELIGIBLE` · `400 VALIDATION_ERROR` (over the batch limit).
 - `GET /admin/batches?status=&riderId=` → `{ "data": [<batch>] }`.
 - `PUT /admin/batches/:id` body `{ "stops": [ … reordered … ] }` or `{ "addOrderIds": [], "removeOrderIds": [] }`; only while `planned`.
 - `POST /admin/batches/:id/cancel` → 200 `{ "data": { "ok": true } }`.
@@ -141,3 +141,18 @@ Query: `zoneId`, `warehouseId`. Poll about every 10 s for the map. 200:
   }]
 }
 ```
+
+## Implementation notes (backend, D2-7)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422, as everywhere else in this API. New error codes: `RIDER_NOT_ELIGIBLE` 409 (`details.reasons`: `offline`, `on_break`, `wrong_zone`, `wrong_warehouse`, `at_capacity`, `stale_location`), `INVALID_TRANSITION` 409 (`details.from`/`to`, or `reason`: `after_pickup`, `before_pickup`, `pickups_pending`), `ALREADY_ACKNOWLEDGED` 409, `OTP_MISMATCH` 401, `OTP_LOCKED` 429.
+- **Ranking.** Suggestions are ordered by fewest active orders, then nearest to the warehouse, then longest since the last assignment; `score` is the position (1 = best). Riders who cannot take the order come back under `ineligible` with their reasons, and a rider's position must be under 5 minutes old.
+- **One live assignment per order** is enforced by a unique partial index, and a rider's capacity (default 2 active orders) is claimed with one conditional update before the assignment is written, so two admins assigning at once cannot overload a rider or double-assign an order. On any failure the claim is given back.
+- **Acknowledgement clock.** A new assignment is due in 120 s. After that a background sweep (every 10 s) sends one WhatsApp (`assignment_unacknowledged_v1`, to be approved in the Meta console) and the board shows `ack_overdue` with "(WhatsApp sent)". Picking the order up counts as acknowledging it. Taking the order back, or handing it over, cancels the wait.
+- **Splitting.** `same_rider` builds one batch (a pickup per warehouse in `pickupOrder` or first-seen order, then one drop) and assigns every child; if any child fails, the others are undone and the batch is cancelled. `different_riders` assigns each child on its own, undoing the earlier ones if a later one fails.
+- **Batches** hold at most `min(maxBatchOrders 3, rider limit 2)` orders. Only a `planned` batch can be edited; an assigned order must be unassigned before it is removed. Stops given by the caller must pick up and drop every order exactly once.
+- **Hand-over** works only after pickup, ignores the new rider's warehouse list (the goods have left the warehouse) but still needs them online, in the zone, with room. The order's status does not change; the new rider must acknowledge, and the old assignment ends as `reassigned`.
+- **Failed deliveries** stay on the board (`failed_delivery`) until resolved. `cancel_return` needs `goodsCondition` (`good` or `spoiled`) and returns the refund when the order was already paid.
+- **Alerts** are worked out on request (no table): `ack_overdue`, `rider_problem`, `order_delayed` (ready more than 5 minutes with no assignment), `rider_offline` (offline with a shift or orders), `failed_delivery`. `offline_delivery_flagged` waits for offline sync (F21).
+- **For Dev 1.** Implement `OrdersPort` (`apps/api/src/platform/orders.ts`) and `RiderIdentity` (`platform/identity.ts`), give `Geography` the new `warehouse(id)` (name and location), and call `dispatch.hooks.onOrderCancelled(orderId)` and `onOrderPaid(orderId)` from the order and payment flows. The order module must make dispatch's transitions through `OrdersPort.transition`, which applies the F14 rules.
+- **Auto mode.** `assignmentMode: "auto"` (setting) lets a 15 s background job give ready orders to the best rider; the default is manual.
+- **Not built here.** Physical hand-over confirmation by the receiving rider. Live tracking is [F20](F20-eta-and-live-tracking.md).

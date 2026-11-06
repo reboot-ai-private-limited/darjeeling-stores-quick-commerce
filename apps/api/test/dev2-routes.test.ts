@@ -68,12 +68,42 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
+  it("registers every endpoint documented for F18 dispatch and assignment", () => {
+    const expected = documented("F18-dispatch-and-assignment.md");
+    expect(expected).toHaveLength(13);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F19 the rider app", () => {
+    const expected = documented("F19-rider-app.md");
+    expect(expected).toHaveLength(27);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F20 ETA and live tracking", () => {
+    const expected = documented("F20-eta-and-live-tracking.md");
+    expect(expected).toHaveLength(3);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F21 offline and low network", () => {
+    const expected = documented("F21-offline-and-low-network.md");
+    expect(expected).toHaveLength(4);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F22 rider cash and settlement", () => {
+    const expected = documented("F22-rider-cash-and-settlement.md");
+    expect(expected).toHaveLength(10);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
   it("registers nothing that the API docs do not describe", () => {
     const expected = new Set(
-      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
+      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F18-dispatch-and-assignment.md", "F19-rider-app.md", "F20-eta-and-live-tracking.md", "F21-offline-and-low-network.md", "F22-rider-cash-and-settlement.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
     );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(69);
+    expect(registered).toHaveLength(126);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {
@@ -83,7 +113,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("answers 401 with the documented error envelope for every route when nobody is logged in", async () => {
     const app = createApp();
-    const open = ["/webhooks/", "/catalog/", "/store/", "/banners", "/waitlist"];
+    const open = ["/webhooks/", "/catalog/", "/store/", "/banners", "/waitlist", "/track/"];
     for (const route of routes.filter(r => !open.some(prefix => r.path.startsWith(prefix)))) {
       const url = `/api/v1${route.path.replace(/:[A-Za-z]+/g, "a".repeat(24))}`;
       const res = await request(app)[route.method](url);
