@@ -22,9 +22,9 @@ export function createFakeGeography(ids: Ids) {
     zones.set(ids.ZONE1, { id: ids.ZONE1, name: "Mall Road & Chowrasta", cityId: CITY1, isEnabled: true, isPaused: false });
     zones.set(ids.ZONE2, { id: ids.ZONE2, name: "Tenzing Norgay Road", cityId: CITY1, isEnabled: true, isPaused: false });
     warehouses = [
-      { id: ids.W1, zoneId: ids.ZONE1, isEnabled: true, isOpenNow: true },
-      { id: ids.W2, zoneId: ids.ZONE1, isEnabled: true, isOpenNow: true },
-      { id: ids.W3, zoneId: ids.ZONE2, isEnabled: true, isOpenNow: true },
+      { id: ids.W1, zoneId: ids.ZONE1, name: "Chowrasta store", location: { lat: 27.041, lng: 88.2663 }, isEnabled: true, isOpenNow: true },
+      { id: ids.W2, zoneId: ids.ZONE1, name: "Mall Road store", location: { lat: 27.0432, lng: 88.2641 }, isEnabled: true, isOpenNow: true },
+      { id: ids.W3, zoneId: ids.ZONE2, name: "Ghoom store", location: { lat: 27.25, lng: 88.25 }, isEnabled: true, isOpenNow: true },
     ];
     localities.set(LOC1, { id: LOC1, cityId: CITY1, name: "Chowrasta", location: { lat: 27.041, lng: 88.263 }, zoneId: ids.ZONE1, isActive: true });
     localities.set(LOC2, { id: LOC2, cityId: CITY1, name: "Ghoom", location: { lat: 27.25, lng: 88.25 }, zoneId: ids.ZONE2, isActive: true });
@@ -41,6 +41,7 @@ export function createFakeGeography(ids: Ids) {
       return zone?.isEnabled ? zone : null;
     },
     warehousesOfZone: async zoneId => warehouses.filter(w => w.zoneId === zoneId).map(w => ({ ...w })),
+    warehouse: async id => { const w = warehouses.find(x => x.id === id); return w ? { ...w } : null; },
     locality: async id => localities.get(id) ?? null,
   };
 

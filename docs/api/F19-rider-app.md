@@ -120,7 +120,7 @@ Body:
 ```json
 { "checklist": { "itemsVerified": true, "bagCount": 2 } }
 ```
-200: the order with status `PICKED_UP`. Errors: `409 INVALID_TRANSITION` · `422 VALIDATION_ERROR` (`itemsVerified` must be true). After this call download the offline bundle (`GET /rider/orders/:id/bundle`, F21).
+200: the order with status `PICKED_UP`. Errors: `409 INVALID_TRANSITION` · `400 VALIDATION_ERROR` (`itemsVerified` must be true). After this call download the offline bundle (`GET /rider/orders/:id/bundle`, F21).
 
 ## POST /rider/orders/:id/start-ride
 No body. For a batch, call it after all pickups are done. For a single stop the app calls `pickup` and `start-ride` back to back (both transitions are recorded). 200: the order with status `OUT_FOR_DELIVERY`; the customer is notified with the tracking link. Errors: `409 INVALID_TRANSITION` (`details.reason: "pickups_pending"`).
@@ -192,7 +192,7 @@ The live map is `GET /admin/riders/live` ([F18](F18-dispatch-and-assignment.md))
 ### POST /admin/riders
 Body: `{ "name": "Pema Sherpa", "phone": "+919800000010", "zoneId": "zone_1", "warehouseIds": ["wh_1", "wh_2"], "vehicle": "Scooter" }`. Creates the user (role `rider`) and the rider profile so the phone can log in with `app: "rider"`. 201: the rider.
 
-Errors: `409 CONFLICT` (phone already used) · `422 VALIDATION_ERROR` with `details.reason: "warehouse_outside_zone"` (**every allowed warehouse must be in the rider's zone**) · `404 NOT_FOUND`.
+Errors: `409 CONFLICT` (phone already used) · `400 VALIDATION_ERROR` with `details.reason: "warehouse_outside_zone"` (**every allowed warehouse must be in the rider's zone**) · `404 NOT_FOUND`.
 
 ### PUT /admin/riders/:id
 Body (all optional): `name`, `zoneId`, `warehouseIds`, `vehicle`, `photoMediaId`. Same cross-zone check. A rider on shift cannot change zone (`409 CONFLICT`).
@@ -206,3 +206,15 @@ Riders query: `zoneId`, `warehouseId`, `status`, `q`. Shifts query: `riderId`, `
 { "id": "shift_1", "riderId": "rider_1", "warehouseId": "wh_1", "startedAt": "2026-11-05T02:30:00Z", "endedAt": null, "punchIn": { "distanceFromWarehouseM": 22, "verified": true }, "breaks": [], "endedBy": null }
 ```
 `punchIn.verified: false` = outside the radius (flagged).
+
+## Implementation notes (backend, D2-7)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422. A `:id` that is not a valid id is `404`.
+- **Rider login is Dev 1's.** Every `/rider/*` route resolves the signed-in rider through the `rider` option of `createDev2Modules`; without it they answer 401. A deactivated rider is refused with 403.
+- **Shifts.** Punching in is allowed anywhere but flagged (`verified: false`) when further than 150 m from the warehouse. One open shift per rider (claimed atomically). Ending a shift with orders already picked up is `409` (`reason: picked_up_orders`); an admin can force it. Hours worked exclude breaks. A rider whose phone stops sending a position for 10 minutes is moved offline by a 60 s sweep (`autoOffline`) and comes back by punching in again.
+- **Work feed.** `GET /rider/assignments` with no `since` returns every live assignment and a cursor `c_<n>`; with `since=c_<n>` it returns only newer events (`assigned`, `reassigned_away`, `cancelled`, `payment_paid`) and the next cursor. Sequence numbers are allocated in the same transaction as the event, so no event is skipped.
+- **Steps.** Pickup → start-ride → arrived → deliver, each one a rider-made order transition. `start-ride` in a batch waits for every pickup (`pickups_pending`). `arrived` also arrives the orders of the same checkout dropped at the same door. `deliver` needs the cash recorded first on pay-on-delivery orders (`409`, `reason: collection_required`), the delivery code when the order requires one (5 wrong tries locks it: `OTP_LOCKED`), and `deliveredAt` (for offline delivery) within the last day and not in the future. One code delivers every sibling at that door whose cash is recorded. Repeating a delivery answers `409` with `reason: already_delivered`.
+- **Order view** never includes the delivery code. A rider sees their own live orders and ones they delivered or failed; anything else is `404`.
+- **History** pages with `cursor`; `deliveredToday` counts from midnight India time.
+- **Profile photo** is a `rider_photo` media upload; failed-delivery photos are `failed_delivery_photo` uploads claimed against the order.
+- **Not built here.** `POST /rider/location` (F20), offline sync and the order bundle (F21), cash endpoints (F22), and the rider app screens.

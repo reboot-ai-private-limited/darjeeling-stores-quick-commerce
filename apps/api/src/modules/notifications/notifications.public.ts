@@ -43,6 +43,11 @@ export const noMediaUrls: MediaUrls = { urls: async () => ({}) };
 export const DEFAULT_TEMPLATES: readonly Omit<Template, "id" | "createdAt" | "updatedAt">[] = [
   { key: "back_in_stock", channel: "push", title: "Back in stock", body: "{{productName}} ({{variantLabel}}) is available again. Order now before it sells out.", whatsappTemplateName: null, category: "utility", language: "en", isActive: true },
   { key: "back_in_stock", channel: "whatsapp", title: null, body: "Good news! {{productName}} ({{variantLabel}}) is back in stock at Darjeeling Stores. Order now.", whatsappTemplateName: "back_in_stock_v1", category: "utility", language: "en", isActive: true },
+  { key: "assignment_assigned", channel: "push", title: "New order assigned", body: "Order {{orderNo}} is assigned to you. Acknowledge it now.", whatsappTemplateName: null, category: "utility", language: "en", isActive: true },
+  { key: "handover_assigned", channel: "push", title: "Order handed over to you", body: "Order {{orderNo}} is handed over to you. Acknowledge it now.", whatsappTemplateName: null, category: "utility", language: "en", isActive: true },
+  { key: "assignment_cancelled", channel: "push", title: "Order taken back", body: "Order {{orderNo}} was taken back by dispatch.", whatsappTemplateName: null, category: "utility", language: "en", isActive: true },
+  { key: "payment_paid", channel: "push", title: "Already paid", body: "Order {{orderNo}} is already paid. Do not collect cash.", whatsappTemplateName: null, category: "utility", language: "en", isActive: true },
+  { key: "assignment_unacknowledged", channel: "whatsapp", title: null, body: "{{name}}, order {{orderNo}} is waiting for you to acknowledge. Open the rider app now.", whatsappTemplateName: "assignment_unacknowledged_v1", category: "utility", language: "en", isActive: true },
   { key: "otp_login", channel: "whatsapp", title: null, body: "{{code}} is your Darjeeling Stores login code. Do not share it with anyone.", whatsappTemplateName: "login_otp", category: "authentication", language: "en", isActive: true },
   { key: "otp_login", channel: "sms", title: null, body: "Your Darjeeling Stores login code is {{code}}. Valid for 5 minutes.", whatsappTemplateName: null, category: "authentication", language: "en", isActive: true },
 ];

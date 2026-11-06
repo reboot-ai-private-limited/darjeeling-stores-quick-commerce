@@ -4,9 +4,10 @@ import { createDev2Modules } from "../../../src/composition/dev2.js";
 import type { StockEvent } from "../../../src/modules/offerings/offerings.public.js";
 import type { Banner, StoreSettingsValue } from "../../../src/modules/discovery/discovery.public.js";
 import { createFakeGeography, type FakeGeography } from "./fake-geography.js";
+import { createFakeOrders, createFakeRiderIdentity, type FakeOrders, type FakeRiderIdentity } from "./fake-orders.js";
 import { createFakeMessaging, type FakeMessaging } from "./fake-messaging.js";
 import { createFakeStorage, type FakeStorage } from "./fake-storage.js";
-import { actorFromHeader, api, customerFromHeader, principalFromHeader, startHarness, type Harness } from "./harness.js";
+import { actorFromHeader, api, customerFromHeader, principalFromHeader, riderFromHeader, startHarness, type Harness } from "./harness.js";
 
 export const ZONE1 = "1".repeat(24);
 export const ZONE2 = "2".repeat(24);
@@ -39,6 +40,9 @@ export interface Fixture {
   msg: FakeMessaging;
   /** Fake zones, localities and warehouse hours. */
   geo: FakeGeography;
+  /** Fake orders with the real status rules, and fake rider login accounts. */
+  orders: FakeOrders;
+  accounts: FakeRiderIdentity;
   /** Home banners and store settings the catalog shows; tests change them freely. */
   banners: Banner[];
   storeValue: StoreSettingsValue;
@@ -62,6 +66,8 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
   const storage = createFakeStorage();
   const msg = createFakeMessaging();
   const geo = createFakeGeography({ ZONE1, ZONE2, W1, W2, W3 });
+  const orders = createFakeOrders();
+  const accounts = createFakeRiderIdentity();
   const banners: Banner[] = [];
   const defaultStore = (): StoreSettingsValue => ({
     etaMinMinutes: 15, etaMaxMinutes: 20, minOrder: 10000, freeDeliveryAbove: 60000, smallOrderFee: 0, afterHoursMode: "pre_order", preOrderAvailable: true,
@@ -74,6 +80,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
     geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
     discoverySettings: { maxChanges: 6 },
+    orders: orders.port, riderIdentity: accounts.identity, rider: riderFromHeader,
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
     events: { publish: event => { events.push(event); } },
@@ -86,7 +93,7 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
     return body === undefined ? r : r.send(body as object);
   };
   const fixture: Fixture = {
-    h, mods, app, events, storage, msg, geo, banners, storeValue, get, send,
+    h, mods, app, events, storage, msg, geo, orders, accounts, banners, storeValue, get, send,
     async runJobs() {
       let total = 0;
       for (let pass = 0; pass < 20; pass++) { const ran = await mods.jobs.service.runOnce(); total += ran; if (ran === 0) break; }
@@ -102,6 +109,10 @@ export async function startFixture(databaseName: string): Promise<Fixture> {
       await mods.notifications.ready();
       await mods.discovery.store.ensureIndexes();
       await mods.addresses.store.ensureIndexes();
+      await mods.riders.store.ensureIndexes();
+      await mods.dispatch.store.ensureIndexes();
+      orders.reset();
+      accounts.reset();
       storage.reset();
       msg.reset();
       geo.reset();

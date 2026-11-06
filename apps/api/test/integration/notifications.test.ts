@@ -39,9 +39,10 @@ describe("message templates", () => {
   it("starts with the built-in templates for back-in-stock alerts and login codes", async () => {
     const res = await f.get("/admin/notification-templates");
     expect(res.status).toBe(200);
-    expect(res.body.meta).toEqual({ count: 4 });
-    expect(res.body.data.map((t: { key: string; channel: string }) => `${t.key}/${t.channel}`)).toEqual(["back_in_stock/push", "back_in_stock/whatsapp", "otp_login/whatsapp", "otp_login/sms"]);
-    expect(res.body.data[1]).toEqual({
+    // Four are for customers; the rest belong to the rider and dispatch flows.
+    expect(res.body.meta).toEqual({ count: 9 });
+    expect(res.body.data.map((t: { key: string; channel: string }) => `${t.key}/${t.channel}`).filter((k: string) => /^(back_in_stock|otp_login)/.test(k))).toEqual(["back_in_stock/push", "back_in_stock/whatsapp", "otp_login/whatsapp", "otp_login/sms"]);
+    expect(res.body.data.find((t: { key: string; channel: string }) => t.key === "back_in_stock" && t.channel === "whatsapp")).toEqual({
       id: expect.stringMatching(/^[a-f0-9]{24}$/), key: "back_in_stock", channel: "whatsapp", title: null, body: expect.stringContaining("{{productName}}"),
       whatsappTemplateName: "back_in_stock_v1", category: "utility", language: "en", isActive: true,
     });
@@ -54,7 +55,7 @@ describe("message templates", () => {
     await f.mods.notifications.ready();
     await f.mods.notifications.ready();
     const after = (await f.get("/admin/notification-templates")).body;
-    expect(after.meta.count).toBe(4);
+    expect(after.meta.count).toBe(9);
     expect(after.data.find((t: { id: string }) => t.id === push.id).title).toBe("It's back!");
   });
 
@@ -719,7 +720,7 @@ describe("background work", () => {
     await started();
     const schedules = await col("job_schedules").find({}).toArray();
     expect(schedules.map(s => [s._id, s.intervalMs]).sort()).toEqual([
-      ["media.sweep", 3_600_000], ["notifications.drain_back_in_stock", 60_000], ["stock.release_expired_holds", 60_000],
+      ["dispatch.ack_sweep", 10_000], ["dispatch.auto_assign", 15_000], ["media.sweep", 3_600_000], ["notifications.drain_back_in_stock", 60_000], ["riders.silent_sweep", 60_000], ["stock.release_expired_holds", 60_000],
     ]);
     expect(schedules.every(s => s.nextRunAt > new Date())).toBe(true);
   });
@@ -773,10 +774,10 @@ describe("background work", () => {
   it("runs each sweep once per interval and stops when told to", async () => {
     const background = await f.mods.startBackground(20);
     await dueNow();
-    for (let i = 0; i < 100 && (await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })) < 3; i++) await new Promise(r => setTimeout(r, 20));
+    for (let i = 0; i < 100 && (await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })) < 6; i++) await new Promise(r => setTimeout(r, 20));
     await background.stop();
-    expect(await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })).toBe(3);
+    expect(await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })).toBe(6);
     await new Promise(r => setTimeout(r, 100));
-    expect(await col("jobs").countDocuments({ type: /^recurring:/ })).toBe(3);
+    expect(await col("jobs").countDocuments({ type: /^recurring:/ })).toBe(6);
   });
 });

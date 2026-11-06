@@ -1,10 +1,13 @@
 ﻿import type { Connection } from "mongoose";
 import mongoose from "mongoose";
 import { noGeography, type Geography } from "../platform/geography.js";
+import type { RiderIdentity } from "../platform/identity.js";
+import type { OrdersPort } from "../platform/orders.js";
 import type { Route } from "../platform/routes.js";
 import { createAddressesModule } from "../modules/addresses/addresses.public.js";
 import { createAvailabilityModule, notifyProductsFrom, type CustomerResolver } from "../modules/availability/availability.public.js";
 import { createCatalogModule, denyAll, type AuthResolver, type MediaPort, type ProductUsagePort } from "../modules/catalog/catalog.public.js";
+import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
 import { createDiscoveryModule, type BannerSource, type DiscoverySettings, type StoreSettings } from "../modules/discovery/discovery.public.js";
 import { createJobsModule } from "../modules/jobs/jobs.public.js";
 import {
@@ -13,6 +16,7 @@ import {
 import {
   createNotificationsModule, type AudienceDirectory, type DeviceRegistry, type PushProvider, type SmsProvider, type UserContacts, type WebhookConfig, type WhatsAppProvider,
 } from "../modules/notifications/notifications.public.js";
+import { createRidersModule, type RiderResolver } from "../modules/riders/riders.public.js";
 import {
   createOfferingsModule, noWarehouses, productDirectoryFrom, type EventPublisher, type WarehouseDirectory,
 } from "../modules/offerings/offerings.public.js";
@@ -39,6 +43,13 @@ export interface Dev2Options {
   geography?: Geography;
   /** Home banners (F12) and hours, fees and the ETA (F11, F17, F20), all Dev 1's. */
   banners?: BannerSource; storeSettings?: StoreSettings; discoverySettings?: Partial<DiscoverySettings>;
+  /** Orders and their state machine (F13, F14), Dev 1's. Without it nothing can be dispatched. */
+  orders?: OrdersPort;
+  /** Rider login accounts (F01), Dev 1's. Without it riders cannot be created. */
+  riderIdentity?: RiderIdentity;
+  /** Who the signed-in rider is. Until the identity session is connected, nobody is signed in (401). */
+  rider?: RiderResolver;
+  deliverySettings?: Partial<DispatchSettings>;
   warehouses?: WarehouseDirectory;
   events?: EventPublisher;
   hasOrders?: (productId: string) => Promise<boolean>;
@@ -53,7 +64,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   let indexes: Promise<void> | undefined;
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
-    jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(),
+    jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(), riders.store.ensureIndexes(), dispatch.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -62,6 +73,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   };
   const principalThenIndexes: PrincipalResolver | undefined = options.principal && (async req => {
     const who = await options.principal!(req);
+    if (who) await ensureIndexes();
+    return who;
+  });
+  const riderThenIndexes: RiderResolver | undefined = options.rider && (async req => {
+    const who = await options.rider!(req);
     if (who) await ensureIndexes();
     return who;
   });
@@ -134,8 +150,44 @@ export function createDev2Modules(options: Dev2Options = {}) {
     },
   });
 
+  // Riders and dispatch. Riders are built first; dispatch reads them and tells them what their orders are.
+  const riders = createRidersModule({
+    connection, geography, ...(options.riderIdentity && { identity: options.riderIdentity }), ...(options.deliverySettings && { settings: options.deliverySettings }),
+    ...(riderThenIndexes && { rider: riderThenIndexes }), auth: authThenIndexes,
+    media: {
+      claim: async ({ mediaId, userId, riderId }) => { await media.service.claimOwned({ mediaId, userId, kind: "rider_photo", owner: { type: "rider", id: riderId } }); },
+      release: (mediaId, reason) => media.service.removeInternal(mediaId, reason),
+    },
+    loads: { pickedUpCount: id => dispatch.field.pickedUpCount(id) },
+  });
+  /** Messages to riders go through the same notifications as everything else; a failure never undoes a dispatch decision. */
+  const tell = (userId: string, templateKey: string, channels: ("push" | "whatsapp")[], vars: Record<string, string>, data: Record<string, string>, dedupeKey: string) =>
+    notifications.notify({ userId, templateKey, channels, vars, data, dedupeKey });
+  const dispatch = createDispatchModule({
+    connection, geography, ...(options.orders && { orders: options.orders }), settings: { ...options.deliverySettings, ...riders.settings, ...options.deliverySettings },
+    ...(riderThenIndexes && { rider: riderThenIndexes }), auth: authThenIndexes,
+    riders: {
+      get: id => riders.service.byId(id), getMany: ids => riders.service.getMany(ids), listActive: () => riders.service.listActive(), forUser: userId => riders.service.forUser(userId),
+      reserveCapacity: (id, max) => riders.service.reserveCapacity(id, max), releaseCapacity: id => riders.service.releaseCapacity(id), markAssigned: (id, at) => riders.service.markAssigned(id, at),
+    },
+    notifier: {
+      assigned: async (rider, i) => { await tell(rider.userId, "assignment_assigned", ["push"], { orderNo: i.orderNo }, { type: "assignment", assignmentId: i.assignmentId, ackDeadlineAt: i.ackDeadlineAt.toISOString(), deepLink: `dsr://assignment/${i.assignmentId}` }, `assignment:${i.assignmentId}:assigned`); },
+      handover: async (rider, i) => { await tell(rider.userId, "handover_assigned", ["push"], { orderNo: i.orderNo }, { type: "handover", assignmentId: i.assignmentId, orderId: i.orderId, deepLink: `dsr://assignment/${i.assignmentId}` }, `assignment:${i.assignmentId}:handover`); },
+      cancelled: async (rider, i) => { await tell(rider.userId, "assignment_cancelled", ["push"], { orderNo: i.orderNo }, { type: "assignment_cancelled", assignmentId: i.assignmentId, orderId: i.orderId }, `assignment:${i.assignmentId}:cancelled`); },
+      paid: async (rider, i) => { await tell(rider.userId, "payment_paid", ["push"], { orderNo: i.orderNo }, { type: "payment_paid", orderId: i.orderId }, `order:${i.orderId}:paid:${rider.id}`); },
+      unacknowledged: async (rider, i) => (await tell(rider.userId, "assignment_unacknowledged", ["whatsapp"], { name: rider.name, orderNo: i.orderNo }, {}, `assignment:${i.assignmentId}:escalated`)).queued.length > 0,
+    },
+    evidence: {
+      claim: async ({ mediaId, userId, orderId }) => { await media.service.claimOwned({ mediaId, userId, kind: "failed_delivery_photo", owner: { type: "order", id: orderId } }); },
+      unclaim: (mediaId, orderId) => media.service.detach(mediaId, { type: "order", id: orderId }),
+    },
+  });
+
   /**
    * Starts the background work: the job worker and the recurring sweeps.
+   *  - tell riders (WhatsApp) and the board about orders nobody acknowledged (every 10 seconds, F18)
+   *  - in auto mode, give waiting ready orders to riders (every 15 seconds, F18)
+   *  - mark riders whose phone has gone quiet offline (every minute, F19)
    *  - release stock held by an order that never finished (every minute, F05)
    *  - hand "item is back" messages from Notify Me to delivery (every minute, F07)
    *  - delete expired and stuck media (hourly, F24)
@@ -146,14 +198,19 @@ export function createDev2Modules(options: Dev2Options = {}) {
     await jobs.service.every("stock.release_expired_holds", 60_000, () => offerings.stock.releaseExpiredHolds());
     await jobs.service.every("notifications.drain_back_in_stock", 60_000, () => notifications.campaigns.drainBackInStock());
     await jobs.service.every("media.sweep", 3_600_000, () => media.service.sweep());
+    await jobs.service.every("dispatch.ack_sweep", 10_000, () => dispatch.assign.sweepAcks());
+    await jobs.service.every("dispatch.auto_assign", 15_000, () => dispatch.assign.autoAssignPending());
+    await jobs.service.every("riders.silent_sweep", 60_000, () => riders.service.sweepSilent());
     jobs.service.start(pollMs);
     return { stop: () => jobs.service.stop() };
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
+      // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
+      ...dispatch.routes, ...riders.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };

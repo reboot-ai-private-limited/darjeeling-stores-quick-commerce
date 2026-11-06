@@ -68,12 +68,24 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
+  it("registers every endpoint documented for F18 dispatch and assignment", () => {
+    const expected = documented("F18-dispatch-and-assignment.md");
+    expect(expected).toHaveLength(13);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
+  it("registers every endpoint documented for F19 the rider app", () => {
+    const expected = documented("F19-rider-app.md");
+    expect(expected).toHaveLength(27);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
   it("registers nothing that the API docs do not describe", () => {
     const expected = new Set(
-      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
+      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F18-dispatch-and-assignment.md", "F19-rider-app.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
     );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(69);
+    expect(registered).toHaveLength(109);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {
