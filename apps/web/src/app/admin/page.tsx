@@ -5,6 +5,9 @@ import Roles from "./roles";
 import StaffLogin from "./staff-login";
 import Staff from "./staff";
 import Security from "./security";
+import CitiesLocalities from "./cities-localities";
+import ZonesEditor from "./zones-editor";
+import Warehouses from "./warehouses";
 import { readAdminSession, type AdminSession } from "./session-client";
 import "./admin.css";
 
@@ -33,6 +36,7 @@ function Icon({ name }: { name: string }) {
 export default function AdminPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [section, setSection] = useState("Overview");
+  const [geoTab, setGeoTab] = useState<"zones" | "cities">("zones");
   const [session, setSession] = useState<AdminSession | null>(null);
   const [logoutError, setLogoutError] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
@@ -63,7 +67,13 @@ export default function AdminPage() {
   if (checkingSession || sessionCheckError) return <div className="admin-shell"><main className="admin-login-screen"><section className="admin-login-card"><h1>Darjeeling Stores</h1>{checkingSession ? <p role="status">Checking your session…</p> : <><p role="alert">{sessionCheckError}</p><button className="admin-login-submit" onClick={() => setCheckAttempt(value => value + 1)}>Try again</button></>}</section></main></div>;
   if (!session) return <div className="admin-shell"><StaffLogin onLogin={value => { setSession(value); setLogoutError(""); }} />{logoutError && <p className="admin-logout-warning" role="alert">{logoutError}<button className="admin-signout" onClick={logout}>Retry sign-out</button></p>}</div>;
   const can = (permission: string) => session.user.permissions.includes("*") || session.user.permissions.includes(permission);
-  const available = (item: string) => item === "Overview" || item === "Security" || (item === "Staff" && can("staff:manage")) || (item === "Roles & permissions" && can("roles:manage") && session.user.scope.all);
+  const available = (item: string) =>
+    item === "Overview" ||
+    item === "Security" ||
+    (item === "Staff" && can("staff:manage")) ||
+    (item === "Roles & permissions" && can("roles:manage") && session.user.scope.all) ||
+    (item === "Zones & localities" && can("zones:manage") && session.user.scope.all) ||
+    (item === "Warehouses" && (can("warehouses:view") || can("warehouses:manage")));
   return <div className="admin-shell">
     <a className="admin-skip" href="#admin-main">Skip to content</a>
     <aside id="admin-navigation" className={`admin-sidebar ${menuOpen ? "is-open" : ""}`} aria-label="Admin navigation">
@@ -76,7 +86,27 @@ export default function AdminPage() {
     <div className="admin-workspace">
       <header className="admin-topbar"><div className="admin-breadcrumb"><button className="admin-menu" aria-label="Toggle navigation" aria-controls="admin-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Icon name="Menu" /></button><span>Workspace</span><span className="admin-slash" aria-hidden="true">/</span><strong>{section}</strong></div><span className="admin-connection"><span aria-hidden="true" />Signed in</span></header>
       <main className="admin-content" id="admin-main">
-        {section === "Staff" ? <Staff userId={session.user.id} onSignOut={() => { setSession(null); setSection("Overview"); }} /> : section === "Security" ? <Security onSession={setSession} /> : section === "Roles & permissions" ? <Roles /> : <>
+        {section === "Staff" ? <Staff userId={session.user.id} onSignOut={() => { setSession(null); setSection("Overview"); }} /> : section === "Security" ? <Security onSession={setSession} /> : section === "Roles & permissions" ? <Roles /> : section === "Zones & localities" ? <div>
+          <div className="admin-tab-nav" role="tablist">
+            <button
+              role="tab"
+              aria-selected={geoTab === "zones"}
+              className={geoTab === "zones" ? "is-active" : ""}
+              onClick={() => setGeoTab("zones")}
+            >
+              Delivery Zones &amp; Map
+            </button>
+            <button
+              role="tab"
+              aria-selected={geoTab === "cities"}
+              className={geoTab === "cities" ? "is-active" : ""}
+              onClick={() => setGeoTab("cities")}
+            >
+              Cities &amp; Localities
+            </button>
+          </div>
+          {geoTab === "zones" ? <ZonesEditor session={session} /> : <CitiesLocalities />}
+        </div> : section === "Warehouses" ? <Warehouses session={session} /> : <>
         <div className="admin-heading"><div><h1>Overview</h1><p>Your store operations, in one place.</p></div><label className="admin-warehouse"><Icon name="Warehouses" /><select disabled aria-label="Warehouse selection unavailable"><option>Warehouses unavailable</option></select></label></div>
         <section className="admin-panel" aria-labelledby="admin-unavailable">
           <div className="admin-panel-toolbar"><h2>Workspace activity</h2><span>Awaiting connection</span></div>
