@@ -195,6 +195,28 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
       }));
     },
 
+    /** The customer cancels their own order, while it is still early enough. Returns the refund asked for, if it was paid for. */
+    async customerCancel(userId: string, orderId: string, reason: string) {
+      const order = await store.getOrder(orderId);
+      if (!order || order.userId !== userId) throw notFound("Order");
+      const allowed = settings.customerCancelUntil === "PLACED" ? ["PENDING_PAYMENT", "PLACED"] : ["PENDING_PAYMENT", "PLACED", "CONFIRMED"];
+      if (!allowed.includes(order.status)) throw new AppError("ORDER_NOT_CANCELLABLE", "This order can no longer be cancelled", { currentStatus: order.status });
+      // A pre-order can be cancelled until its slot cutoff only; the slot is released with the order.
+      const moved = await core.move(orderId, "CANCELLED", { userId, role: "customer" }, { reason });
+      if (!moved.ok) {
+        if (moved.reason === "not_found") throw notFound("Order");
+        throw new AppError("ORDER_NOT_CANCELLABLE", "This order can no longer be cancelled", { currentStatus: moved.from });
+      }
+      return { order: { id: moved.order.id, status: moved.order.status }, refund: moved.refund ? { id: moved.refund.id, amount: moved.refund.amount, status: "requested" as const } : null, deliveryFeeRefunded: moved.feesRefunded ?? false };
+    },
+
+    /** The orders of a group that have not ended, for payment confirmation and expiry. */
+    async groupForPayment(groupId: string) {
+      const group = await store.getGroup(groupId);
+      return group && { group, children: await store.childrenOf(groupId) };
+    },
+    setRefundStatus: async (orderId: string, refundStatus: "none" | "pending" | "done") => { await store.patch(orderId, { refundStatus }); },
+
     // ---------------------------------------------------------------- the port used by delivery
 
     port: ((): OrdersPort => {
@@ -261,7 +283,7 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
           const order = await store.getOrder(orderId);
           const group = order ? await store.getGroup(order.groupId) : null;
           if (!order || !group) return null;
-          return money.refund({ order, group, amount: input.amount, reason: input.reason, kind: "overpaid", by: { userId: by.kind === "system" ? null : by.id, role: by.kind } });
+          return money.refund({ order, group, amount: input.amount, reason: input.reason, kind: "overpaid", key: `overpaid:${orderId}:${input.amount}`, by: { userId: by.kind === "system" ? null : by.id, role: by.kind } });
         },
       };
     })(),

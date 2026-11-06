@@ -6,7 +6,7 @@ import {
 import { StaleOrderError, type OrderDeps } from "./ports.js";
 
 export interface Actor { userId: string | null; role: string; name?: string | null }
-export type MoveResult = { ok: true; order: Order } | { ok: false; reason: "not_found" | "invalid_transition"; from?: OrderStatus };
+export type MoveResult = { ok: true; order: Order; refund?: { id: string; amount: number } | null; feesRefunded?: boolean } | { ok: false; reason: "not_found" | "invalid_transition"; from?: OrderStatus };
 
 const DEV_KEY = createHash("sha256").update("dev-only-order-code-key").digest();
 
@@ -78,6 +78,11 @@ export function createOrderCore(deps: OrderDeps) {
 
   /** What must follow a cancellation: stock back, coupon back, rider released, refund asked for, customer told. */
   async function afterCancel(order: Order, actor: Actor, reason: string, refundKind: "cancel" | "failed_delivery" = "cancel", restock = true): Promise<{ id: string; amount: number } | null> {
+    const result = await cancelEffects(order, actor, reason, refundKind, restock);
+    return result.refund;
+  }
+
+  async function cancelEffects(order: Order, actor: Actor, reason: string, refundKind: "cancel" | "failed_delivery", restock: boolean): Promise<{ refund: { id: string; amount: number } | null; feesRefunded: boolean }> {
     const group = (await store.getGroup(order.groupId))!;
     const siblings = await store.childrenOf(order.groupId);
     if (restock) {
@@ -94,11 +99,12 @@ export function createOrderCore(deps: OrderDeps) {
     const amount = refundOnCancel(order, siblings);
     let refund: { id: string; amount: number } | null = null;
     if (amount > 0) {
-      refund = await money.refund({ order, group, amount, reason, kind: refundKind, by: { userId: actor.userId, role: actor.role } });
+      refund = await money.refund({ order, group, amount, reason, kind: refundKind, key: `${refundKind}:${order.id}`, by: { userId: actor.userId, role: actor.role } });
       if (refund) await store.patch(order.id, { refundStatus: "pending" });
     }
     await notifier.cancelled(order.userId, order, reason).catch(() => undefined);
-    return refund;
+    const fees = order.allocatedCharges.reduce((sum, c) => sum + c.amount, 0);
+    return { refund, feesRefunded: Boolean(refund) && fees > 0 && amount >= order.itemsSubtotal - order.allocatedDiscount + fees };
   }
 
   /** The one function that changes `status`. Illegal moves are refused unless `force` is set. */
@@ -112,8 +118,10 @@ export function createOrderCore(deps: OrderDeps) {
       try {
         const updated = await store.transition(orderId, order.status, patchFor(order, to, actor, details, at), event);
         if (!options.skipEffects) {
-          if (to === "CANCELLED") await afterCancel(updated, actor, String(details.reason ?? "cancelled"));
-          else if (to === "DELIVERED") await media.scheduleDeletion(orderId, updated.stamps.deliveredAt ?? at).catch(() => undefined);
+          if (to === "CANCELLED") {
+            const effects = await cancelEffects(updated, actor, String(details.reason ?? "cancelled"), "cancel", true);
+            return { ok: true, order: updated, refund: effects.refund, feesRefunded: effects.feesRefunded };
+          } else if (to === "DELIVERED") await media.scheduleDeletion(orderId, updated.stamps.deliveredAt ?? at).catch(() => undefined);
           else if (to === "CONFIRMED") await notifier.confirmed(updated.userId, updated).catch(() => undefined);
         }
         return { ok: true, order: updated };
@@ -129,7 +137,7 @@ export function createOrderCore(deps: OrderDeps) {
   const siblingStatuses = async (groupId: string) => (await store.childrenOf(groupId)).map(o => o.status);
 
   return {
-    box, move, afterCancel, eventOf, group, siblingStatuses,
+    box, move, afterCancel, cancelEffects, eventOf, group, siblingStatuses,
     groupStatus: async (groupId: string) => groupStatusOf(await siblingStatuses(groupId)),
     invalid(from: OrderStatus, to?: OrderStatus): AppError {
       return new AppError("INVALID_TRANSITION", `The order cannot move from ${from}${to ? ` to ${to}` : ""}`, { from, ...(to && { to }), allowed: LEGAL[from] });

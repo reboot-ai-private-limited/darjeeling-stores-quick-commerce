@@ -12,6 +12,7 @@ import { createCashModule } from "../modules/cash/cash.public.js";
 import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
 import { createHoursModule } from "../modules/hours/hours.public.js";
 import { createOrdersModule, type MoneyPort, type OrderSettings } from "../modules/orders/orders.public.js";
+import { createRefundsModule, type RefundSettings } from "../modules/refunds/refunds.public.js";
 import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
 import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
 import { baselineEta, createTrackingModule, DEFAULT_TRACKING_SETTINGS, type EtaProvider, type TrackingSettings } from "../modules/tracking/tracking.public.js";
@@ -63,6 +64,8 @@ export interface Dev2Options {
   orderSettings?: Partial<OrderSettings>;
   /** Refunds and online payments (F15, F16). Until the payments module is connected nothing is refunded and online orders get no checkout. */
   money?: MoneyPort;
+  /** Refund rules (F16): the window for asking after delivery, and whether a photo is needed. */
+  refundSettings?: Partial<RefundSettings>;
   pricingSettings?: Partial<PricingSettings>; orderHistory?: OrderHistory; customerNames?: (userIds: readonly string[]) => Promise<Map<string, string>>;
   /** Live ETA settings, the routes provider that replaces the straight-line estimate, and the secret that signs public tracking links (F20). */
   trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; trackingTokenSecret?: string;
@@ -83,7 +86,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
     jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(), riders.store.ensureIndexes(), dispatch.store.ensureIndexes(),
-    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(), cart.store.ensureIndexes(), orders.store.ensureIndexes(), hours.store.ensureIndexes(),
+    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(), cart.store.ensureIndexes(), orders.store.ensureIndexes(), hours.store.ensureIndexes(), refunds.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -190,8 +193,13 @@ export function createDev2Modules(options: Dev2Options = {}) {
     ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.cartSettings && { settings: options.cartSettings }),
     ...(options.customerPolicy && { customers: options.customerPolicy }), hours: options.hours ?? hours.service,
   });
+  // Refunds and online payments reach the orders module through one port; an option replaces it (tests do).
+  const money: MoneyPort = options.money ?? {
+    refund: input => refunds.service.createAuto(input),
+    startPayment: async () => null,
+  };
   const orders = createOrdersModule({
-    connection, geography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.orderSettings && { settings: options.orderSettings }), ...(options.money && { money: options.money }),
+    connection, geography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.orderSettings && { settings: options.orderSettings }), money,
     quotes: {
       get: (userId, id) => cart.quotes.get(userId, id), revalidate: (userId, id) => cart.quotes.revalidate(userId, id),
       claim: (id, groupId) => cart.store.claimQuote(id, groupId), clearCart: userId => cart.store.clearCart(userId),
@@ -229,6 +237,28 @@ export function createDev2Modules(options: Dev2Options = {}) {
     },
   });
   const ordersPort = options.orders ?? orders.port;
+  const refunds = createRefundsModule({
+    connection, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.refundSettings && { settings: options.refundSettings }),
+    cancelOwn: (userId, orderId, reason) => orders.service.customerCancel(userId, orderId, reason),
+    orders: {
+      get: async id => {
+        const o = await orders.store.getOrder(id);
+        return o && {
+          id: o.id, orderNo: o.orderNo, groupId: o.groupId, userId: o.userId, warehouseId: o.warehouseId, status: o.status, paymentMethod: o.paymentMethod, paymentStatus: o.paymentStatus,
+          items: o.items.map(i => ({ productId: i.productId, name: i.name, unitPrice: i.unitPrice, qty: i.qty, status: i.status })), itemsSubtotal: o.itemsSubtotal,
+          allocatedDiscount: o.allocatedDiscount, allocatedCharges: o.allocatedCharges, deliveredAt: o.stamps.deliveredAt, customerName: o.customerName, customerPhone: o.customerPhone,
+        };
+      },
+      setRefundStatus: (orderId, status) => orders.service.setRefundStatus(orderId, status),
+      customerCancel: (userId, orderId, reason) => orders.service.customerCancel(userId, orderId, reason),
+    },
+    media: { claim: async ({ mediaId, userId, orderId }) => { await media.service.claimOwned({ mediaId, userId, kind: "refund_photo", owner: { type: "order", id: orderId } }); } },
+    notifier: {
+      approved: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_approved", channels: ["push"], vars: { orderNo: r.orderNo, amount: String(r.amount / 100) }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:approved` }); },
+      rejected: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_rejected", channels: ["push"], vars: { orderNo: r.orderNo, reason: r.rejectReason ?? "" }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:rejected` }); },
+      done: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_done", channels: ["push", "whatsapp"], vars: { orderNo: r.orderNo, amount: String(r.amount / 100) }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:done` }); },
+    },
+  });
 
   // Riders and dispatch. Riders are built first; dispatch reads them and tells them what their orders are.
   const riders = createRidersModule({
@@ -316,11 +346,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, orders, hours, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, orders, hours, refunds, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
       // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
-      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes, ...hours.routes,
+      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes, ...refunds.routes, ...hours.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };

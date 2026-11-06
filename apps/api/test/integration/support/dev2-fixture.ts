@@ -64,7 +64,7 @@ export interface Fixture {
 }
 
 /** `realOrders`: use the real orders module instead of the in-memory fake (the cart, order and delivery tests that run the whole journey). */
-export async function startFixture(databaseName: string, options: { realOrders?: boolean } = {}): Promise<Fixture> {
+export async function startFixture(databaseName: string, options: { realOrders?: boolean; realMoney?: boolean } = {}): Promise<Fixture> {
   const h = await startHarness(databaseName);
   const events: StockEvent[] = [];
   const storage = createFakeStorage();
@@ -85,7 +85,7 @@ export async function startFixture(databaseName: string, options: { realOrders?:
     webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
     geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
     discoverySettings: { maxChanges: 6 },
-    ...(options.realOrders ? {} : { orders: orders.port }), money: money.port, riderIdentity: accounts.identity, rider: riderFromHeader,
+    ...(options.realOrders ? {} : { orders: orders.port }), ...(options.realMoney ? {} : { money: money.port }), riderIdentity: accounts.identity, rider: riderFromHeader,
     trackingTokenSecret: "test-secret", syncSettings: { upi: { vpa: "darjeelingstores@bank", payeeName: "Darjeeling Stores" }, otpIterations: 1000 },
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
@@ -123,6 +123,7 @@ export async function startFixture(databaseName: string, options: { realOrders?:
       await mods.pricing.store.ensureIndexes();
       await mods.cart.store.ensureIndexes();
       await mods.orders.store.ensureIndexes();
+      await mods.refunds.store.ensureIndexes();
       await mods.hours.store.ensureIndexes();
       money.reset();
       orders.reset();

@@ -95,7 +95,7 @@ export interface Riders {
 /** What the orders module asks of refunds and payments (F15, F16). Until they exist nothing is refunded. */
 export interface MoneyPort {
   /** An order was cancelled or lost items: refund what was paid. */
-  refund(input: { order: Order; group: OrderGroup; amount: number; reason: string; kind: "cancel" | "item_removed" | "failed_delivery" | "overpaid"; by: { userId: string | null; role: string } }): Promise<{ id: string; amount: number } | null>;
+  refund(input: { order: Order; group: OrderGroup; amount: number; reason: string; kind: "cancel" | "item_removed" | "failed_delivery" | "overpaid" | "late_payment"; key: string; by: { userId: string | null; role: string } }): Promise<{ id: string; amount: number } | null>;
   /** The online payment for a new online group (F15): the data to open the checkout, or null for cash. */
   startPayment(group: OrderGroup): Promise<unknown>;
 }

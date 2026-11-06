@@ -40,7 +40,7 @@ describe("message templates", () => {
     const res = await f.get("/admin/notification-templates");
     expect(res.status).toBe(200);
     // Four are for customers; the rest belong to the rider and dispatch flows.
-    expect(res.body.meta).toEqual({ count: 13 });
+    expect(res.body.meta).toEqual({ count: 17 });
     expect(res.body.data.map((t: { key: string; channel: string }) => `${t.key}/${t.channel}`).filter((k: string) => /^(back_in_stock|otp_login)/.test(k))).toEqual(["back_in_stock/push", "back_in_stock/whatsapp", "otp_login/whatsapp", "otp_login/sms"]);
     expect(res.body.data.find((t: { key: string; channel: string }) => t.key === "back_in_stock" && t.channel === "whatsapp")).toEqual({
       id: expect.stringMatching(/^[a-f0-9]{24}$/), key: "back_in_stock", channel: "whatsapp", title: null, body: expect.stringContaining("{{productName}}"),
@@ -55,7 +55,7 @@ describe("message templates", () => {
     await f.mods.notifications.ready();
     await f.mods.notifications.ready();
     const after = (await f.get("/admin/notification-templates")).body;
-    expect(after.meta.count).toBe(13);
+    expect(after.meta.count).toBe(17);
     expect(after.data.find((t: { id: string }) => t.id === push.id).title).toBe("It's back!");
   });
 

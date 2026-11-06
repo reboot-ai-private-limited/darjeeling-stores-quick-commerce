@@ -81,7 +81,7 @@ export function createAdminOrderService(deps: OrderDeps, core: OrderCore) {
     await store.updateGroup(group.id, { pricing: { ...group.pricing, subtotal: group.pricing.subtotal - removedValue, discount: group.pricing.discount - discountShare, total: group.pricing.total - customerDelta } });
     let refund: { id: string; amount: number } | null = null;
     if (prepaid && customerDelta > 0) {
-      refund = await money.refund({ order: updated, group, amount: customerDelta, reason: `${item.name}: ${reason}`, kind: "item_removed", by: actorOf(ctx) });
+      refund = await money.refund({ order: updated, group, amount: customerDelta, reason: `${item.name}: ${reason}`, kind: "item_removed", key: `item:${order.id}:${index}:${order.rev}`, by: actorOf(ctx) });
       if (refund) await store.patch(order.id, { refundStatus: "pending" });
     }
     await notifier.itemUnavailable(order.userId, updated, item.name).catch(() => undefined);
