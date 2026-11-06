@@ -128,12 +128,18 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
+  it("registers every endpoint documented for F17 hours, pre-orders and ops mode", () => {
+    const expected = documented("F17-hours-preorders-and-ops-mode.md");
+    expect(expected).toHaveLength(7);
+    expect(expected.filter(e => !registered.includes(e))).toEqual([]);
+  });
+
   it("registers nothing that the API docs do not describe", () => {
     const expected = new Set(
-      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F10-cart-and-quote.md", "F11-delivery-fees-and-surcharges.md", "F12-coupons-and-offers.md", "F13-order-placement-and-split-orders.md", "F14-order-lifecycle-and-packing.md", "F18-dispatch-and-assignment.md", "F19-rider-app.md", "F20-eta-and-live-tracking.md", "F21-offline-and-low-network.md", "F22-rider-cash-and-settlement.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
+      ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F10-cart-and-quote.md", "F11-delivery-fees-and-surcharges.md", "F12-coupons-and-offers.md", "F13-order-placement-and-split-orders.md", "F14-order-lifecycle-and-packing.md", "F17-hours-preorders-and-ops-mode.md", "F18-dispatch-and-assignment.md", "F19-rider-app.md", "F20-eta-and-live-tracking.md", "F21-offline-and-low-network.md", "F22-rider-cash-and-settlement.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
     );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(168);
+    expect(registered).toHaveLength(174);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {

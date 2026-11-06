@@ -45,7 +45,7 @@ beforeAll(async () => {
   store = mod.store;
   app = h.appWith(mod.routes);
 }, 180_000);
-afterAll(async () => { await h?.stop(); });
+afterAll(async () => { await h?.stop(); }, 60_000);
 beforeEach(async () => {
   await h.reset();
   await store.ensureIndexes();

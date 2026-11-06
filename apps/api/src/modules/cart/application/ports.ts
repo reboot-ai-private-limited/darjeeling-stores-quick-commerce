@@ -54,6 +54,8 @@ export interface CustomerPolicy { codAllowed(userId: string): Promise<boolean> }
 export interface HoursSource {
   /** Why orders cannot be taken at the moment, or null when they can. */
   closedReason(zoneId: string, at: Date): Promise<null | { code: "STORE_CLOSED" | "ZONE_PAUSED"; message: string; opensAt: Date | null; until: Date | null; preOrderAvailable: boolean }>;
+  /** The warehouses that can supply a pre-order window. Throws when the zone is open, the slot is full or its booking time has passed. */
+  forWindow(zoneId: string, window: { start: Date; end: Date }, at: Date): Promise<string[]>;
 }
 
 export interface CartSettings {

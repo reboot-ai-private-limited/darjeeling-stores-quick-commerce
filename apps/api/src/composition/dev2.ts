@@ -10,6 +10,7 @@ import { createCatalogModule, denyAll, type AuthResolver, type MediaPort, type P
 import { createCartModule, type CartSettings, type CustomerPolicy, type HoursSource } from "../modules/cart/cart.public.js";
 import { createCashModule } from "../modules/cash/cash.public.js";
 import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
+import { createHoursModule } from "../modules/hours/hours.public.js";
 import { createOrdersModule, type MoneyPort, type OrderSettings } from "../modules/orders/orders.public.js";
 import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
 import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
@@ -82,7 +83,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
     jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(), riders.store.ensureIndexes(), dispatch.store.ensureIndexes(),
-    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(), cart.store.ensureIndexes(), orders.store.ensureIndexes(),
+    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(), cart.store.ensureIndexes(), orders.store.ensureIndexes(), hours.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -150,7 +151,12 @@ export function createDev2Modules(options: Dev2Options = {}) {
     media: { urls: ids => media.service.urls(ids) },
   });
 
-  const geography = options.geography ?? noGeography;
+  // Opening hours and pauses sit in front of the geography port: a warehouse is open only inside its hours and not paused.
+  const hours = createHoursModule({
+    connection, geography: options.geography ?? noGeography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }),
+    preorders: { list: query => orders.service.preorders(query) },
+  });
+  const geography = hours.service.decorate(options.geography ?? noGeography);
   const pricing = createPricingModule({
     connection, geography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }),
     ...(options.pricingSettings && { settings: options.pricingSettings }), orders: options.orderHistory ?? { orderCount: userId => orders.service.orderCount(userId) },
@@ -182,7 +188,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const cart = createCartModule({
     connection, geography, lines: offerings.stock, addresses: addresses.reader, pricing: pricing.service, travel: eta,
     ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.cartSettings && { settings: options.cartSettings }),
-    ...(options.customerPolicy && { customers: options.customerPolicy }), ...(options.hours && { hours: options.hours }),
+    ...(options.customerPolicy && { customers: options.customerPolicy }), hours: options.hours ?? hours.service,
   });
   const orders = createOrdersModule({
     connection, geography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.orderSettings && { settings: options.orderSettings }), ...(options.money && { money: options.money }),
@@ -202,6 +208,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
       },
     },
     stock: offerings.stock, coupons: pricing.service,
+    slots: { hold: (orderId, warehouseId, window) => hours.service.hold(orderId, warehouseId, window), release: async orderId => { await hours.service.release(orderId); } },
     media: {
       copyToOrder: async ({ sourceMediaId, orderId }) => { try { return await media.service.copyToOrder({ sourceMediaId, orderId }); } catch { return null; } },
       scheduleDeletion: async (orderId, endedAt) => { await media.service.scheduleOrderMediaExpiry(orderId, endedAt); },
@@ -214,10 +221,10 @@ export function createDev2Modules(options: Dev2Options = {}) {
     dispatch: { cancelled: orderId => dispatch.hooks.onOrderCancelled(orderId), paid: orderId => dispatch.hooks.onOrderPaid(orderId) },
     link: orderId => { try { return tracking.service.link(orderId); } catch { return null; } },
     notifier: {
-      placed: async (userId, group, orderNos) => { await notifications.notify({ userId, templateKey: "order_placed", channels: ["push"], vars: { orderNo: orderNos.join(", ") }, data: { type: "order", groupId: group.id }, dedupeKey: `order:${group.id}:placed` }); },
-      confirmed: async (userId, order) => { await notifications.notify({ userId, templateKey: "order_confirmed", channels: ["push"], vars: { orderNo: order.orderNo }, data: { type: "order", orderId: order.id }, dedupeKey: `order:${order.id}:confirmed` }); },
-      itemUnavailable: async (userId, order, itemName) => { await notifications.notify({ userId, templateKey: "item_unavailable", channels: ["push"], vars: { orderNo: order.orderNo, itemName }, data: { type: "order", orderId: order.id }, dedupeKey: `order:${order.id}:item:${itemName}:${order.rev}` }); },
-      cancelled: async (userId, order, reason) => { await notifications.notify({ userId, templateKey: "order_cancelled", channels: ["push"], vars: { orderNo: order.orderNo, reason }, data: { type: "order", orderId: order.id }, dedupeKey: `order:${order.id}:cancelled` }); },
+      placed: async (userId, group, orderNos) => { await notifications.notify({ userId, templateKey: "customer_order_placed", channels: ["push"], vars: { orderNo: orderNos.join(", ") }, data: { type: "order", groupId: group.id }, dedupeKey: `order:${group.id}:placed` }); },
+      confirmed: async (userId, order) => { await notifications.notify({ userId, templateKey: "customer_order_confirmed", channels: ["push"], vars: { orderNo: order.orderNo }, data: { type: "order", orderId: order.id }, dedupeKey: `order:${order.id}:confirmed` }); },
+      itemUnavailable: async (userId, order, itemName) => { await notifications.notify({ userId, templateKey: "customer_item_unavailable", channels: ["push"], vars: { orderNo: order.orderNo, itemName }, data: { type: "order", orderId: order.id }, dedupeKey: `order:${order.id}:item:${itemName}:${order.rev}` }); },
+      cancelled: async (userId, order, reason) => { await notifications.notify({ userId, templateKey: "customer_order_cancelled", channels: ["push"], vars: { orderNo: order.orderNo, reason }, data: { type: "order", orderId: order.id }, dedupeKey: `order:${order.id}:cancelled` }); },
       newOrder: async () => undefined,
     },
   });
@@ -309,11 +316,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, orders, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, orders, hours, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
       // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
-      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes,
+      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes, ...hours.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };

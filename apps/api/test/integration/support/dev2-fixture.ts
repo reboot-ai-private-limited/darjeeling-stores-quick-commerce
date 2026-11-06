@@ -123,6 +123,7 @@ export async function startFixture(databaseName: string, options: { realOrders?:
       await mods.pricing.store.ensureIndexes();
       await mods.cart.store.ensureIndexes();
       await mods.orders.store.ensureIndexes();
+      await mods.hours.store.ensureIndexes();
       money.reset();
       orders.reset();
       accounts.reset();

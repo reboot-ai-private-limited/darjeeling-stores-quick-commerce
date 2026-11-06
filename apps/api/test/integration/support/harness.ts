@@ -19,7 +19,7 @@ export function actorFromHeader(req: Request): Actor | undefined {
   if (who.startsWith("scoped:")) {
     return {
       userId: "000000000000000000000003", role: "manager", scope: { all: false, warehouseIds: [who.slice("scoped:".length)] },
-      permissions: ["catalog:view", "warehouse_catalog:view", "warehouse_catalog:manage", "catalog:import", "stock:view", "stock:manage", "notify_demand:view", "riders:view", "riders:manage", "dispatch:manage", "orders:view", "orders:manage", "cash:manage", "delivery_rules:manage", "ops_mode:manage", "pricing:manage"],
+      permissions: ["catalog:view", "warehouse_catalog:view", "warehouse_catalog:manage", "catalog:import", "stock:view", "stock:manage", "notify_demand:view", "riders:view", "riders:manage", "dispatch:manage", "orders:view", "orders:manage", "warehouses:manage", "cash:manage", "delivery_rules:manage", "ops_mode:manage", "pricing:manage"],
     };
   }
   return undefined;

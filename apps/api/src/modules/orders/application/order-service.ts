@@ -119,6 +119,12 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
           deliveryOtpEnc: core.box.seal(newCode()), otpWrong: 0, expiresAt: online ? new Date(at.getTime() + settings.paymentWindowMinutes * 60_000) : null,
           idempotencyKey: key, requestHash, childOrderIds: children.map(c => c.id), source: "app", createdAt: at, updatedAt: at,
         };
+        // A pre-order takes a place in its slot, atomically against the slot's capacity.
+        if (quote.scheduledWindow) {
+          const held: string[] = [];
+          try { for (const child of children) { await deps.slots.hold(child.id, child.warehouseId, quote.scheduledWindow); held.push(child.id); } }
+          catch (error) { for (const id of held) await deps.slots.release(id).catch(() => undefined); await rollback(groupId, couponHeld); throw error; }
+        }
         const events = children.map(c => core.eventOf(c, "placed", { userId, role: "customer" }, { to: c.status, meta: { groupNo }, at }));
         try { await store.insertGroup(group, children, events); }
         catch (error) {
@@ -179,6 +185,14 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
       const order = await store.getOrder(id);
       if (!order || order.userId !== userId) throw notFound("Order");
       return carts.reorder(userId, order.items.filter(i => i.status !== "unavailable").map(i => ({ productId: i.productId, variantId: i.variantId, qty: i.originalQty })));
+    },
+
+    /** Pre-orders whose slot starts in a time range, for the packing list. */
+    async preorders(query: { from: Date; to: Date; warehouseIds?: readonly string[] | undefined; slotStart?: Date | undefined }) {
+      const rows = await store.listOrders({ preOrder: true, windowFrom: query.from, windowTo: query.to, ...(query.warehouseIds && { warehouseIds: query.warehouseIds }), ...(query.slotStart && { windowStart: query.slotStart }) }, 500);
+      return rows.filter(o => o.status !== "CANCELLED").map(o => ({
+        orderId: o.id, orderNo: o.orderNo, warehouseId: o.warehouseId, status: o.status, itemCount: o.items.filter(i => i.status !== "unavailable").reduce((s, i) => s + i.qty, 0), scheduledWindow: o.scheduledWindow!,
+      }));
     },
 
     // ---------------------------------------------------------------- the port used by delivery

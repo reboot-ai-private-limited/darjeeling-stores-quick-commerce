@@ -9,7 +9,7 @@ export class StaleOrderError extends Error {}
 
 export interface OrderFilter {
   warehouseIds?: readonly string[]; statuses?: readonly OrderStatus[]; paymentStatus?: string; riderIds?: readonly string[]; q?: string; from?: Date; to?: Date;
-  preOrder?: boolean; flagged?: boolean; userId?: string; ids?: readonly string[];
+  preOrder?: boolean; flagged?: boolean; userId?: string; ids?: readonly string[]; windowFrom?: Date; windowTo?: Date; windowStart?: Date;
 }
 export interface Change { seq: number; orderId: string; warehouseId: string; event: "created" | "status_changed" | "assigned" | "ack_changed" | "updated"; at: Date }
 
@@ -112,6 +112,11 @@ export interface HoursPolicy {
   /** The status new orders in this warehouse start in after payment (manual means an admin confirms). */
   confirmMode(warehouseId: string): Promise<"auto" | "manual">;
 }
+/** Places in pre-order slots (F17). */
+export interface SlotPort {
+  hold(orderId: string, warehouseId: string, window: { start: Date; end: Date }): Promise<void>;
+  release(orderId: string): Promise<void>;
+}
 export interface AdminNames { nameOf(userId: string): Promise<string | null> }
 
 export interface OrderSettings {
@@ -133,6 +138,6 @@ export const DEFAULT_ORDER_SETTINGS: OrderSettings = {
 
 export interface OrderDeps {
   store: OrderStore; quotes: QuoteSource; carts: CartPort; addresses: AddressSource; stock: StockPort; coupons: CouponPort; media: OrderMedia; riders: Riders; money: MoneyPort;
-  notifier: OrderNotifier; dispatch: DispatchHooks; geography: Geography; link: (orderId: string) => { token: string; expiresAt: Date } | null;
+  notifier: OrderNotifier; dispatch: DispatchHooks; slots: SlotPort; geography: Geography; link: (orderId: string) => { token: string; expiresAt: Date } | null;
   settings: OrderSettings; now: () => Date; newId: () => string;
 }

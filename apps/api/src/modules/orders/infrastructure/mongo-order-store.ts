@@ -92,6 +92,8 @@ export function createMongoOrderStore(connection: Connection): OrderStore {
       if (filter.statuses) query.status = { $in: [...filter.statuses] };
       if (filter.paymentStatus) query.paymentStatus = filter.paymentStatus;
       if (filter.userId) query.userId = filter.userId;
+      if (filter.windowStart) query["scheduledWindow.start"] = filter.windowStart;
+      else if (filter.windowFrom || filter.windowTo) query["scheduledWindow.start"] = { ...(filter.windowFrom && { $gte: filter.windowFrom }), ...(filter.windowTo && { $lt: filter.windowTo }) };
       if (filter.ids) query._id = { ...(query._id as object | undefined), $in: [...filter.ids] };
       if (filter.preOrder !== undefined) query.scheduledWindow = filter.preOrder ? { $ne: null } : null;
       if (filter.from || filter.to) query.createdAt = { ...(filter.from && { $gte: filter.from }), ...(filter.to && { $lte: filter.to }) };

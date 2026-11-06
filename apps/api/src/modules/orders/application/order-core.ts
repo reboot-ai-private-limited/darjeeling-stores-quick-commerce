@@ -90,6 +90,7 @@ export function createOrderCore(deps: OrderDeps) {
     if (siblings.every(s => s.status === "CANCELLED")) await coupons.release(group.id).catch(() => undefined);
     await dispatch.cancelled(order.id).catch(() => undefined);
     await media.scheduleDeletion(order.id, now()).catch(() => undefined);
+    await deps.slots.release(order.id).catch(() => undefined);
     const amount = refundOnCancel(order, siblings);
     let refund: { id: string; amount: number } | null = null;
     if (amount > 0) {

@@ -1,7 +1,7 @@
 import type { Connection } from "mongoose";
 import { Types } from "mongoose";
 import { noGeography, type Geography } from "../../platform/geography.js";
-import { noCustomers, type CustomerResolver } from "../catalog/catalog.public.js";
+import { AppError, noCustomers, type CustomerResolver } from "../catalog/catalog.public.js";
 import { createCartService } from "./application/cart-service.js";
 import { createQuoteService } from "./application/quote-service.js";
 import {
@@ -20,7 +20,10 @@ export { cartRoutes } from "./interface/routes.js";
 /** Every customer may pay cash until the identity module can say otherwise. */
 export const anyoneMayPayCash: CustomerPolicy = { codAllowed: async () => true };
 /** Without the hours module a zone is open whenever one of its warehouses is open now. */
-export const alwaysOpen: HoursSource = { closedReason: async () => null };
+export const alwaysOpen: HoursSource = {
+  closedReason: async () => null,
+  forWindow: async () => { throw new AppError("VALIDATION_ERROR", "Pre-orders are not available", { field: "scheduledWindow" }); },
+};
 
 export interface CartModuleOptions {
   connection: Connection;

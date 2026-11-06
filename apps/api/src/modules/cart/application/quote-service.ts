@@ -33,15 +33,22 @@ export function createQuoteService(deps: CartDeps) {
 
     const zone = await geography.zone(zoneId);
     if (!zone || !zone.isEnabled) throw new AppError("OUT_OF_ZONE", "We do not deliver to that address yet");
-    if (zone.isPaused) throw new AppError("ZONE_PAUSED", "Deliveries are paused in this area for now", { message: "Deliveries are paused in this area for now", until: null });
     const at = now();
-    const closed = await hours.closedReason(zoneId, at);
-    if (closed) {
-      throw new AppError(closed.code, closed.message, closed.code === "ZONE_PAUSED"
-        ? { message: closed.message, until: closed.until?.toISOString() ?? null }
-        : { opensAt: closed.opensAt?.toISOString() ?? null, preOrderAvailable: closed.preOrderAvailable });
+    const window = input.scheduledWindow ?? null;
+    let open;
+    if (window) {
+      // A pre-order: only for when the zone is closed, from the warehouses that offer that slot.
+      const ids = new Set(await hours.forWindow(zoneId, window, at));
+      open = (await geography.warehousesOfZone(zoneId)).filter(w => w.isEnabled && ids.has(w.id));
+    } else {
+      const closed = await hours.closedReason(zoneId, at);
+      if (closed) {
+        throw new AppError(closed.code, closed.message, closed.code === "ZONE_PAUSED"
+          ? { message: closed.message, until: closed.until?.toISOString() ?? null }
+          : { opensAt: closed.opensAt?.toISOString() ?? null, preOrderAvailable: closed.preOrderAvailable });
+      }
+      open = (await geography.warehousesOfZone(zoneId)).filter(w => w.isEnabled && w.isOpenNow);
     }
-    const open = (await geography.warehousesOfZone(zoneId)).filter(w => w.isEnabled && w.isOpenNow);
     if (open.length === 0) throw new AppError("STORE_CLOSED", "We are closed right now", { opensAt: null, preOrderAvailable: false });
 
     const items = cart.items;
@@ -93,7 +100,7 @@ export function createQuoteService(deps: CartDeps) {
       const minutes = eta.packMinutes + eta.riderArrivalMinutes + eta.travelMinutes + eta.extraMinutes;
       deliveries.push({
         warehouseId: group.warehouseId, warehouseName: warehouse.name, lines: group.lines.map(i => quoteLines[i]!), itemsSubtotal: itemShare[g]!,
-        eta: { ...eta, promisedAt: new Date(at.getTime() + minutes * 60_000) },
+        eta: { ...eta, promisedAt: window ? window.end : new Date(at.getTime() + minutes * 60_000) },
         allocatedDiscount: discountShares[g]!, allocatedCharges: bill.charges.map((c, k) => ({ type: c.type, label: c.label, amount: chargeShares[k]![g]! })),
       });
     }
