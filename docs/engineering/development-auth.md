@@ -22,7 +22,7 @@ Mock mode refuses any nondevelopment environment and any database name not endin
 
 Phone `9000000001` is normalized to `+919000000001` and seeded as the development super admin with all-warehouse scope. Existing unrelated accounts are never promoted or overwritten. Other customer phones use the same code but receive customer accounts with no warehouse grants. Rider login is unavailable until preregistration policy is implemented.
 
-Every mock login OTP is `000000`. A request is still required first. Challenges expire after five minutes and are consumed once, with five wrong attempts allowed. An active challenge cannot be repeatedly replaced. These controls do not constitute production abuse protection.
+Every mock login OTP is `000000`. A request is still required first. Challenges expire after five minutes and are consumed once, with the fifth wrong attempt starting a persistent 15-minute verification/resend lockout. Customer/rider requests have persisted five-per-hour phone/IP quotas. An active challenge cannot be repeatedly replaced. These controls do not constitute production abuse protection.
 
 ## Runnable local example
 
@@ -65,7 +65,7 @@ Both cookies always remain HTTP-only and host-only. Cookie names and API paths r
 
 The access token is a signed HS256 JWT valid for 30 minutes by default, validated with configured issuer `darjeeling-stores-api`, audience `darjeeling-stores-clients`, `at+jwt` type and required subject, issue/expiry time and token identifier. Permissions are read from the current database role rather than trusted from JWT claims. Every access also checks the persisted session's current access hash and revocation/expiry, so JWT validation alone does not bypass logout.
 
-The refresh token is a separate cryptographically random secret with a default absolute 15-day family lifetime. It is not a JWT. Both credentials are hashed with SHA-256 before persistence in `auth_sessions`; raw refresh secrets are never returned in JSON. The session TTL index is cleanup only: reads check expiry explicitly.
+The refresh token is a separate cryptographically random secret with a default absolute 15-day family lifetime. It is not a JWT. Both credentials are hashed with SHA-256 before persistence in `auth_sessions`; browser refresh secrets are never returned in JSON. Explicit native customer/rider clients receive refresh credentials in JSON without cookies. The session TTL index is cleanup only: reads check expiry explicitly.
 
 | Cookie | Attributes | Scope |
 | --- | --- | --- |
@@ -78,20 +78,20 @@ Browser requests identify themselves with `X-Client: admin`; successful verifica
 
 `POST /auth/refresh` requires the refresh cookie, an exact configured Origin, and `X-CSRF-Token: 1`. This is an explicit custom-header and trusted-origin CSRF policy, not a secret double-submit token. Browser verification and cookie logout enforce the same origin/header policy. A missing or untrusted origin cannot refresh or log out cookie sessions. Direct CLI cookie requests must set those headers too.
 
-Refresh atomically rotates both credentials and invalidates the previous access token. Replay of a used refresh token revokes its entire session family, without revoking other families for the user. Concurrent refresh has one winner; the losing replay revokes that winner, forcing fresh sign-in. Replay history is bounded to 500 rotations per family, after which sign-in is required. A lost successful refresh response cannot safely retry the old token.
+Refresh atomically rotates both credentials and invalidates the previous access token. Replay of a used refresh token revokes every session belonging to that user, as specified by F01. Concurrent refresh has one winner; the losing replay revokes that winner, forcing fresh sign-in. Replay history is bounded to 500 rotations per family, after which sign-in is required. A lost successful refresh response cannot safely retry the old token.
 
 The browser helper retries a failed authenticated read once after refresh and serializes rotation within a tab. Web Locks coordinates across tabs where supported. Browsers without Web Locks can still encounter cross-tab refresh races and require sign-in. Reload restores the profile from the access cookie, refreshing first when necessary. Logout revokes persisted credentials and clears both cookies using their original paths. Failed server logout is reported; clearing the UI alone does not prove server revocation.
 
 ## Limits and cleanup
 
-JWT access and hashed rotating refresh sessions now persist across API restarts. Mock OTP challenges remain process-local and disappear on restart. The browser login, session restore and logout are connected. Production staff password/2FA authentication is documented in [staff authentication](staff-authentication.md). Native refresh transport, complete customer/rider abuse protection and deployment hardening remain separate work. Do not treat fixed-code mock sign-in as production-ready authentication.
+JWT access and hashed rotating refresh sessions now persist across API restarts. Mock OTP challenges, request quotas and lockout persist in MongoDB across restart; expiry is checked independently of TTL cleanup. The browser login, session restore and logout are connected. Production staff password/2FA authentication is documented in [staff authentication](staff-authentication.md). Native customer/rider login, refresh, own-profile/phone/deletion operations and device ownership checks are implemented. Live delivery and deployment activation remain separate work. Do not treat fixed-code mock sign-in as production-ready authentication.
 
-Disable with `mockOTP=false` and restart. Mock login, refresh, profile and logout routes disappear. F02 administration remains registered when `JWT_SECRET` is configured, but rejects the tagged development owner account outside mock composition; production staff login uses its separate password/2FA flow. Seeded records remain in the development database, tagged on the owner as `devMockAccount`. Production authentication must reject such mock identities unless an explicit reviewed migration removes that designation. Do not copy this database into production.
+Disable with `mockOTP=false` and restart. The fixed-code flow is disabled. With JWT_SECRET configured, normal profile/session/customer routes remain registered; OTP returns 503 until a real delivery transport is configured. F02 administration remains registered when `JWT_SECRET` is configured, but rejects the tagged development owner account outside mock composition; production staff login uses its separate password/2FA flow. Seeded records remain in the development database, tagged on the owner and newly created mock customers as `devMockAccount`. Production authentication must reject such mock identities unless an explicit reviewed migration removes that designation. Do not copy this database into production.
 
 ## Verification
 
 Configuration tests cover fail-closed environment parsing. Disposable Mongo HTTP tests cover owner seed/login/logout, single use, wrong-attempt exhaustion, customer isolation, missing routes when disabled, invalid database targets and refusal to overwrite an existing owner phone.
 
-Session tests additionally cover JWT claims/signatures, stored hashes, persistence across store recreation, expiry independent of TTL cleanup, atomic refresh, replay family revocation, cookie flags, logout cleanup and CSRF/origin failures. Browser helper unit tests cover concurrent refresh deduplication and failure handling; they do not replace real browser acceptance.
+Session tests additionally cover JWT claims/signatures, stored hashes, persistence across store recreation, expiry independent of TTL cleanup, atomic refresh, user-wide replay revocation, cookie flags, logout cleanup and CSRF/origin failures. Browser helper unit tests cover concurrent refresh deduplication and failure handling; they do not replace real browser acceptance.
 
 Implementation references: [jose signing and verification](https://github.com/panva/jose), [cookie attributes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie).

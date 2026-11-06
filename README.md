@@ -18,7 +18,7 @@ Use Node.js satisfying `>=22` and dependency engine requirements, pnpm 12.6.0, G
 
 ## Quickstart
 
-Development-only authentication is configured with `NODE_ENV=development` and `mockOTP=true` in the ignored root `.env`. The API `dev` command now loads that file; copy `.env.example` on a new checkout. Phone `9000000001` and OTP `000000` provide the requested mock super-admin flow on a dedicated `_dev` database. See [development authentication](docs/engineering/development-auth.md); this does not implement production authentication.
+Development-only authentication is configured with `NODE_ENV=development` and `mockOTP=true` in the ignored root `.env`. The API `dev` command now loads that file; copy `.env.example` on a new checkout. Phone `9000000001` and OTP `000000` provide the requested mock super-admin flow on a dedicated `_dev` database. See [development authentication](docs/engineering/development-auth.md); fixed-code sign-in is development-only. Staff password/TOTP authentication and all [F01 route handlers](docs/api/F01-authentication.md) are implemented; live customer/rider OTP delivery remains disabled until a provider is configured.
 
 From a clean checkout root in PowerShell, with prerequisites available and ports 27017/3000/4000 free:
 

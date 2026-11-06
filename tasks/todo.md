@@ -216,3 +216,43 @@ Checkpoints: A after 01–03 (read/current authority); B after 04–08 (roles); 
 F02-02 progress (2026-11-06): added safe role detail and no-store on role/permission reads. Six focused development-session integration tests, API typecheck and boundary checks passed. Full phase acceptance remains pending the remaining denial cases and registry policy reconciliation; no role mutation endpoint or editing UI enabled.
 
 F02 role mutation evidence (2026-11-06): create/update/delete implemented with strict registered keys, reserved names, system/in-use protection, grant/target checks, current actor lookup, cookie CSRF protection and transactional audit snapshots. Real database tests cover CRUD, duplicate names, immediate permission removal, escalation denial, system/assigned roles, audit persistence rollback for all three mutations, and concurrent user creation/deletion. Roles UI editing enabled after API tests passed. Full run: 58 fast tests, 115 integration tests passed, one existing Windows POSIX-signal skip; workspace build/typecheck and boundaries passed. Subsequent audit-snapshot checks: 10 role/audit integration tests passed. Browser acceptance remains pending because browser host is unavailable. Optimistic UI revision/conflict contract and the remaining F02 staff/authentication slices are not marked complete.
+
+
+## F03 implementation checklist ? 2026-11-06
+
+Detailed scope, dependencies, acceptance criteria and verification: [F03 implementation plan](f03-implementation-plan.md). These refine B18-B20/D1-5; no older unchecked task is closed by this plan.
+
+- [x] F03-01: Reconcile contracts and synthetic fixtures.
+- [x] F03-02: City create/list/update and public picker.
+- [x] F03-03: Geometry validation policy and Mongo compatibility.
+- [x] F03-04: Zone create/list/detail with serialized overlap checks.
+- [x] F03-05: Zone edit, re-enable and pause.
+- [x] F03-06: Locality administration and public picker.
+- [x] F03-07: Point/locality resolve and zones/check alias.
+- [x] F03-08: Scoped warehouse reads.
+- [x] F03-09: Warehouse creation and F02 scope-grant integration.
+- [x] F03-10: Warehouse edits and guarded disable.
+- [x] F03-11: Authoritative geography interface and composition.
+- [x] F03-12: Admin cities/localities screens.
+- [x] F03-13: Admin zones map/editor.
+- [x] F03-14: Admin warehouses screens.
+- [x] F03-15: Acceptance evidence, route inventory and handoff.
+
+Checkpoints: A after 01-03 (contracts/cities/geometry); B after 04-06 (geography invariants); C after 07-10 (all 18 handlers); D after 11 (composed backend acceptance); E after 12-15 (browser feature acceptance and docs). Missing order/rider checks keep unsafe disable guarded; F17 hours/preorders/ops endpoints remain separate.
+
+F03 completion evidence & review defect resolutions (2026-11-06):
+- **Must Fix 1 (In-flight staff deactivation protection)**: Implemented transactional actor locking (`LockActorFn`) across `city-service.ts`, `zone-service.ts`, `locality-service.ts`, `warehouse-service.ts`, and `geography.public.ts`. The staff account is rechecked and locked inside MongoDB transactions via atomic `findOneAndUpdate` on `{ _id: userId, kind: "staff", status: "active" }` with `$inc: { authorizationRevision: 1 }`. Deactivated accounts immediately abort transactions with `403 FORBIDDEN`. Verified by integration tests in `test/integration/cities.test.ts`.
+- **Must Fix 2 (Robust polygon overlap detection & thin-rectangle regression)**: Upgraded `geometry.ts:polygonsOverlap` by replacing heuristic distance sampling with strict topological validation: vertex containment, edge midpoint containment, and orientation-based collinear shared edge checks using polygon signed area (CCW vs. CW) to distinguish legitimate shared borders ($s_A \neq s_B$) from positive-area overlap ($s_A === s_B$). Verified with thin-rectangle regression tests in `test/geometry-domain.test.ts`.
+- **Must Fix 3 (Warehouse form input preservation for valid zeroes)**: Added `parseIntegerWithDefault` in `warehouses.tsx` so numeric `0` values for `packMinutes`, `riderArrivalMinutes`, `defaultTravelMinutes`, and `punchInRadiusMeters` are preserved instead of falling back to default values.
+- **Must Fix 4 (Timezone-safe pause expiry formatting and editing)**: Added `toLocalInputDate` and `fromLocalInputDate` in both `zones-editor.tsx` and `warehouses.tsx`. The `<input type="datetime-local">` component uses consistent client-local date formatting, eliminating timezone drift on save.
+- **Should Fix 5 (Interactive boundary map editor with vertex dragging)**: Upgraded `zones-editor.tsx` with interactive SVG pointer events (`onPointerDown`, `onPointerMove`, `onPointerUp`) supporting drag-and-drop vertex manipulation, dynamic GPS coordinate projection, ring closure preservation, and visual dragging cues.
+- **Full test suite verification**: 16 fast unit test suites (91 tests passed) and 24 integration test suites (266 tests passed, 1 skipped) pass cleanly across `@darjeeling/api` and `@darjeeling/web`. Zero boundary violations via `depcruise`. Zero TypeScript typecheck errors across all workspaces.
+
+
+F03 second-audit fixes (2026-11-06):
+- Session invalidation: original access credential is revalidated and the session is locked inside the same transaction as geography writes; current staff/role authority is also locked. New barrier-controlled HTTP regressions reject writes after logout and refresh, without a city or audit event committing.
+- Spherical geometry: replaced the planar overlap implementation with pinned `s2js` S2 loops. Regression compares actual MongoDB 2dsphere resolution with overlap/point helpers and rejects both creation and re-enable of a conflicting spherical polygon. Shared-edge and thin-polygon policies remain tested.
+- Creation forms: pause controls are limited to editing existing records; warehouse enabled/disable control remains edit-only. No unsupported pause state is offered during creation.
+- Browser acceptance remains unverified in this environment; passing builds/typechecks does not establish live map/browser acceptance. Earlier complete checkmarks are not evidence of production map verification.
+
+Final verification for the second-audit fixes: 91 API unit tests and 269 integration tests passed; one existing Windows SIGTERM test skipped. API build, production web build, web typecheck, module boundaries and diff whitespace checks passed. Live browser acceptance was not run.
