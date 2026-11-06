@@ -23,6 +23,7 @@ const schema = sessionSettings.extend({
   NODE_ENV: z.enum(["development", "test", "production"]).default("production"),
   mockOTP: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
   JWT_SECRET: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  STAFF_TOTP_KEY: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   MONGODB_URI: z.string().regex(/^mongodb(?:\+srv)?:\/\/\S+$/, "must be a MongoDB URI"),
   CORS_ORIGINS: z.string().default("").transform(value => value.split(",").map(origin => origin.trim()).filter(Boolean)).refine(origins => origins.every(origin => {
@@ -32,6 +33,8 @@ const schema = sessionSettings.extend({
 }).superRefine((config, context) => {
   if (config.mockOTP && config.NODE_ENV !== "development") context.addIssue({ code: "custom", path: ["mockOTP"], message: "Mock OTP requires development mode" });
   if (config.mockOTP && !config.JWT_SECRET) context.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "JWT signing key required" });
+  if (!config.mockOTP && config.JWT_SECRET && !config.STAFF_TOTP_KEY) context.addIssue({ code: "custom", path: ["STAFF_TOTP_KEY"], message: "Staff authentication requires a separate encryption key" });
+  if (config.STAFF_TOTP_KEY && config.STAFF_TOTP_KEY === config.JWT_SECRET) context.addIssue({ code: "custom", path: ["STAFF_TOTP_KEY"], message: "Use an independent encryption key" });
   if (durationSeconds(config.ACCESS_TOKEN_TTL) >= durationSeconds(config.REFRESH_TOKEN_TTL)) context.addIssue({ code: "custom", path: ["REFRESH_TOKEN_TTL"], message: "Refresh lifetime must exceed access lifetime" });
   const secure = config.AUTH_COOKIE_SECURE === undefined ? config.NODE_ENV === "production" : config.AUTH_COOKIE_SECURE === "true";
   if (config.NODE_ENV === "production" && !secure) context.addIssue({ code: "custom", path: ["AUTH_COOKIE_SECURE"], message: "Production requires Secure cookies" });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config/env.js";
 
 describe("mock OTP configuration", () => {
-  const base = { MONGODB_URI: "mongodb://localhost/test", JWT_SECRET: "a".repeat(64) };
+  const base = { MONGODB_URI: "mongodb://localhost/test", JWT_SECRET: "a".repeat(64), STAFF_TOTP_KEY: "b".repeat(64) };
   it("defaults to disabled and requires explicit development mode", () => {
     expect(loadConfig(base).mockOTP).toBe(false);
     for (const NODE_ENV of [undefined, "production", "test"]) {
@@ -23,5 +23,9 @@ describe("mock OTP configuration", () => {
       { AUTH_COOKIE_SECURE: "false" }, { AUTH_COOKIE_SECURE: "yes" },
       { NODE_ENV: "development", AUTH_COOKIE_SECURE: "false", AUTH_COOKIE_SAME_SITE: "none" },
     ]) expect(() => loadConfig({ ...base, ...values })).toThrow("Invalid configuration");
+  });
+  it("requires independent encryption and signing keys for staff authentication", () => {
+    expect(() => loadConfig({ ...base, STAFF_TOTP_KEY: undefined })).toThrow("STAFF_TOTP_KEY");
+    expect(() => loadConfig({ ...base, STAFF_TOTP_KEY: base.JWT_SECRET })).toThrow("STAFF_TOTP_KEY");
   });
 });
