@@ -1,6 +1,6 @@
 # Development mock authentication
 
-Status: Implemented development-only bypass; production authentication remains pending
+Status: Implemented development-only bypass; production staff authentication is documented in [staff authentication](staff-authentication.md).
 Owner: Backend maintainers
 Scope: Local OTP login, development owner, JWT access and rotating refresh cookies
 
@@ -84,9 +84,9 @@ The browser helper retries a failed authenticated read once after refresh and se
 
 ## Limits and cleanup
 
-JWT access and hashed rotating refresh sessions now persist across API restarts. Mock OTP challenges remain process-local and disappear on restart. The browser login, session restore and logout are connected. Production password/2FA authentication, native refresh transport, complete abuse protection and deployment hardening remain pending. Do not treat fixed-code mock sign-in as production-ready authentication.
+JWT access and hashed rotating refresh sessions now persist across API restarts. Mock OTP challenges remain process-local and disappear on restart. The browser login, session restore and logout are connected. Production staff password/2FA authentication is documented in [staff authentication](staff-authentication.md). Native refresh transport, complete customer/rider abuse protection and deployment hardening remain separate work. Do not treat fixed-code mock sign-in as production-ready authentication.
 
-Disable with `mockOTP=false` and restart. Mock routes disappear; development sessions cease to work. Seeded records remain in the development database, tagged on the owner as `devMockAccount`. Production authentication must reject such mock identities unless an explicit reviewed migration removes that designation. Do not copy this database into production.
+Disable with `mockOTP=false` and restart. Mock login, refresh, profile and logout routes disappear. F02 administration remains registered when `JWT_SECRET` is configured, but rejects the tagged development owner account outside mock composition; production staff login uses its separate password/2FA flow. Seeded records remain in the development database, tagged on the owner as `devMockAccount`. Production authentication must reject such mock identities unless an explicit reviewed migration removes that designation. Do not copy this database into production.
 
 ## Verification
 

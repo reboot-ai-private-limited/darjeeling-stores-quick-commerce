@@ -2,6 +2,8 @@
 
 Spec: [F01](../foundation/01-authentication.md) · Conventions: [00](00-conventions.md)
 
+Implementation status (2026-11-06): staff login, restricted temporary-password change, TOTP setup/enable, cookie refresh/logout, `GET /me` and `GET /me/access` are implemented. First-owner creation is an explicit CLI, with no public bootstrap route. See [staff authentication](../engineering/staff-authentication.md) for setup, transport contracts and verification. Other F01 endpoints below remain proposed except the existing development mock OTP routes.
+
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
@@ -80,6 +82,8 @@ Body:
 
 200: a Session whose `user.role` is `admin` or `super_admin`.
 
+Implemented staff roles also include custom staff roles. Browser sessions use HTTP-only cookies and omit tokens from JSON when `X-Client: admin`. Accounts with a temporary password or required 2FA enrolment receive only `{ "data": { "nextAction": "change_password", "expiresInSeconds": 600 } }` (or `enrol_2fa`) and an expiring restricted cookie; they have no normal session yet. Complete `POST /admin/auth/change-password` with `{ "newPassword": "…" }`, then setup/enable if required. `GET /admin/auth/status` restores the pending step; `POST /admin/auth/cancel` invalidates it. The password-change endpoint rejects reusing the temporary password. Owners must enrol 2FA before normal access.
+
 Errors: `401 INVALID_CREDENTIALS` · `401 TOTP_REQUIRED` (resend with `totpCode`) · `429 ACCOUNT_LOCKED` (`details.retryAfterSeconds`) · `429 RATE_LIMITED`.
 
 ## POST /admin/auth/2fa/setup · POST /admin/auth/2fa/enable
@@ -88,6 +92,8 @@ Setup 200:
 { "data": { "secret": "JBSWY3DPEHPK3PXP", "otpauthUrl": "otpauth://totp/DarjeelingStores:owner@darjeelingstores.in?secret=JBSWY3DPEHPK3PXP&issuer=DarjeelingStores" } }
 ```
 Enable body: `{ "code": "123456" }` · 200: `{ "data": { "ok": true } }` · Errors: `401 INVALID_OTP`.
+
+Implemented enable returns a completed cookie Session instead of the proposed `ok` envelope, revoking earlier sessions. Setup accepts a restricted enrolment challenge or a staff session logged in within ten minutes; enable requires the resulting challenge cookie. Already-enabled authenticators cannot be replaced here. Replayed codes fail. See the engineering reference for expiry, throttling, encryption and reset rules.
 
 ## GET /me
 200:

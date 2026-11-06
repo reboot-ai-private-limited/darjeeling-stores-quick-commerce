@@ -187,3 +187,32 @@ Each entry gives dependencies, likely file areas, acceptance and verification. S
 B01.1 evidence: reconciled proposed business envelopes and client request-ID wording with implemented probe and middleware behavior; confirmed referenced API documents exist. Parent B01 remains open pending B01.2 and B01.3.
 
 B06.1 progress: added transaction-required audit writer with strict metadata fields and disposable replica-set tests for commit, validation-failure rollback and rejection outside a transaction. Audit reads, reason/before/after policy, integration with real sensitive mutations, and forced persistence-failure rollback remain open.
+
+## F02 completion plan — 2026-11-06
+
+Detailed implementation design and acceptance criteria: [F02 roles/staff plan](f02-implementation-plan.md). Based on pulled `origin/main` at `1d2d920`; local grant-policy edits retained. These slices refine B07/B10/B11/B12 and do not discard their existing state.
+
+- [ ] F02-01: Finalize registry, protected-role and grant policy.
+- [ ] F02-02: Role list/detail/permissions read contract and authorization.
+- [ ] F02-03: Current-actor resolver, `/me/access`, catalog/offerings authorization wiring.
+- [ ] F02-04: Transactional audit and assignment/delete conflict protocol.
+- [ ] F02-05: Strict role creation and duplicate/concurrent cases.
+- [ ] F02-06: Permission updates, target/grant checks and immediate enforcement.
+- [ ] F02-07: System/in-use role deletion protection and concurrency tests.
+- [ ] F02-08: Enable tested role editing in admin UI.
+- [ ] F02-09: Staff data and password credential service.
+- [ ] F02-10: Safe staff list/detail reads and filters.
+- [ ] F02-11: Audited staff creation and validated role/warehouse grants.
+- [ ] F02-12: Audited staff role/scope updates and immediate enforcement.
+- [ ] F02-13: Deactivate/reactivate with owner/self protection and revocation.
+- [ ] F02-14: Transactional all-session forced logout.
+- [ ] F02-15: Audited password reset and credential revocation.
+- [ ] F02-16: Safe 2FA reset after real restricted-enrollment prerequisite.
+- [ ] F02-17: Staff UI reads and per-action enablement.
+- [ ] F02-18: Endpoint traceability, full checks, browser acceptance and docs.
+
+Checkpoints: A after 01–03 (read/current authority); B after 04–08 (roles); C after 09–12 (staff data); D after 13–17 (lifecycle/UI); E after 18 (acceptance). Tests and blockers are specified in the linked plan. No unchecked parent task is considered done by adding this plan.
+
+F02-02 progress (2026-11-06): added safe role detail and no-store on role/permission reads. Six focused development-session integration tests, API typecheck and boundary checks passed. Full phase acceptance remains pending the remaining denial cases and registry policy reconciliation; no role mutation endpoint or editing UI enabled.
+
+F02 role mutation evidence (2026-11-06): create/update/delete implemented with strict registered keys, reserved names, system/in-use protection, grant/target checks, current actor lookup, cookie CSRF protection and transactional audit snapshots. Real database tests cover CRUD, duplicate names, immediate permission removal, escalation denial, system/assigned roles, audit persistence rollback for all three mutations, and concurrent user creation/deletion. Roles UI editing enabled after API tests passed. Full run: 58 fast tests, 115 integration tests passed, one existing Windows POSIX-signal skip; workspace build/typecheck and boundaries passed. Subsequent audit-snapshot checks: 10 role/audit integration tests passed. Browser acceptance remains pending because browser host is unavailable. Optimistic UI revision/conflict contract and the remaining F02 staff/authentication slices are not marked complete.

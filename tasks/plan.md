@@ -287,3 +287,7 @@ Application rollback can leave newly written users/sessions/roles/settings/geogr
 | Unverified operating values | Require real polygons, hours and owner-approved policy inputs | Test fixtures never become silent production defaults |
 
 No duration estimate is committed. Size each slice after resolving its inputs and library choices; split any slice that cannot be reviewed and verified in one focused session. Source review, local integration results, provider delivery and staging operations remain distinct forms of evidence.
+
+## F02 implementation expansion — 2026-11-06
+
+Use [the detailed F02 completion plan](f02-implementation-plan.md) for the remaining role/staff APIs, concurrency/audit safety and admin UI work. It is grounded in pulled `origin/main` at `1d2d920`, including the new catalog/offerings modules and their default-deny auth integration. Its ordered F02-01–F02-18 checklist is appended to [todo.md](todo.md). Existing foundation tasks and historical evidence are retained.
