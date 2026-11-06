@@ -12,6 +12,7 @@ import { createCashModule } from "../modules/cash/cash.public.js";
 import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
 import { createHoursModule } from "../modules/hours/hours.public.js";
 import { createOrdersModule, type MoneyPort, type OrderSettings } from "../modules/orders/orders.public.js";
+import { createPaymentsModule, type PaymentProvider, type PaymentSettings } from "../modules/payments/payments.public.js";
 import { createRefundsModule, type RefundSettings } from "../modules/refunds/refunds.public.js";
 import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
 import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
@@ -66,6 +67,8 @@ export interface Dev2Options {
   money?: MoneyPort;
   /** Refund rules (F16): the window for asking after delivery, and whether a photo is needed. */
   refundSettings?: Partial<RefundSettings>;
+  /** Razorpay, or a stand-in. Defaults to the one set up by RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET; without them online payment answers 503. */
+  paymentProvider?: PaymentProvider; paymentSettings?: Partial<PaymentSettings>;
   pricingSettings?: Partial<PricingSettings>; orderHistory?: OrderHistory; customerNames?: (userIds: readonly string[]) => Promise<Map<string, string>>;
   /** Live ETA settings, the routes provider that replaces the straight-line estimate, and the secret that signs public tracking links (F20). */
   trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; trackingTokenSecret?: string;
@@ -86,7 +89,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const ensureIndexes = () => (indexes ??= Promise.all([
     catalog.store.ensureIndexes(), offerings.store.ensureIndexes(), availability.store.ensureIndexes(), media.store.ensureIndexes(),
     jobs.store.ensureIndexes(), notifications.ready(), discovery.store.ensureIndexes(), addresses.store.ensureIndexes(), riders.store.ensureIndexes(), dispatch.store.ensureIndexes(),
-    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(), cart.store.ensureIndexes(), orders.store.ensureIndexes(), hours.store.ensureIndexes(), refunds.store.ensureIndexes(),
+    cash.store.ensureIndexes(), tracking.store.ensureIndexes(), sync.store.ensureIndexes(), pricing.store.ensureIndexes(), cart.store.ensureIndexes(), orders.store.ensureIndexes(), hours.store.ensureIndexes(), refunds.store.ensureIndexes(), payments.store.ensureIndexes(),
   ]).then(() => undefined, error => { indexes = undefined; throw error; }));
   const authThenIndexes: AuthResolver = async req => {
     const actor = await auth(req);
@@ -196,7 +199,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   // Refunds and online payments reach the orders module through one port; an option replaces it (tests do).
   const money: MoneyPort = options.money ?? {
     refund: input => refunds.service.createAuto(input),
-    startPayment: async () => null,
+    startPayment: group => payments.service.startPayment(group.id),
   };
   const orders = createOrdersModule({
     connection, geography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.orderSettings && { settings: options.orderSettings }), money,
@@ -257,6 +260,36 @@ export function createDev2Modules(options: Dev2Options = {}) {
       approved: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_approved", channels: ["push"], vars: { orderNo: r.orderNo, amount: String(r.amount / 100) }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:approved` }); },
       rejected: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_rejected", channels: ["push"], vars: { orderNo: r.orderNo, reason: r.rejectReason ?? "" }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:rejected` }); },
       done: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_done", channels: ["push", "whatsapp"], vars: { orderNo: r.orderNo, amount: String(r.amount / 100) }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:done` }); },
+    },
+  });
+
+  const payments = createPaymentsModule({
+    connection, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.paymentProvider && { provider: options.paymentProvider }),
+    ...(options.paymentSettings && { settings: options.paymentSettings }),
+    groups: {
+      get: async id => {
+        const r = await orders.service.groupForPayment(id);
+        return r && {
+          id, groupNo: r.group.groupNo, userId: r.group.userId, paymentMethod: r.group.paymentMethod, paymentStatus: r.group.paymentStatus, total: r.group.pricing.total, expiresAt: r.group.expiresAt,
+          customerName: r.group.address.contactName, customerPhone: r.group.address.contactPhone,
+          children: r.children.map(c => ({ id: c.id, orderNo: c.orderNo, status: c.status, amountDue: c.amountDue, collectionRecorded: c.collection !== null, warehouseId: c.warehouseId })),
+        };
+      },
+      groupOfOrder: async orderId => (await orders.store.getOrder(orderId))?.groupId ?? null,
+      idByNo: groupNo => orders.store.groupIdByNo(groupNo),
+      markPaid: (groupId, info) => orders.service.markGroupPaid(groupId, info), markCodPaid: (groupId, info) => orders.service.markCodGroupPaid(groupId, info),
+      expireOverdue: limit => orders.service.expireOverdue(limit),
+    },
+    refunds: {
+      refund: async ({ groupId, amount, reason, kind, key }) => {
+        const group = await orders.store.getGroup(groupId);
+        const first = (await orders.store.childrenOf(groupId))[0];
+        if (group && first) {
+          await refunds.service.createAuto({
+            order: { id: first.id, orderNo: first.orderNo, groupId, userId: group.userId, warehouseId: first.warehouseId, paymentMethod: group.paymentMethod }, amount, reason, kind, key, by: { userId: null, role: "system" },
+          });
+        }
+      },
     },
   });
 
@@ -337,6 +370,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
     await jobs.service.every("stock.release_expired_holds", 60_000, () => offerings.stock.releaseExpiredHolds());
     await jobs.service.every("notifications.drain_back_in_stock", 60_000, () => notifications.campaigns.drainBackInStock());
     await jobs.service.every("media.sweep", 3_600_000, () => media.service.sweep());
+    await jobs.service.every("payments.expire_overdue", 60_000, () => payments.service.expireOverdue());
     await jobs.service.every("pricing.expire_rain", 60_000, () => pricing.service.expireRain());
     await jobs.service.every("dispatch.ack_sweep", 10_000, () => dispatch.assign.sweepAcks());
     await jobs.service.every("dispatch.auto_assign", 15_000, () => dispatch.assign.autoAssignPending());
@@ -346,11 +380,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, orders, hours, refunds, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, orders, hours, refunds, payments, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
       // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
-      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes, ...refunds.routes, ...hours.routes,
+      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes, ...refunds.routes, ...payments.routes, ...hours.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };

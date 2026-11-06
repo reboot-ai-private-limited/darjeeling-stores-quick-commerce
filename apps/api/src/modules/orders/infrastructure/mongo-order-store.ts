@@ -67,6 +67,10 @@ export function createMongoOrderStore(connection: Connection): OrderStore {
     },
     async findGroupByKey(userId, key) { const doc = await groups().findOne({ userId, idempotencyKey: key }); return doc ? toGroup(doc) : null; },
     countGroupsOf(userId) { return groups().countDocuments({ userId }); },
+    async groupIdByNo(groupNo) { return (await groups().findOne({ groupNo }, { projection: { _id: 1 } }))?._id ?? null; },
+    async expiredGroupIds(before, limit) {
+      return (await groups().find({ expiresAt: { $ne: null, $lte: before }, paymentMethod: "online", paymentStatus: { $ne: "paid" } }).sort({ expiresAt: 1 }).limit(limit).toArray()).map(g => g._id);
+    },
     async getGroup(id) { const doc = await groups().findOne({ _id: id }); return doc ? toGroup(doc) : null; },
     async updateGroup(id, patch) { await groups().updateOne({ _id: id }, { $set: { ...strip(patch), updatedAt: new Date() } as never }); },
     async listGroupsOf(userId, filter, limit, beforeId) {

@@ -21,6 +21,9 @@ export interface OrderStore {
   findGroupByKey(userId: string, key: string): Promise<OrderGroup | null>;
   getGroup(id: string): Promise<OrderGroup | null>;
   countGroupsOf(userId: string): Promise<number>;
+  groupIdByNo(groupNo: string): Promise<string | null>;
+  /** Online groups whose payment time has passed. */
+  expiredGroupIds(before: Date, limit: number): Promise<string[]>;
   updateGroup(id: string, patch: Partial<OrderGroup>): Promise<void>;
   /** `live` true: groups with an order still in progress; false: groups where every order has ended. */
   listGroupsOf(userId: string, filter: { live?: boolean }, limit: number, beforeId?: string): Promise<OrderGroup[]>;

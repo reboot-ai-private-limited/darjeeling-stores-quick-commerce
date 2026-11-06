@@ -95,7 +95,7 @@ export function toDeliveryOrder(o: Order, g: OrderGroup, siblings: readonly Orde
     voiceNote: o.voiceMediaId ? { mediaId: o.voiceMediaId, durationSec: o.voiceDurationSec, expired: voiceExpired } : null,
     housePhoto: o.housePhotoMediaId ? { mediaId: o.housePhotoMediaId } : null,
     paymentMethod: o.paymentMethod, paymentStatus: o.paymentStatus, amountDue: o.amountDue,
-    alreadyPaid: o.paymentMethod === "online" && o.paymentStatus === "paid",
+    alreadyPaid: o.paymentStatus === "paid",
     collectionRecorded: o.collection !== null, collectionMethod: o.collection?.method ?? null, collectionAmount: o.collection?.amount ?? null,
     deliveredOffline: o.delivery?.offline ?? false, otpRequired: true, promisedAt: o.promisedAt, readyAt: o.stamps.readyAt, deliveredAt: o.stamps.deliveredAt,
   };

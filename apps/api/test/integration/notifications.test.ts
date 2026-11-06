@@ -720,7 +720,7 @@ describe("background work", () => {
     await started();
     const schedules = await col("job_schedules").find({}).toArray();
     expect(schedules.map(s => [s._id, s.intervalMs]).sort()).toEqual([
-      ["dispatch.ack_sweep", 10_000], ["dispatch.auto_assign", 15_000], ["media.sweep", 3_600_000], ["notifications.drain_back_in_stock", 60_000], ["pricing.expire_rain", 60_000], ["riders.silent_sweep", 60_000], ["stock.release_expired_holds", 60_000],
+      ["dispatch.ack_sweep", 10_000], ["dispatch.auto_assign", 15_000], ["media.sweep", 3_600_000], ["notifications.drain_back_in_stock", 60_000], ["payments.expire_overdue", 60_000], ["pricing.expire_rain", 60_000], ["riders.silent_sweep", 60_000], ["stock.release_expired_holds", 60_000],
     ]);
     expect(schedules.every(s => s.nextRunAt > new Date())).toBe(true);
   });
@@ -774,10 +774,10 @@ describe("background work", () => {
   it("runs each sweep once per interval and stops when told to", async () => {
     const background = await f.mods.startBackground(20);
     await dueNow();
-    for (let i = 0; i < 100 && (await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })) < 7; i++) await new Promise(r => setTimeout(r, 20));
+    for (let i = 0; i < 100 && (await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })) < 8; i++) await new Promise(r => setTimeout(r, 20));
     await background.stop();
-    expect(await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })).toBe(7);
+    expect(await col("jobs").countDocuments({ type: /^recurring:/, status: "done" })).toBe(8);
     await new Promise(r => setTimeout(r, 100));
-    expect(await col("jobs").countDocuments({ type: /^recurring:/ })).toBe(7);
+    expect(await col("jobs").countDocuments({ type: /^recurring:/ })).toBe(8);
   });
 });

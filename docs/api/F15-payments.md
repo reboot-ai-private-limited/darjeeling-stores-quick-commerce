@@ -53,7 +53,7 @@ Headers: `Idempotency-Key`. Body:
 ```json
 { "data": { "groupId": "grp_1", "state": "confirming", "provisional": true } }
 ```
-`state`: `confirming` (signature ok, waiting for the webhook), `confirmed` (webhook already processed). Calling it twice is safe. Errors: `409 PAYMENT_MISMATCH` · `422 VALIDATION_ERROR` (bad signature) · `410 PAYMENT_EXPIRED`.
+`state`: `confirming` (signature ok, waiting for the webhook), `confirmed` (webhook already processed). Calling it twice is safe. Errors: `409 PAYMENT_MISMATCH` · `400 VALIDATION_ERROR` (bad signature) · `410 PAYMENT_EXPIRED`.
 
 ## GET /order-groups/:id/payment
 200:
@@ -107,3 +107,14 @@ Query: `date`. 200:
 
 ## POST /admin/payments/:id/mark-paid
 Use only after checking the Razorpay dashboard. Body: `{ "razorpayPaymentId": "pay_Nz2", "note": "Verified in dashboard" }` → 200: the payment. Audited. Errors: `409 CONFLICT` (already captured).
+
+## Implementation notes (backend, payments module)
+
+- **Validation errors are `400 VALIDATION_ERROR`**, not 422 (a bad checkout signature is `400` with `details.field: razorpaySignature`). `PAYMENT_MISMATCH` is `422` and `PAYMENT_EXPIRED` is `410`.
+- **Setup.** Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`; without all three, creating a payment answers `503 SERVICE_UNAVAILABLE`. Order placement does not fail then: the online order is saved unpaid with `payment: null`, and `POST /payments/retry` makes the checkout when Razorpay is back. The webhook URL to register in the Razorpay dashboard is `/api/v1/webhooks/razorpay` (events: `payment.captured`, `payment.failed`, `order.paid`, `payment_link.paid`).
+- **Source of truth.** `POST /payments/verify` checks the checkout signature (HMAC of `order_id|payment_id`), records the attempt as `authorized` and answers `confirming`; it never confirms the order. Only a signed webhook does that. The webhook's own signature is HMAC-SHA256 of the raw body; a bad one is `403`, and a good one always answers `200` with what was done in `data.result`: `paid`, `paid_cod`, `already_captured`, `duplicate`, `amount_mismatch`, `late_refund`, `overpaid_refund`, `duplicate_refund`, `failure_recorded`, `unknown_payment`, `ignored`.
+- **Once only.** Each event id is stored (unique), and marking a payment captured is a conditional update, so repeated, simultaneous or re-sent events place the order once. If the event has no id header, a hash of the body stands in.
+- **Capturing** (online): every order of the group moves `PENDING_PAYMENT` to `PLACED` (then `CONFIRMED` when confirmation is automatic), `paidAmount` is set, the stock hold becomes permanent and the expiry is cleared. A different amount than due confirms nothing: the payment is flagged `amount_mismatch` and the admin alerted. A capture after the orders were cancelled or expired is flagged `late_payment` and a `late_payment` refund is created; a second payment for an already paid group is refunded as `overpaid`.
+- **Expiry.** A job (`payments.expire_overdue`, every minute) cancels online orders still unpaid after `paymentWindowMinutes` (15) and puts their stock back. After that `retry` and `verify` are `410`, and `GET /order-groups/:id/payment` says `expired`. A failed attempt does not cancel anything. `retry` makes a new Razorpay order (`attempt` counts up); `state` is `failed` after a failed attempt until the next one.
+- **Pay online later** (`POST /orders/:id/pay-link`) works for a cash group with nothing collected: the amount is what is still due on all its active orders; asking again returns the same link while it is open (2 hours). When it is paid every order's `amountDue` becomes 0, the order shows `alreadyPaid`, and the rider's feed gets `payment_paid` (and `collect-cash` answers `409 already_paid`). If the cash was taken first, the online payment is refunded as `overpaid`.
+- **Admin.** These screens are for staff who see every warehouse (a warehouse-scoped manager gets `403`), because a payment can span warehouses. `reconcile` compares one India-time day of captures at Razorpay with ours right away and answers `202` with the `jobId` of the saved result. `mark-paid` treats a stuck payment as received and is audited.

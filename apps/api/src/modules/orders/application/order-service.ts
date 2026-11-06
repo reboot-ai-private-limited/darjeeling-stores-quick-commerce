@@ -62,7 +62,7 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
       const existing = await store.findGroupByKey(userId, key);
       if (existing) {
         if (existing.requestHash !== requestHash) throw new AppError("IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was used with a different request");
-        return { group: await groupView(existing), payment: existing.paymentMethod === "online" ? await money.startPayment(existing) : null };
+        return { group: await groupView(existing), payment: existing.paymentMethod === "online" ? await money.startPayment(existing).catch(() => null) : null };
       }
       const quote = await quotes.get(userId, input.quoteId);
       if (quote.usedByGroupId) throw conflict("This quote was already used for an order", { reason: "quote_used" });
@@ -131,7 +131,7 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
           await rollback(groupId, couponHeld);
           if (error instanceof DuplicateGroupError) {
             const winner = await store.findGroupByKey(userId, key);
-            if (winner && winner.requestHash === requestHash) return { group: await groupView(winner), payment: online ? await money.startPayment(winner) : null };
+            if (winner && winner.requestHash === requestHash) return { group: await groupView(winner), payment: online ? await money.startPayment(winner).catch(() => null) : null };
             throw new AppError("IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was used with a different request");
           }
           throw error;
@@ -152,7 +152,7 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
         await notifier.placed(userId, group, children.map(c => c.orderNo)).catch(() => undefined);
         for (const child of children) await notifier.newOrder(child.warehouseId, child).catch(() => undefined);
         const saved = (await store.getGroup(groupId))!;
-        return { group: await groupView(saved), payment: online ? await money.startPayment(saved) : null };
+        return { group: await groupView(saved), payment: online ? await money.startPayment(saved).catch(() => null) : null };
       } catch (error) {
         throw error;
       }
@@ -208,6 +208,58 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
         throw new AppError("ORDER_NOT_CANCELLABLE", "This order can no longer be cancelled", { currentStatus: moved.from });
       }
       return { order: { id: moved.order.id, status: moved.order.status }, refund: moved.refund ? { id: moved.refund.id, amount: moved.refund.amount, status: "requested" as const } : null, deliveryFeeRefunded: moved.feesRefunded ?? false };
+    },
+
+    /**
+     * The online payment for a group arrived (F15): every order waiting for payment is placed (and confirmed when that is automatic),
+     * and the stock hold becomes permanent. Safe to repeat.
+     */
+    async markGroupPaid(groupId: string, info: { paymentId: string }): Promise<{ changed: boolean }> {
+      const group = await store.getGroup(groupId);
+      if (!group) throw notFound("Order group");
+      const kids = (await store.childrenOf(groupId)).filter(k => k.status === "PENDING_PAYMENT");
+      if (kids.length === 0) return { changed: false };
+      for (const kid of kids) {
+        const owed = kid.itemsSubtotal - kid.allocatedDiscount + kid.allocatedCharges.reduce((sum, c) => sum + c.amount, 0);
+        await store.patch(kid.id, { paymentStatus: "paid", paidAmount: owed }, core.eventOf(kid, "payment_captured", { userId: null, role: "system" }, { meta: { paymentId: info.paymentId, amount: owed } }));
+        const placed = await core.move(kid.id, "PLACED", { userId: null, role: "system" }, { paymentId: info.paymentId });
+        if (placed.ok && settings.confirmMode === "auto") await core.move(kid.id, "CONFIRMED", { userId: null, role: "system" });
+      }
+      await store.updateGroup(groupId, { paymentStatus: "paid", expiresAt: null });
+      await stock.confirm(groupId).catch(() => undefined);
+      const fresh = await store.childrenOf(groupId);
+      await notifier.placed(group.userId, group, fresh.map(k => k.orderNo)).catch(() => undefined);
+      for (const kid of fresh) await notifier.newOrder(kid.warehouseId, kid).catch(() => undefined);
+      return { changed: true };
+    },
+
+    /** A cash-on-delivery group was paid online before the cash was taken: nothing is due at the door any more. */
+    async markCodGroupPaid(groupId: string, info: { paymentId: string }): Promise<{ changed: boolean }> {
+      const group = await store.getGroup(groupId);
+      if (!group) throw notFound("Order group");
+      let changed = false;
+      for (const kid of (await store.childrenOf(groupId)).filter(k => !["CANCELLED", "DELIVERED"].includes(k.status) && k.collection === null && k.paymentStatus !== "paid")) {
+        const owed = kid.amountDue;
+        await store.patch(kid.id, { paymentStatus: "paid", paidAmount: owed, amountDue: 0 }, core.eventOf(kid, "paid_online", { userId: null, role: "system" }, { meta: { paymentId: info.paymentId, amount: owed } }));
+        await deps.dispatch.paid(kid.id).catch(() => undefined);
+        changed = true;
+      }
+      if (changed) await store.updateGroup(groupId, { paymentStatus: "paid" });
+      return { changed };
+    },
+
+    /** Online orders whose payment time ran out are cancelled and their stock released. Returns how many groups. */
+    async expireOverdue(limit = 50): Promise<number> {
+      const due = await store.expiredGroupIds(now(), limit);
+      let count = 0;
+      for (const groupId of due) {
+        const kids = (await store.childrenOf(groupId)).filter(k => k.status === "PENDING_PAYMENT");
+        for (const kid of kids) await core.move(kid.id, "CANCELLED", { userId: null, role: "system" }, { reason: "payment_expired" });
+        await stock.release(groupId, "expired").catch(() => undefined);
+        await store.updateGroup(groupId, { expiresAt: null });
+        if (kids.length > 0) count++;
+      }
+      return count;
     },
 
     /** The orders of a group that have not ended, for payment confirmation and expiry. */

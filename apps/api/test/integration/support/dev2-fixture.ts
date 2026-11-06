@@ -7,6 +7,7 @@ import { createFakeGeography, type FakeGeography } from "./fake-geography.js";
 import { createFakeOrders, createFakeRiderIdentity, type FakeOrders, type FakeRiderIdentity } from "./fake-orders.js";
 import { createFakeMessaging, type FakeMessaging } from "./fake-messaging.js";
 import { createFakeMoney, type FakeMoney } from "./fake-money.js";
+import { createFakePayments, type FakePayments } from "./fake-payments.js";
 import { createFakeStorage, type FakeStorage } from "./fake-storage.js";
 import { actorFromHeader, api, customerFromHeader, principalFromHeader, riderFromHeader, startHarness, type Harness } from "./harness.js";
 
@@ -46,6 +47,8 @@ export interface Fixture {
   accounts: FakeRiderIdentity;
   /** Refunds the orders module asked for. */
   money: FakeMoney;
+  /** Razorpay held in memory. */
+  razorpay: FakePayments;
   /** Home banners and store settings the catalog shows; tests change them freely. */
   banners: Banner[];
   storeValue: StoreSettingsValue;
@@ -73,6 +76,7 @@ export async function startFixture(databaseName: string, options: { realOrders?:
   const orders = createFakeOrders();
   const accounts = createFakeRiderIdentity();
   const money = createFakeMoney();
+  const paymentsFake = createFakePayments();
   const banners: Banner[] = [];
   const defaultStore = (): StoreSettingsValue => ({
     etaMinMinutes: 15, etaMaxMinutes: 20, minOrder: 10000, freeDeliveryAbove: 60000, smallOrderFee: 0, afterHoursMode: "pre_order", preOrderAvailable: true,
@@ -85,7 +89,7 @@ export async function startFixture(databaseName: string, options: { realOrders?:
     webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
     geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
     discoverySettings: { maxChanges: 6 },
-    ...(options.realOrders ? {} : { orders: orders.port }), ...(options.realMoney ? {} : { money: money.port }), riderIdentity: accounts.identity, rider: riderFromHeader,
+    ...(options.realOrders ? {} : { orders: orders.port }), ...(options.realMoney ? {} : { money: money.port }), paymentProvider: paymentsFake.provider, riderIdentity: accounts.identity, rider: riderFromHeader,
     trackingTokenSecret: "test-secret", syncSettings: { upi: { vpa: "darjeelingstores@bank", payeeName: "Darjeeling Stores" }, otpIterations: 1000 },
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
@@ -99,7 +103,7 @@ export async function startFixture(databaseName: string, options: { realOrders?:
     return body === undefined ? r : r.send(body as object);
   };
   const fixture: Fixture = {
-    h, mods, app, events, storage, msg, geo, orders, accounts, money, banners, storeValue, get, send,
+    h, mods, app, events, storage, msg, geo, orders, accounts, money, razorpay: paymentsFake, banners, storeValue, get, send,
     async runJobs() {
       let total = 0;
       for (let pass = 0; pass < 20; pass++) { const ran = await mods.jobs.service.runOnce(); total += ran; if (ran === 0) break; }
@@ -124,6 +128,8 @@ export async function startFixture(databaseName: string, options: { realOrders?:
       await mods.cart.store.ensureIndexes();
       await mods.orders.store.ensureIndexes();
       await mods.refunds.store.ensureIndexes();
+      await mods.payments.store.ensureIndexes();
+      paymentsFake.reset();
       await mods.hours.store.ensureIndexes();
       money.reset();
       orders.reset();
