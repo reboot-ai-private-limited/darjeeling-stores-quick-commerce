@@ -8,11 +8,11 @@ const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
 export const slotsQuery = z.object({ zoneId: id });
 export const hoursBody = z.object({
   hours: z.array(z.object({ days: z.array(z.number().int().min(0).max(6)).min(1).max(7), open: clock, close: clock }).strict()).min(1).max(14),
-  lastOrderMinutesBeforeClose: z.number().int().min(0).max(240).default(15), afterHoursMode: z.enum(["closed", "pre_order"]).default("closed"),
+  lastOrderMinutesBeforeClose: z.number().int().min(0).max(240).optional(), afterHoursMode: z.enum(["closed", "pre_order"]).optional(),
 }).strict();
 export const preorderBody = z.object({
   enabled: z.boolean(), slots: z.array(z.object({ start: clock, end: clock, capacity: z.number().int().min(1).max(1000) }).strict()).max(12),
-  cutoffMinutesBeforeSlot: z.number().int().min(0).max(720).default(60), packLeadMinutes: z.number().int().min(0).max(240).default(45),
+  cutoffMinutesBeforeSlot: z.number().int().min(0).max(720).optional(), packLeadMinutes: z.number().int().min(0).max(240).optional(),
 }).strict();
 export const pauseBody = z.object({
   scope: z.enum(["warehouse", "zone"]), id, message: z.string().trim().min(1).max(300).nullish(), until: z.coerce.date().nullish(),

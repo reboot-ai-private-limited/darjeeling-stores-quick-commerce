@@ -13,6 +13,10 @@ The master catalog has **no price and no stock** (those are per warehouse, [F05]
 | `PUT` | `/admin/categories/:id` | Admin `catalog:manage` | Edit, move or toggle a category |
 | `DELETE` | `/admin/categories/:id` | Admin `catalog:manage` | Delete an empty category |
 | `POST` | `/admin/categories/reorder` | Admin `catalog:manage` | Reorder siblings |
+| `GET` | `/admin/brands` | Admin `catalog:view` | List brands |
+| `POST` | `/admin/brands` | Admin `catalog:manage` | Create a brand |
+| `PUT` | `/admin/brands/:id` | Admin `catalog:manage` | Edit a brand or switch it on or off |
+| `DELETE` | `/admin/brands/:id` | Admin `catalog:manage` | Delete a brand no product uses |
 | `GET` | `/admin/products` | Admin `catalog:view` | Search and filter products |
 | `POST` | `/admin/products` | Admin `catalog:manage` | Create a product with variants |
 | `GET` | `/admin/products/:id` | Admin `catalog:view` | One product |
@@ -156,3 +160,20 @@ Phase 3. Returns `text/csv` of the master catalog. 🔒 audited.
 - Every product change bumps the `rev` of its offerings so apps pick up the change in delta sync.
 - Image attach/remove depends on the media module (D2-3); until it exists, images cannot be attached in the real composition.
 - Slugs support Latin letters and digits only.
+
+## Brand, food type, extra categories, badge, returnable flag and variant attributes
+All optional, so existing products keep working. A product that does not have them reads back with the defaults shown.
+
+| Field | Values | Default | Notes |
+|---|---|---|---|
+| `brandId` | a brand id or `null` | `null` | The brand must exist and be switched on. The product view also returns `brand: { id, name }`. |
+| `foodType` | `veg`, `non_veg`, `egg`, `vegan`, `not_applicable` | `not_applicable` | The mark customers see on food, and the "Pure veg" filter. Use `not_applicable` for non-food. |
+| `extraCategoryIds` | up to 5 category ids | `[]` | The product also shows under these. They must exist, be distinct, and not repeat `categoryId`. Moving the main category to one of them removes it from this list. |
+| `badge` | `bestseller`, `trending`, `new_launch`, `imported`, `organic` or `null` | `null` | The pill on the product card, chosen by staff. |
+| `isReturnable` | boolean | `true` | `false` for eggs, cut vegetables, personal care. A non-returnable item is still refunded when it arrived damaged or missing, but not for a change of mind ([F16](F16-cancellations-and-refunds.md)). |
+| variant `attributes` | up to 5 `{ name, value }` | `[]` | How a variant differs beyond weight, for example `{ "name": "Flavour", "value": "Chocolate" }`. A name cannot repeat within one variant. `weightGrams` stays required. |
+
+`GET /admin/products` also takes `brandId` and `foodType`, and `categoryId` matches the main or an extra category. A category that is only used as an extra category still counts as having products, so it cannot be deleted.
+
+### Brands
+`POST /admin/brands` body `{ "name": "Amul", "logoMediaId": null, "sortOrder": 0 }` (upload the logo first with kind `brand_logo`). `PUT` takes any of `name`, `logoMediaId`, `sortOrder`, `isActive`. Names are unique. `DELETE` returns `409 CONFLICT` while products use the brand; switch it off instead. Each brand returns `{ id, name, slug, logoMediaId, logoUrls, sortOrder, isActive }`. The catalog export CSV gains the columns `brandId`, `foodType`, `badge`, `returnable`, `extraCategories` and `attributes`.

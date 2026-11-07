@@ -6,11 +6,12 @@ export interface CartInput { clientRev: number; addressId?: string | null | unde
 
 /** The server cart: lines are priced live, never stored with a price. */
 export function createCartService(deps: CartDeps) {
-  const { store, lines, addresses, geography, pricing, settings, now } = deps;
+  const { store, lines, addresses, geography, pricing, now } = deps;
 
   async function view(cart: Cart | null) {
     const items = cart?.items ?? [];
     const zoneId = cart?.zoneId ?? null;
+    const settings = await deps.settings(zoneId ? { zoneId } : undefined);
     const resolved = zoneId && items.length > 0 ? await lines.resolveLines({ zoneId, lines: items }) : [];
     const priced = items.map((item, i) => {
       const r = resolved[i];
@@ -58,6 +59,7 @@ export function createCartService(deps: CartDeps) {
       }
       if (!zoneId) throw validation("Choose a delivery address first", { field: "addressId" });
 
+      const settings = await deps.settings({ zoneId });
       const wanted = mergeItems(input.items);
       if (wanted.length > settings.maxItemsPerOrder) throw validation(`A cart holds at most ${settings.maxItemsPerOrder} different items`, { field: "items" });
       const resolved = wanted.length > 0 ? await lines.resolveLines({ zoneId, lines: wanted }) : [];

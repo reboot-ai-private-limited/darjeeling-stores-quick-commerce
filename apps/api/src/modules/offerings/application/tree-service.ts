@@ -28,14 +28,15 @@ export function createTreeService(deps: OfferingsDeps) {
       if (rows.length > MAX_OFFERINGS) throw validation("This warehouse has too many products to show at once; narrow it with q or status");
 
       const info = new Map<string, ProductInfo>((await products.getMany(rows.map(o => o.productId))).map(p => [p.id, p]));
+      const limits = await thresholds({ warehouseId });
       const byCategory = new Map<string, TreeProduct[]>();
       for (const offering of rows) {
         const product = info.get(offering.productId);
         if (!product) continue;
         if (filters.lowStock) {
           const low = product.stockMode === "pooled_weight"
-            ? isLow(product, offering.stockGrams ?? 0, thresholds)
-            : offering.variants.some(v => isLow(product, v.stock ?? 0, thresholds));
+            ? isLow(product, offering.stockGrams ?? 0, limits)
+            : offering.variants.some(v => isLow(product, v.stock ?? 0, limits));
           if (!low) continue;
         }
         const entry: TreeProduct = {

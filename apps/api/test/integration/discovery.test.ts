@@ -203,9 +203,10 @@ describe("what a customer sees for a product", () => {
     expect(res.body.data).toEqual([{
       id: p.id, name: "Fresh Tomato (Local)", slug: "fresh-tomato-local", categoryId: expect.any(String), type: "loose", tags: ["fresh", "local"], images: [],
       variants: [
-        { variantId: p.v250, label: "250 g", weightGrams: 250, price: 1800, mrp: 2000, discountAmount: 200, discountPercent: 10, onSale: false, saleEndsAt: null, available: true, maxQty: null },
-        { variantId: p.v500, label: "500 g", weightGrams: 500, price: 3200, mrp: 4000, discountAmount: 800, discountPercent: 20, onSale: false, saleEndsAt: null, available: true, maxQty: null },
+        { variantId: p.v250, label: "250 g", weightGrams: 250, attributes: [], price: 1800, mrp: 2000, discountAmount: 200, discountPercent: 10, onSale: false, saleEndsAt: null, available: true, maxQty: null },
+        { variantId: p.v500, label: "500 g", weightGrams: 500, attributes: [], price: 3200, mrp: 4000, discountAmount: 800, discountPercent: 20, onSale: false, saleEndsAt: null, available: true, maxQty: null },
       ],
+      categoryIds: [expect.any(String)], brand: null, foodType: "not_applicable", badge: null, isReturnable: true,
       available: true, availability: "in_stock", rev: expect.any(Number),
     }]);
     const banned = ["stock", "stockGrams", "warehouseId", "warehouse", "offeringId", "zoneId", "isOutOfStockOverride"];

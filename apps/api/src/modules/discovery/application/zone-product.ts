@@ -1,9 +1,11 @@
 import type { GeoWarehouse } from "../../../platform/geography.js";
-import type { Product } from "../../catalog/catalog.public.js";
+import type { Badge, FoodType, Product, VariantAttribute } from "../../catalog/catalog.public.js";
 import { discountAmount, discountPercent, effectivePrice, onSale, unitsAvailable, type Offering, type OfferingVariant, type ProductInfo } from "../../offerings/offerings.public.js";
 
 export interface ZoneContext {
   warehouses: ReadonlyMap<string, GeoWarehouse>;
+  /** Active brands by id, for the name on a product card. */
+  brands: ReadonlyMap<string, { id: string; name: string }>;
   /** At least one warehouse of the zone is taking orders now. */
   zoneOpen: boolean;
   now: Date;
@@ -11,11 +13,16 @@ export interface ZoneContext {
 }
 
 export interface ZoneVariant {
-  variantId: string; label: string; weightGrams: number; price: number; mrp: number; discountAmount: number; discountPercent: number;
+  variantId: string; label: string; weightGrams: number; attributes: VariantAttribute[]; price: number; mrp: number; discountAmount: number; discountPercent: number;
   onSale: boolean; saleEndsAt: string | null; available: boolean; maxQty: number | null;
 }
 export interface ZoneProduct {
   id: string; name: string; slug: string; categoryId: string; type: string; tags: string[];
+  /** The main category first, then the extra ones the product also shows under. */
+  categoryIds: string[];
+  brand: { id: string; name: string } | null; foodType: FoodType; badge: Badge | null;
+  /** False when the item cannot be sent back once delivered (a damaged or missing item is still refunded). */
+  isReturnable: boolean;
   images: { mediaId: string; alt: string; urls: Record<string, string> }[];
   variants: ZoneVariant[]; available: boolean; availability: "in_stock" | "out_of_stock" | "closed"; rev: number;
 }
@@ -55,7 +62,7 @@ export function resolveProduct(product: Product, offerings: readonly Offering[],
     const caps = pool.map(({ line }) => line.maxQtyPerOrder).filter((n): n is number => n !== null);
     const limits = [...caps, ...(ctx.maxQtyPerItem !== null ? [ctx.maxQtyPerItem] : [])];
     variants.push({
-      variantId: variant.id, label: variant.label, weightGrams: variant.weightGrams, price, mrp: best.mrp,
+      variantId: variant.id, label: variant.label, weightGrams: variant.weightGrams, attributes: variant.attributes, price, mrp: best.mrp,
       discountAmount: discountAmount(best.mrp, price), discountPercent: discountPercent(best.mrp, price),
       onSale: onSale(best, ctx.now), saleEndsAt: onSale(best, ctx.now) ? (best.saleEnd?.toISOString() ?? null) : null,
       available: available.length > 0, maxQty: limits.length > 0 ? Math.min(...limits) : null,
@@ -66,6 +73,8 @@ export function resolveProduct(product: Product, offerings: readonly Offering[],
   const available = variants.some(v => v.available);
   return {
     id: product.id, name: product.name, slug: product.slug, categoryId: product.categoryId, type: product.type, tags: product.tags,
+    categoryIds: [product.categoryId, ...product.extraCategoryIds],
+    brand: (product.brandId ? ctx.brands.get(product.brandId) : undefined) ?? null, foodType: product.foodType, badge: product.badge, isReturnable: product.isReturnable,
     images: [...product.images].sort((a, b) => a.sortOrder - b.sortOrder).map(i => ({ mediaId: i.mediaId, alt: i.alt, urls: urls[i.mediaId] ?? {} })),
     variants, available, availability: available ? "in_stock" : ctx.zoneOpen ? "out_of_stock" : "closed",
     // The newest change to anything that sells this product here, including offerings now switched off.

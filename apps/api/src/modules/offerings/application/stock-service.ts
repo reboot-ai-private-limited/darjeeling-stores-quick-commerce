@@ -73,7 +73,7 @@ export function createStockService(deps: OfferingsDeps) {
       id: newId(), warehouseId: line.warehouseId, productId: line.productId, variantId: pooled ? null : line.variantId, mode: line.mode,
       delta: applied.after - applied.before, balanceAfter: applied.after, reason, orderKey: key, restoreKey, note: null, by: null, createdAt: at,
     }]);
-    await stockSideEffects(tx, thresholds, product, offering, withStock(offering, pooled ? null : line.variantId, applied.after), events);
+    await stockSideEffects(tx, await thresholds({ warehouseId: line.warehouseId }), product, offering, withStock(offering, pooled ? null : line.variantId, applied.after), events);
   }
 
   async function release(key: string, why: "cancel" | "expired" | "payment_failed"): Promise<{ released: boolean }> {
@@ -139,7 +139,7 @@ export function createStockService(deps: OfferingsDeps) {
               restoreKey: null, note: null, by: null, createdAt: at,
             });
             applied.push({ warehouseId: line.warehouseId, productId: line.productId, variantId: line.variantId, qty: line.qty, amount, mode: pooled ? "grams" : "units", restored: 0 });
-            await stockSideEffects(tx, thresholds, product, offering, withStock(offering, pooled ? null : line.variantId, change.after), eventsOut);
+            await stockSideEffects(tx, await thresholds({ warehouseId: line.warehouseId }), product, offering, withStock(offering, pooled ? null : line.variantId, change.after), eventsOut);
           }
           if (shortages.length > 0) throw new ShortageSignal(shortages);
           await tx.insertMovements(movements);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Route } from "../../../platform/routes.js";
-import { customerGuarded, parse, pathId, sendData, type CustomerResolver } from "../../catalog/catalog.public.js";
+import { customerGuarded, open, parse, pathId, sendData, type CustomerResolver } from "../../catalog/catalog.public.js";
 import type { CartService } from "../application/cart-service.js";
 import type { QuoteService } from "../application/quote-service.js";
 
@@ -9,10 +9,12 @@ const item = z.object({ productId: id, variantId: id, qty: z.number().int().min(
 export const cartBody = z.object({
   clientRev: z.number().int().min(0).max(2_000_000_000), addressId: id.nullish(), zoneId: id.nullish(), items: z.array(item).max(100),
 }).strict();
+export const tipOptionsQuery = z.object({ zoneId: id }).strict();
 export const couponBody = z.object({ code: z.string().trim().min(1).max(40) }).strict();
 export const quoteBody = z.object({
   addressId: id.nullish(), couponCode: z.string().trim().min(1).max(40).nullish(), paymentMethod: z.enum(["cod", "online"]).default("cod"),
   scheduledWindow: z.object({ start: z.coerce.date(), end: z.coerce.date() }).strict().nullish(), acceptZoneChange: z.boolean().default(false),
+  tipAmount: z.number().int().min(0).max(1_000_000).default(0),
 }).strict().refine(b => !b.scheduledWindow || b.scheduledWindow.end > b.scheduledWindow.start, { path: ["scheduledWindow"], message: "The window must end after it starts" });
 
 /** The 6 endpoints of docs/api/F10-cart-and-quote.md. Paths are relative to the API prefix. */
@@ -29,9 +31,10 @@ export function cartRoutes(cart: CartService, quotes: QuoteService, customer: Cu
     { method: "post", path: "/quotes", handler: mine(async (who, req, res) => {
       const body = parse(quoteBody, req.body);
       sendData(res, await quotes.create(who.userId, {
-        addressId: body.addressId, couponCode: body.couponCode, paymentMethod: body.paymentMethod, scheduledWindow: body.scheduledWindow, acceptZoneChange: body.acceptZoneChange,
+        addressId: body.addressId, couponCode: body.couponCode, paymentMethod: body.paymentMethod, scheduledWindow: body.scheduledWindow, acceptZoneChange: body.acceptZoneChange, tipAmount: body.tipAmount,
       }), 201);
     }) },
+    { method: "get", path: "/tips/options", handler: open(async (req, res) => sendData(res, await quotes.tipOptions(parse(tipOptionsQuery, req.query).zoneId))) },
     { method: "get", path: "/quotes/:id", handler: mine(async (who, req, res) => sendData(res, await quotes.read(who.userId, pathId(req, "id", "Quote")))) },
   ];
 }

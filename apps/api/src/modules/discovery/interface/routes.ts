@@ -11,7 +11,7 @@ const flag = z.enum(["true", "false"]).transform(value => value === "true");
 
 export const homeQuery = z.object({ zoneId });
 export const productsQuery = z.object({
-  zoneId, categoryId: id.optional(), limit: z.coerce.number().int().min(1).max(100).default(40), cursor: z.string().max(100).optional(), inStockOnly: flag.optional(),
+  zoneId, categoryId: id.optional(), brandId: id.optional(), foodType: z.enum(["veg", "non_veg", "egg", "vegan", "not_applicable"]).optional(), limit: z.coerce.number().int().min(1).max(100).default(40), cursor: z.string().max(100).optional(), inStockOnly: flag.optional(),
 });
 export const searchQuery = z.object({ zoneId, q: z.string().trim().min(2).max(100), limit: z.coerce.number().int().min(1).max(50).default(20) });
 export const changesQuery = z.object({ zoneId, since: z.coerce.number().int().min(0) });
@@ -22,11 +22,12 @@ export const waitlistBody = z.object({
   location: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).strict().nullish(),
 }).strict();
 
-/** The 9 endpoints of docs/api/F08-discovery-and-location.md. Paths are relative to the API prefix. All are open to guests. */
+/** The endpoints of docs/api/F08-discovery-and-location.md. Paths are relative to the API prefix. All are open to guests. */
 export function discoveryRoutes(catalog: ZoneCatalogService, store: StoreService, customer: CustomerResolver): Route[] {
   return [
     { method: "get", path: "/catalog/home", handler: open(async (req, res) => sendData(res, await catalog.home(parse(homeQuery, req.query).zoneId))) },
     { method: "get", path: "/catalog/categories", handler: open(async (req, res) => sendData(res, await catalog.categories(parse(homeQuery, req.query).zoneId))) },
+    { method: "get", path: "/catalog/brands", handler: open(async (req, res) => sendData(res, await catalog.brands(parse(homeQuery, req.query).zoneId))) },
     { method: "get", path: "/catalog/products", handler: open(async (req, res) => {
       const q = parse(productsQuery, req.query);
       const page = await catalog.products(q.zoneId, q);

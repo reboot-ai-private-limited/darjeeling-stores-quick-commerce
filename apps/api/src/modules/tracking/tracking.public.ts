@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { noOrders, type OrdersPort } from "../../platform/orders.js";
 import { noCustomers, type CustomerResolver } from "../catalog/catalog.public.js";
 import { noRiders, type RiderResolver, type RiderService } from "../riders/riders.public.js";
@@ -11,6 +12,7 @@ import { trackingRoutes } from "./interface/routes.js";
 export type { TrackingService, PingInput } from "./application/tracking-service.js";
 export type { EtaProvider, TrackingSettings } from "./domain/tracking.js";
 export { baselineEta, DEFAULT_TRACKING_SETTINGS } from "./domain/tracking.js";
+export { createGoogleRoutesEta, withFallbackEta, type GoogleRoutesOptions } from "./infrastructure/google-routes-eta.js";
 export { trackingRoutes } from "./interface/routes.js";
 
 export interface TrackingModuleOptions {
@@ -30,7 +32,7 @@ export interface TrackingModuleOptions {
 /** Builds rider positions, live ETA and tracking (F20). Call `store.ensureIndexes()` once after the database connects. */
 export function createTrackingModule(options: TrackingModuleOptions) {
   const { connection, riders, relations, orders = noOrders, rider = noRiders, customer = noCustomers } = options;
-  const settings: TrackingSettings = { ...DEFAULT_TRACKING_SETTINGS, ...options.settings };
+  const settings: TrackingSettings = liveSettings(DEFAULT_TRACKING_SETTINGS, options.settings);
   const store = createMongoTrackingStore(connection);
   const eta = options.eta ?? baselineEta(settings);
   const service = createTrackingService({

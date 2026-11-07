@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { Types } from "mongoose";
 import { noGeography, type Geography } from "../../platform/geography.js";
 import { noCustomers, type CustomerResolver } from "../catalog/catalog.public.js";
@@ -53,7 +54,7 @@ export function createDiscoveryModule(options: DiscoveryModuleOptions) {
     connection, geography = noGeography, catalog, source, media, banners = noBanners, storeSettings = defaultStoreSettings,
     contacts = noContacts, customer = noCustomers,
   } = options;
-  const settings: DiscoverySettings = { ...DEFAULT_DISCOVERY_SETTINGS, ...options.settings };
+  const settings: DiscoverySettings = liveSettings(DEFAULT_DISCOVERY_SETTINGS, options.settings);
   const now = () => new Date();
   const waitlist = createMongoWaitlistStore(connection);
   const zoneCatalog = createZoneCatalogService({ geography, catalog, source, media, banners, storeSettings, settings, now });

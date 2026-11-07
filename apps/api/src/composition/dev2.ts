@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import { noGeography, type Geography } from "../platform/geography.js";
 import type { RiderIdentity } from "../platform/identity.js";
+import { liveSettings, type SettingsProvider } from "../platform/settings.js";
 import type { OrdersPort } from "../platform/orders.js";
 import type { Route } from "../platform/routes.js";
 import { createAddressesModule } from "../modules/addresses/addresses.public.js";
@@ -9,11 +10,11 @@ import { createAvailabilityModule, notifyProductsFrom, type CustomerResolver } f
 import { createCatalogModule, denyAll, type AuthResolver, type MediaPort, type ProductUsagePort } from "../modules/catalog/catalog.public.js";
 import { createCartModule, type CartSettings, type CustomerPolicy, type HoursSource } from "../modules/cart/cart.public.js";
 import { createCashModule } from "../modules/cash/cash.public.js";
-import { createDispatchModule, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
-import { createHoursModule } from "../modules/hours/hours.public.js";
+import { createDispatchModule, DEFAULT_DISPATCH_SETTINGS, type DispatchSettings } from "../modules/dispatch/dispatch.public.js";
+import { createHoursModule, type HoursSettings } from "../modules/hours/hours.public.js";
 import { createOrdersModule, type MoneyPort, type OrderSettings } from "../modules/orders/orders.public.js";
 import { createPaymentsModule, type PaymentProvider, type PaymentSettings } from "../modules/payments/payments.public.js";
-import { createRefundsModule, type RefundSettings } from "../modules/refunds/refunds.public.js";
+import { createRefundsModule, type Eligibility, type RefundSettings } from "../modules/refunds/refunds.public.js";
 import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
 import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
 import { baselineEta, createTrackingModule, DEFAULT_TRACKING_SETTINGS, type EtaProvider, type TrackingSettings } from "../modules/tracking/tracking.public.js";
@@ -26,8 +27,10 @@ import {
   createNotificationsModule, type AudienceDirectory, type DeviceRegistry, type PushProvider, type SmsProvider, type UserContacts, type WebhookConfig, type WhatsAppProvider,
 } from "../modules/notifications/notifications.public.js";
 import { createRidersModule, type RiderResolver } from "../modules/riders/riders.public.js";
+import { createTipsModule } from "../modules/tips/tips.public.js";
 import {
   createOfferingsModule, noWarehouses, productDirectoryFrom, type EventPublisher, type WarehouseDirectory,
+  type StockThresholds,
 } from "../modules/offerings/offerings.public.js";
 
 export interface Dev2Options {
@@ -61,15 +64,18 @@ export interface Dev2Options {
   deliverySettings?: Partial<DispatchSettings>;
   /** Fee, surcharge and coupon settings (F11, F12) and how many orders a customer has placed (for first-order coupons). */
   /** Cart and quote settings, whether a customer may pay cash, and hours/pre-order rules (F10, F17). */
-  cartSettings?: Partial<CartSettings>; customerPolicy?: CustomerPolicy; hours?: HoursSource;
+  cartSettings?: Partial<CartSettings> | SettingsProvider<CartSettings>; customerPolicy?: CustomerPolicy; hours?: HoursSource;
   orderSettings?: Partial<OrderSettings>;
   /** Refunds and online payments (F15, F16). Until the payments module is connected nothing is refunded and online orders get no checkout. */
   money?: MoneyPort;
   /** Refund rules (F16): the window for asking after delivery, and whether a photo is needed. */
-  refundSettings?: Partial<RefundSettings>;
+  refundSettings?: Partial<RefundSettings>; eligibility?: Eligibility;
   /** Razorpay, or a stand-in. Defaults to the one set up by RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET; without them online payment answers 503. */
   paymentProvider?: PaymentProvider; paymentSettings?: Partial<PaymentSettings>;
-  pricingSettings?: Partial<PricingSettings>; orderHistory?: OrderHistory; customerNames?: (userIds: readonly string[]) => Promise<Map<string, string>>;
+  pricingSettings?: Partial<PricingSettings> | SettingsProvider<PricingSettings>;
+  /** Low-stock limits and the zone price rule (F05), and the pre-order and hours defaults (F17). Fixed values or live providers over the admin settings. */
+  stockThresholds?: StockThresholds | SettingsProvider<StockThresholds>; priceConflictMode?: "block" | "warn" | (() => Promise<"block" | "warn">);
+  hoursSettings?: Partial<HoursSettings> | SettingsProvider<HoursSettings>; orderHistory?: OrderHistory; customerNames?: (userIds: readonly string[]) => Promise<Map<string, string>>;
   /** Live ETA settings, the routes provider that replaces the straight-line estimate, and the secret that signs public tracking links (F20). */
   trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; trackingTokenSecret?: string;
   /** Offline sync: the doorstep UPI details and the offline delivery checks (F21). */
@@ -126,6 +132,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const catalog = createCatalogModule({ connection, auth: authThenIndexes, usage, media: options.media ?? media.catalogPort });
   const offerings = createOfferingsModule({
     connection, auth: authThenIndexes, products: productDirectoryFrom(catalog),
+    ...(options.stockThresholds && { thresholds: options.stockThresholds }), ...(options.priceConflictMode && { priceConflictMode: options.priceConflictMode }),
     ...(options.warehouses && { warehouses: options.warehouses }),
     // Stock events go to the caller's listener and to Notify Me, whose "item is back" messages are then handed to the delivery queue
     // at once. A failing listener never undoes a stock change.
@@ -160,7 +167,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   // Opening hours and pauses sit in front of the geography port: a warehouse is open only inside its hours and not paused.
   const hours = createHoursModule({
     connection, geography: options.geography ?? noGeography, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }),
-    preorders: { list: query => orders.service.preorders(query) },
+    preorders: { list: query => orders.service.preorders(query) }, ...(options.hoursSettings && { settings: options.hoursSettings }),
   });
   const geography = hours.service.decorate(options.geography ?? noGeography);
   const pricing = createPricingModule({
@@ -190,7 +197,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   });
 
   // The cart and quotes, then orders placed from them. Orders also work as the port that delivery reads and changes orders through.
-  const eta = options.eta ?? baselineEta({ ...DEFAULT_TRACKING_SETTINGS, ...options.trackingSettings });
+  const eta = options.eta ?? baselineEta(liveSettings(DEFAULT_TRACKING_SETTINGS, options.trackingSettings));
   const cart = createCartModule({
     connection, geography, lines: offerings.stock, addresses: addresses.reader, pricing: pricing.service, travel: eta,
     ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.cartSettings && { settings: options.cartSettings }),
@@ -242,6 +249,8 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const ordersPort = options.orders ?? orders.port;
   const refunds = createRefundsModule({
     connection, auth: authThenIndexes, ...(customerThenIndexes && { customer: customerThenIndexes }), ...(options.refundSettings && { settings: options.refundSettings }),
+    // A product marked non-returnable (eggs, cut vegetables, personal care) is refunded only when damaged or missing.
+    eligibility: options.eligibility ?? { eligible: async (productId, reason) => { const product = await catalog.service.getProductEntity(productId); return !product || product.isReturnable || reason !== "other"; } },
     cancelOwn: (userId, orderId, reason) => orders.service.customerCancel(userId, orderId, reason),
     orders: {
       get: async id => {
@@ -307,7 +316,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const tell = (userId: string, templateKey: string, channels: ("push" | "whatsapp")[], vars: Record<string, string>, data: Record<string, string>, dedupeKey: string) =>
     notifications.notify({ userId, templateKey, channels, vars, data, dedupeKey });
   const dispatch = createDispatchModule({
-    connection, geography, orders: ordersPort, settings: { ...options.deliverySettings, ...riders.settings, ...options.deliverySettings },
+    connection, geography, orders: ordersPort, settings: liveSettings(DEFAULT_DISPATCH_SETTINGS, riders.settings, options.deliverySettings),
     ...(riderThenIndexes && { rider: riderThenIndexes }), auth: authThenIndexes,
     riders: {
       get: id => riders.service.byId(id), getMany: ids => riders.service.getMany(ids), listActive: () => riders.service.listActive(), forUser: userId => riders.service.forUser(userId),
@@ -345,7 +354,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
   const tracking = createTrackingModule({
     connection, relations, orders: ordersPort, ...(riderThenIndexes && { rider: riderThenIndexes }), ...(customerThenIndexes && { customer: customerThenIndexes }),
     riders: { forUser: userId => riders.service.forUser(userId), byId: id => riders.service.byId(id), recordLocation: (id, location, at) => riders.service.recordLocation(id, location, at) },
-    settings: { pingOnOrderSeconds: riders.settings.locationPingSecondsOnOrder, pingIdleSeconds: riders.settings.locationPingSecondsIdle, ...options.trackingSettings },
+    settings: liveSettings(DEFAULT_TRACKING_SETTINGS, { get pingOnOrderSeconds() { return riders.settings.locationPingSecondsOnOrder; }, get pingIdleSeconds() { return riders.settings.locationPingSecondsIdle; } }, options.trackingSettings),
     eta, ...(options.trackingTokenSecret && { tokenSecret: options.trackingTokenSecret }),
   });
   const sync = createSyncModule({
@@ -354,6 +363,9 @@ export function createDev2Modules(options: Dev2Options = {}) {
     field: dispatch.field, cash: cash.service, tracking: tracking.service, media: { linkFor: id => media.service.linkFor(id) },
     ...(options.syncSettings && { settings: options.syncSettings }),
   });
+
+  // Rider tips: what riders earned from customers' tips, and what the owner still has to pay them (F22).
+  const tips = createTipsModule({ connection, auth: authThenIndexes, ...(riderThenIndexes && { rider: riderThenIndexes }), findRider: userId => riders.service.forUser(userId) });
 
   /**
    * Starts the background work: the job worker and the recurring sweeps.
@@ -380,11 +392,11 @@ export function createDev2Modules(options: Dev2Options = {}) {
   }
 
   return {
-    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tracking, sync, pricing, cart, orders, hours, refunds, payments, stock: offerings.stock,
+    catalog, offerings, availability, media, jobs, notifications, discovery, addresses, riders, dispatch, cash, tips, tracking, sync, pricing, cart, orders, hours, refunds, payments, stock: offerings.stock,
     routes: [
       ...catalog.routes, ...offerings.routes, ...availability.routes, ...media.routes, ...notifications.routes, ...discovery.routes, ...addresses.routes,
       // `/admin/riders/live` must be registered before the riders' `/admin/riders/:id`, or "live" would be read as an id.
-      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes, ...refunds.routes, ...payments.routes, ...hours.routes,
+      ...dispatch.routes, ...riders.routes, ...cash.routes, ...tips.routes, ...tracking.routes, ...sync.routes, ...pricing.routes, ...cart.routes, ...orders.routes, ...refunds.routes, ...payments.routes, ...hours.routes,
     ] satisfies Route[],
     ensureIndexes, startBackground,
   };

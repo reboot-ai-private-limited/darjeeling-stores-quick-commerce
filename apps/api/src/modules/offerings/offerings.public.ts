@@ -1,5 +1,6 @@
 import type { Connection } from "mongoose";
 import { Types } from "mongoose";
+import { settingsProvider, type SettingsProvider } from "../../platform/settings.js";
 import { denyAll, type AuthResolver, type CatalogStore, type ProductUsagePort } from "../catalog/catalog.public.js";
 import { createOfferingsService } from "./application/offerings-service.js";
 import type { EventPublisher, ProductDirectory, WarehouseDirectory } from "./application/ports.js";
@@ -9,6 +10,7 @@ import { createStockService } from "./application/stock-service.js";
 import { createMongoOfferingsStore } from "./infrastructure/mongo-offerings-store.js";
 import { offeringsRoutes } from "./interface/routes.js";
 import type { StockThresholds } from "./domain/stock.js";
+export type { StockThresholds } from "./domain/stock.js";
 
 export type { StockService, ReserveLine, ReserveResult, Shortage, LineResolution, ReservationView } from "./application/stock-service.js";
 export type { ImportService } from "./application/import-service.js";
@@ -49,16 +51,22 @@ export interface OfferingsModuleOptions {
   auth?: AuthResolver;
   warehouses?: WarehouseDirectory;
   events?: EventPublisher;
-  thresholds?: StockThresholds;
+  /** Fixed values, or a provider that reads the admin settings for a warehouse on each use. */
+  thresholds?: StockThresholds | SettingsProvider<StockThresholds>;
+  /** Fixed, or read from the admin settings on each use. Defaults to `block`. */
+  priceConflictMode?: "block" | "warn" | (() => Promise<"block" | "warn">);
   /** Asks the orders module whether any order ever referenced the product. Without it, hard delete is always refused. */
   hasOrders?: (productId: string) => Promise<boolean>;
 }
 
 /** Builds stock, pricing and the `stock`/`catalog` ports. Call `store.ensureIndexes()` once after the database connects. */
 export function createOfferingsModule(options: OfferingsModuleOptions) {
-  const { connection, products, auth = denyAll, warehouses = noWarehouses, events = noEvents, thresholds = { grams: 5000, units: 5 }, hasOrders } = options;
+  const { connection, products, auth = denyAll, warehouses = noWarehouses, events = noEvents, hasOrders } = options;
+  const thresholds = settingsProvider<StockThresholds>({ grams: 5000, units: 5 }, options.thresholds);
   const store = createMongoOfferingsStore(connection);
-  const deps = { store, warehouses, products, events, thresholds, now: () => new Date(), newId: () => new Types.ObjectId().toHexString() };
+  const modeOption = options.priceConflictMode ?? "block";
+  const priceConflictMode: () => Promise<"block" | "warn"> = typeof modeOption === "function" ? modeOption : async () => modeOption;
+  const deps = { store, warehouses, products, events, thresholds, priceConflictMode, now: () => new Date(), newId: () => new Types.ObjectId().toHexString() };
   const offerings = createOfferingsService(deps);
   const stock = createStockService(deps);
   const tree = createTreeService(deps);

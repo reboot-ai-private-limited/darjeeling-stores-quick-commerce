@@ -1,10 +1,11 @@
-import type { Category, Product } from "../../catalog/catalog.public.js";
+import type { Brand, Category, Product } from "../../catalog/catalog.public.js";
 import type { Offering } from "../../offerings/offerings.public.js";
 
 /** What discovery reads from the catalog module. */
 export interface CatalogReader {
   getProducts(ids: readonly string[]): Promise<Product[]>;
   listCategories(): Promise<Category[]>;
+  listBrands(): Promise<Brand[]>;
 }
 
 /** What discovery reads from the offerings module: what a zone sells and which revision it is at. */

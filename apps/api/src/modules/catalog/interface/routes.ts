@@ -2,11 +2,11 @@ import type { Route } from "../../../platform/routes.js";
 import type { CatalogService } from "../application/catalog-service.js";
 import { guarded, parse, pathId, sendData, type AuthResolver } from "./http-support.js";
 import {
-  categoryCreate, categoryUpdate, duplicateCheck, imageAttach, imageOrder, productCreate, productListQuery,
+  brandCreate, brandUpdate, categoryCreate, categoryUpdate, duplicateCheck, imageAttach, imageOrder, productCreate, productListQuery,
   productUpdate, reorderBody, variantCreate, variantUpdate,
 } from "./schemas.js";
 
-/** The 20 endpoints of docs/api/F04-master-catalog.md. Paths are relative to the API prefix. */
+/** The endpoints of docs/api/F04-master-catalog.md (categories, products, variants, images, brands and the export). Paths are relative to the API prefix. */
 export function catalogRoutes(service: CatalogService, auth: AuthResolver): Route[] {
   const view = (permission: string, h: Parameters<typeof guarded>[2]) => guarded(auth, permission, h);
   const ok = { ok: true };
@@ -22,6 +22,15 @@ export function catalogRoutes(service: CatalogService, auth: AuthResolver): Rout
     { method: "put", path: "/admin/categories/:id", handler: view("catalog:manage", async (_c, req, res) => sendData(res, await service.updateCategory(pathId(req, "id", "Category"), parse(categoryUpdate, req.body)))) },
     { method: "delete", path: "/admin/categories/:id", handler: view("catalog:manage", async (ctx, req, res) => {
       await service.deleteCategory(ctx, pathId(req, "id", "Category"));
+      sendData(res, ok);
+    }) },
+
+    // brands
+    { method: "get", path: "/admin/brands", handler: view("catalog:view", async (_c, _q, res) => sendData(res, await service.listBrands())) },
+    { method: "post", path: "/admin/brands", handler: view("catalog:manage", async (_c, req, res) => sendData(res, await service.createBrand(parse(brandCreate, req.body)), 201)) },
+    { method: "put", path: "/admin/brands/:id", handler: view("catalog:manage", async (_c, req, res) => sendData(res, await service.updateBrand(pathId(req, "id", "Brand"), parse(brandUpdate, req.body)))) },
+    { method: "delete", path: "/admin/brands/:id", handler: view("catalog:manage", async (ctx, req, res) => {
+      await service.deleteBrand(ctx, pathId(req, "id", "Brand"));
       sendData(res, ok);
     }) },
 

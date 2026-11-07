@@ -1,9 +1,9 @@
 export type MediaKind =
-  | "product_image" | "category_image" | "banner" | "rider_photo" | "address_voice" | "address_photo"
+  | "product_image" | "category_image" | "brand_logo" | "banner" | "rider_photo" | "address_voice" | "address_photo"
   | "order_voice" | "order_photo" | "failed_delivery_photo" | "refund_photo";
 export type MediaStatus = "pending" | "processing" | "ready" | "failed" | "deleting" | "deleted";
 export type PrincipalKind = "staff" | "customer" | "rider";
-export type OwnerType = "product" | "category" | "banner" | "rider" | "address" | "order";
+export type OwnerType = "product" | "category" | "brand" | "banner" | "rider" | "address" | "order";
 export type Resource = "image" | "audio";
 export type Access = "public" | "private";
 
@@ -45,6 +45,7 @@ const IMAGE_ADMIN = { resource: "image", uploaders: ["staff"], retention: null }
 export const RULES: Record<MediaKind, KindRule> = {
   product_image: { ...IMAGE_ADMIN, access: "public", staffUpload: ["catalog:manage"], staffRead: ["catalog:view"], ownerTypes: ["product"], prefix: "public/products" },
   category_image: { ...IMAGE_ADMIN, access: "public", staffUpload: ["catalog:manage"], staffRead: ["catalog:view"], ownerTypes: ["category"], prefix: "public/categories" },
+  brand_logo: { ...IMAGE_ADMIN, access: "public", staffUpload: ["catalog:manage"], staffRead: ["catalog:view"], ownerTypes: ["brand"], prefix: "public/brands" },
   banner: { ...IMAGE_ADMIN, access: "public", staffUpload: ["pricing:manage"], staffRead: ["pricing:manage"], ownerTypes: ["banner"], prefix: "public/banners" },
   rider_photo: { resource: "image", access: "private", uploaders: ["rider", "staff"], staffUpload: ["riders:manage"], staffRead: ["riders:view"], ownerTypes: ["rider"], prefix: "private/riders", retention: null },
   address_voice: { resource: "audio", access: "private", uploaders: ["customer"], staffUpload: [], staffRead: ["orders:view"], ownerTypes: ["address"], prefix: "private/addresses", retention: null },
@@ -55,7 +56,7 @@ export const RULES: Record<MediaKind, KindRule> = {
   refund_photo: { resource: "image", access: "private", uploaders: ["customer"], staffUpload: [], staffRead: ["refunds:manage", "orders:view"], ownerTypes: ["order"], prefix: "private/evidence", retention: "evidence" },
 };
 export const KINDS = Object.keys(RULES) as MediaKind[];
-export const OWNER_TYPES: readonly OwnerType[] = ["product", "category", "banner", "rider", "address", "order"];
+export const OWNER_TYPES: readonly OwnerType[] = ["product", "category", "brand", "banner", "rider", "address", "order"];
 
 /** Kinds whose copy on an order is deleted a fixed time after the order ends. */
 export const ORDER_COPY_KINDS: readonly MediaKind[] = ["order_voice", "order_photo"];

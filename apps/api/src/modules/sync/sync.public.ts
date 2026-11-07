@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { noOrders, type OrdersPort } from "../../platform/orders.js";
 import { denyAll, type AuthResolver } from "../catalog/catalog.public.js";
 import { noRiders, type RiderResolver, type RiderService } from "../riders/riders.public.js";
@@ -28,7 +29,7 @@ export interface SyncModuleOptions {
 /** Builds the rider's offline bundle and sync queue, and the review of offline deliveries (F21). Call `store.ensureIndexes()` once after the database connects. */
 export function createSyncModule(options: SyncModuleOptions) {
   const { connection, riders, field, cash, tracking, media, orders = noOrders, rider = noRiders, auth = denyAll } = options;
-  const settings: SyncSettings = { ...DEFAULT_SYNC_SETTINGS, ...options.settings };
+  const settings: SyncSettings = liveSettings(DEFAULT_SYNC_SETTINGS, options.settings);
   const store = createMongoSyncStore(connection);
   const service = createSyncService({ store, orders, settings, now: () => new Date(), field, cash, tracking, riders, media });
   return { store, service, settings, routes: syncRoutes(service, riders, rider, auth) };

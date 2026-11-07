@@ -1,4 +1,5 @@
 import type { Geography } from "../../../platform/geography.js";
+import type { SettingsProvider } from "../../../platform/settings.js";
 import { AppError, conflict, forbidden, notFound, validation, type Ctx } from "../../catalog/catalog.public.js";
 import {
   bannerView, computeBill, couponDiscount, couponProblem, couponView, describeCoupon, ruleView, tierProblem, validClock,
@@ -17,7 +18,7 @@ export interface PricingSettings {
 export const DEFAULT_PRICING_SETTINGS: PricingSettings = { surchargeCap: 5000, rainDefaults: { amount: 1500, extraMinutes: 10 } };
 
 export interface PricingDeps {
-  store: PricingStore; geography: Geography; media: BannerMedia; orders: OrderHistory; settings: PricingSettings; now: () => Date; newId: () => string;
+  store: PricingStore; geography: Geography; media: BannerMedia; orders: OrderHistory; settings: SettingsProvider<PricingSettings>; now: () => Date; newId: () => string;
 }
 
 export interface FeeRuleInput { type: "delivery_fee"; zoneIds: string[]; isActive: boolean; alwaysFree: boolean; minOrder: number | null; feeBasis: "afterDiscount" | "beforeDiscount"; tiers: Tier[] }
@@ -41,7 +42,7 @@ const publicReason = (reason: CouponReason): string =>
 
 /** Delivery fees, surcharges, coupons and home banners (F11, F12). All money is paise. */
 export function createPricingService(deps: PricingDeps) {
-  const { store, geography, media, orders, settings, now, newId } = deps;
+  const { store, geography, media, orders, now, newId } = deps;
 
   /** A rule or coupon may only name zones the caller manages: every warehouse of each zone must be in their scope. */
   async function assertZones(ctx: Ctx, zoneIds: readonly string[]): Promise<void> {
@@ -131,6 +132,7 @@ export function createPricingService(deps: PricingDeps) {
     /** The exact bill a customer would get. Nothing is saved. */
     async preview(ctx: Ctx, input: { zoneId: string; subtotal: number; discount: number; at: Date; splitIntoWarehouses: number }) {
       await assertZones(ctx, [input.zoneId]);
+      const settings = await deps.settings({ zoneId: input.zoneId });
       const bill = computeBill({
         zoneId: input.zoneId, subtotal: input.subtotal, discount: input.discount, at: input.at, rules: await store.activeRules(), surchargeCap: settings.surchargeCap,
         deliveries: input.splitIntoWarehouses,
@@ -155,6 +157,7 @@ export function createPricingService(deps: PricingDeps) {
         return { ruleId: match.id, isActive: true, activeUntil: input.until?.toISOString() ?? null };
       }
       const at = now();
+      const settings = await deps.settings(input.zoneIds.length === 1 ? { zoneId: input.zoneIds[0]! } : undefined);
       const rule: SurchargeRule = {
         id: newId(), type: "surcharge", kind: "rain", zoneIds: input.zoneIds, isActive: true, activeUntil: input.until, window: null,
         amount: settings.rainDefaults.amount, extraMinutes: settings.rainDefaults.extraMinutes, waivedByFreeDelivery: false, createdAt: at, updatedAt: at,
@@ -174,6 +177,7 @@ export function createPricingService(deps: PricingDeps) {
     // ---------------------------------------------------------------- the bill (used by quotes)
 
     async bill(input: { zoneId: string; subtotal: number; discount: number; at?: Date; freeDelivery?: boolean; deliveries?: number }) {
+      const settings = await deps.settings({ zoneId: input.zoneId });
       return computeBill({
         zoneId: input.zoneId, subtotal: input.subtotal, discount: input.discount, at: input.at ?? now(), rules: await store.activeRules(), surchargeCap: settings.surchargeCap,
         ...(input.freeDelivery !== undefined && { freeDelivery: input.freeDelivery }), ...(input.deliveries !== undefined && { deliveries: input.deliveries }),

@@ -18,6 +18,9 @@ The rider app records cash and doorstep UPI; the admin records the end-of-day de
 | `GET` | `/admin/reconciliation` | Admin `cash:manage` | Items needing review |
 | `POST` | `/admin/reconciliation/:id/resolve` | Admin `cash:manage` | Resolve a reconciliation item 🔒 |
 | `POST` | `/admin/orders/:id/fix-collection` | Admin `orders:manage` | Correct a wrong collection record 🔒 |
+| `GET` | `/admin/rider-tips` | Admin `riders:view` | Tips earned per rider, and what is still owed |
+| `GET` | `/admin/rider-tips/orders` | Admin `riders:view` | The deliveries behind the tips |
+| `POST` | `/admin/rider-tips/pay` | Admin `cash:manage` | Mark tips as paid to a rider 🔒 |
 
 ## GET /rider/cash
 200:
@@ -115,3 +118,12 @@ Corrects a mistaken collection record. Body: `{ "method": "cash", "amount": 8800
 - **Offline.** Cash from `POST /rider/sync` ([F21](F21-offline-and-low-network.md)) is recorded even when the order was cancelled (`unmatched`), moved to another rider (`unmatched`), already paid online (`overpaid`), or for a different amount (`unmatched`).
 - **For Dev 1.** `OrdersPort` gained `setCollection` (record, replace or clear the payment taken at the door and set the payment status), `createRefund` and `reverseDelivery`; see `apps/api/src/platform/orders.ts`.
 - **Not built.** Cash reports (F25) and warehouse-manager screens.
+
+## Rider tips
+Customers can add a tip at checkout ([F10](F10-cart-and-quote.md)). A tip belongs to the rider who delivers that order. Riders are salaried, so the system does not pay them: it keeps a list of what each rider earned and what the owner still has to hand over. Tips are worked out from the delivered orders themselves, so they always match the orders. Cash collected at the door still includes the tip, and the rider hands in the full amount like any cash on delivery; the tip is then paid to the rider from this list, whether the customer paid cash or online.
+
+- `GET /admin/rider-tips?from&to&warehouseId&riderId` returns `{ from, to, totals: { count, total, owed, paid }, riders: [{ riderId, riderName, count, total, owed, paid }] }`, largest amount owed first.
+- `GET /admin/rider-tips/orders?from&to&warehouseId&riderId&status=owed|paid&limit` returns `[{ orderId, orderNo, riderId, warehouseId, amount, deliveredAt, status, paidAt }]`, newest first.
+- `POST /admin/rider-tips/pay` with `{ "riderId": "...", "orderIds": ["..."], "note": "Paid in cash" }` or `{ "riderId": "...", "upTo": "2026-11-07" }` (every owed tip delivered up to and including that day) marks tips as paid, once each, and writes an audit record. Repeating it pays nothing twice. 200: `{ riderId, paidCount, paidAmount }`. Send exactly one of `orderIds` or `upTo`.
+
+Scoped staff see and pay only tips for deliveries from their own warehouses. Dates are Indian days, at most 366 days at a time.

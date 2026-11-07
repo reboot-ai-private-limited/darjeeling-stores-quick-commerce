@@ -27,8 +27,8 @@ export interface OrderAccess {
   customerCancel(userId: string, orderId: string, reason: string): Promise<unknown>;
 }
 export interface RefundMedia { claim(input: { mediaId: string; userId: string; orderId: string }): Promise<void> }
-/** Whether an item may be refunded after delivery (for example, perishables only). */
-export interface Eligibility { eligible(productId: string): Promise<boolean> }
+/** Whether an item may be refunded after delivery for this reason. A non-returnable item is still refunded when it arrived damaged or missing. */
+export interface Eligibility { eligible(productId: string, reason: "damaged_item" | "missing_item" | "other"): Promise<boolean> }
 export interface RefundNotifier {
   approved(userId: string, refund: Refund): Promise<void>;
   rejected(userId: string, refund: Refund): Promise<void>;

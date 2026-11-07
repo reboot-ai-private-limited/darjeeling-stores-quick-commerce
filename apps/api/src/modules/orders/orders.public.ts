@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { Types } from "mongoose";
 import { noGeography, type Geography } from "../../platform/geography.js";
 import { denyAll, noCustomers, type AuthResolver, type CustomerResolver } from "../catalog/catalog.public.js";
@@ -43,7 +44,7 @@ export interface OrdersModuleOptions {
 /** Builds order placement, the order state machine and the admin order screens (F13, F14). Call `store.ensureIndexes()` once after the database connects. */
 export function createOrdersModule(options: OrdersModuleOptions) {
   const store = createMongoOrderStore(options.connection);
-  const settings: OrderSettings = { ...DEFAULT_ORDER_SETTINGS, ...options.settings };
+  const settings: OrderSettings = liveSettings(DEFAULT_ORDER_SETTINGS, options.settings);
   const deps = {
     store, quotes: options.quotes, carts: options.carts, addresses: options.addresses, stock: options.stock, coupons: options.coupons, media: options.media,
     riders: options.riders ?? noRidersOnOrders, money: options.money ?? noMoney, notifier: options.notifier ?? silentOrderNotifier, dispatch: options.dispatch ?? noDispatchHooks, slots: options.slots ?? noSlots,

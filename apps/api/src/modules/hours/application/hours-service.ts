@@ -1,12 +1,13 @@
 import type { GeoWarehouse, Geography } from "../../../platform/geography.js";
+import type { SettingsProvider } from "../../../platform/settings.js";
 import { AppError, assertWarehouseScope, conflict, forbidden, notFound, validation, type Ctx } from "../../catalog/catalog.public.js";
 import {
   DEFAULT_PREORDER, hoursProblem, hoursView, isOpen, istDate, istInstant, istIso, matchSlot, nextOpening, onOfferedDay, pauseActive, slotsProblem, upcomingSlots,
   type HoursRule, type Pause, type PreOrderConfig, type Slot, type WarehouseHours,
 } from "../domain/hours.js";
-import { SlotFullError, type HoursStore, type PreorderSource } from "./ports.js";
+import { SlotFullError, type HoursSettings, type HoursStore, type PreorderSource } from "./ports.js";
 
-export interface HoursDeps { store: HoursStore; geography: Geography; preorders: PreorderSource; now: () => Date }
+export interface HoursDeps { store: HoursStore; geography: Geography; preorders: PreorderSource; settings: SettingsProvider<HoursSettings>; now: () => Date }
 export interface ClosedReason { code: "STORE_CLOSED" | "ZONE_PAUSED"; message: string; opensAt: Date | null; until: Date | null; preOrderAvailable: boolean }
 
 const audit = (ctx: Ctx, action: string, entityType: string, entityId: string, warehouseId?: string) =>
@@ -106,18 +107,23 @@ export function createHoursService(deps: HoursDeps) {
 
     async getHours(ctx: Ctx, warehouseId: string) { await warehouseOf(ctx, warehouseId); const h = await store.getHours(warehouseId); return h ? hoursView(h) : null; },
 
-    async setHours(ctx: Ctx, warehouseId: string, input: { hours: HoursRule[]; lastOrderMinutesBeforeClose: number; afterHoursMode: "closed" | "pre_order" }) {
+    async setHours(ctx: Ctx, warehouseId: string, body: { hours: HoursRule[]; lastOrderMinutesBeforeClose?: number | undefined; afterHoursMode?: "closed" | "pre_order" | undefined }) {
       await warehouseOf(ctx, warehouseId);
+      const defaults = await deps.settings({ warehouseId });
+      const input = { hours: body.hours, lastOrderMinutesBeforeClose: body.lastOrderMinutesBeforeClose ?? defaults.lastOrderMinutesBeforeClose, afterHoursMode: body.afterHoursMode ?? defaults.afterHoursMode };
       const problem = hoursProblem(input.hours);
       if (problem) throw validation(problem, { field: "hours" });
       const current = await store.getHours(warehouseId);
-      const next: WarehouseHours = { warehouseId, ...input, preOrder: current?.preOrder ?? DEFAULT_PREORDER, updatedAt: now() };
+      const preOrder = current?.preOrder ?? { ...DEFAULT_PREORDER, cutoffMinutesBeforeSlot: defaults.cutoffMinutesBeforeSlot, packLeadMinutes: defaults.packLeadMinutes };
+      const next: WarehouseHours = { warehouseId, ...input, preOrder, updatedAt: now() };
       await store.saveHours(next, audit(ctx, "hours.set_hours", "warehouse", warehouseId, warehouseId));
       return hoursView(next);
     },
 
-    async setPreorder(ctx: Ctx, warehouseId: string, input: { enabled: boolean; slots: Slot[]; cutoffMinutesBeforeSlot: number; packLeadMinutes: number }) {
+    async setPreorder(ctx: Ctx, warehouseId: string, body: { enabled: boolean; slots: Slot[]; cutoffMinutesBeforeSlot?: number | undefined; packLeadMinutes?: number | undefined }) {
       await warehouseOf(ctx, warehouseId);
+      const defaults = await deps.settings({ warehouseId });
+      const input = { enabled: body.enabled, slots: body.slots, cutoffMinutesBeforeSlot: body.cutoffMinutesBeforeSlot ?? defaults.cutoffMinutesBeforeSlot, packLeadMinutes: body.packLeadMinutes ?? defaults.packLeadMinutes };
       const problem = slotsProblem(input.slots);
       if (problem) throw validation(problem, { field: "slots" });
       if (input.enabled && input.slots.length === 0) throw validation("Add at least one slot to turn pre-orders on", { field: "slots" });
@@ -125,7 +131,7 @@ export function createHoursService(deps: HoursDeps) {
       const preOrder: PreOrderConfig = { ...input };
       const next: WarehouseHours = current
         ? { ...current, preOrder, updatedAt: now() }
-        : { warehouseId, hours: [], lastOrderMinutesBeforeClose: 15, afterHoursMode: "closed", preOrder, updatedAt: now() };
+        : { warehouseId, hours: [], lastOrderMinutesBeforeClose: defaults.lastOrderMinutesBeforeClose, afterHoursMode: defaults.afterHoursMode, preOrder, updatedAt: now() };
       await store.saveHours(next, audit(ctx, "hours.set_preorder", "warehouse", warehouseId, warehouseId));
       return hoursView(next);
     },
@@ -190,9 +196,10 @@ export function createHoursService(deps: HoursDeps) {
       const slotStart = query.slotStart ? istInstant(dayStart, query.slotStart) : undefined;
       const rows = await preorders.list({ from: dayStart, to: dayEnd, ...(warehouseIds && { warehouseIds }), ...(slotStart && { slotStart }) });
       const configs = new Map((await store.getManyHours([...new Set(rows.map(r => r.warehouseId))])).map(c => [c.warehouseId, c]));
+      const leadOf = new Map(await Promise.all([...new Set(rows.map(r => r.warehouseId))].map(async id => [id, (await deps.settings({ warehouseId: id })).packLeadMinutes] as const)));
       const data = rows.map(r => ({
         orderId: r.orderId, orderNo: r.orderNo, scheduledWindow: { start: istIso(r.scheduledWindow.start), end: istIso(r.scheduledWindow.end) }, status: r.status, itemCount: r.itemCount,
-        packingStartsAt: istIso(new Date(r.scheduledWindow.start.getTime() - (configs.get(r.warehouseId)?.preOrder.packLeadMinutes ?? 45) * 60_000)),
+        packingStartsAt: istIso(new Date(r.scheduledWindow.start.getTime() - (configs.get(r.warehouseId)?.preOrder.packLeadMinutes ?? leadOf.get(r.warehouseId)!) * 60_000)),
       }));
       const whs = warehouseIds ?? [...new Set(rows.map(r => r.warehouseId))];
       const bySlot = new Map<string, { start: string; booked: number; capacity: number }>();

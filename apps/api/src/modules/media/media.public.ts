@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { Types } from "mongoose";
 import type { MediaPort } from "../catalog/catalog.public.js";
 import { createMediaService } from "./application/media-service.js";
@@ -46,7 +47,7 @@ export function createMediaModule(options: MediaModuleOptions) {
   const { connection, storage = unconfiguredStorage, principal = noPrincipals, policy = defaultAccessPolicy } = options;
   const store = createMongoMediaStore(connection);
   const service = createMediaService({
-    store, storage, policy, settings: { ...DEFAULT_SETTINGS, ...options.settings }, now: () => new Date(), newId: () => new Types.ObjectId().toHexString(),
+    store, storage, policy, settings: liveSettings(DEFAULT_SETTINGS, options.settings), now: () => new Date(), newId: () => new Types.ObjectId().toHexString(),
   });
   /** What the catalog module asks of media: look up images, claim one for a product, delete one. */
   const catalogPort: MediaPort = {

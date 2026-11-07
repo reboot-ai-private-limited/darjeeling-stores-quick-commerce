@@ -22,7 +22,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F04 master catalog", () => {
     const expected = documented("F04-master-catalog.md");
-    expect(expected).toHaveLength(20);
+    expect(expected).toHaveLength(24);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -58,7 +58,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F08 discovery, apart from location resolve which belongs to F03", () => {
     const expected = documented("F08-discovery-and-location.md");
-    expect(expected).toHaveLength(9);
+    expect(expected).toHaveLength(10);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -76,7 +76,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F19 the rider app", () => {
     const expected = documented("F19-rider-app.md");
-    expect(expected).toHaveLength(27);
+    expect(expected).toHaveLength(28);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -94,7 +94,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F22 rider cash and settlement", () => {
     const expected = documented("F22-rider-cash-and-settlement.md");
-    expect(expected).toHaveLength(10);
+    expect(expected).toHaveLength(13);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -112,7 +112,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F10 cart and quote", () => {
     const expected = documented("F10-cart-and-quote.md");
-    expect(expected).toHaveLength(6);
+    expect(expected).toHaveLength(7);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -151,7 +151,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
       ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F10-cart-and-quote.md", "F11-delivery-fees-and-surcharges.md", "F12-coupons-and-offers.md", "F13-order-placement-and-split-orders.md", "F14-order-lifecycle-and-packing.md", "F15-payments.md", "F16-cancellations-and-refunds.md", "F17-hours-preorders-and-ops-mode.md", "F18-dispatch-and-assignment.md", "F19-rider-app.md", "F20-eta-and-live-tracking.md", "F21-offline-and-low-network.md", "F22-rider-cash-and-settlement.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
     );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(194);
+    expect(registered).toHaveLength(204);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {
@@ -161,7 +161,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("answers 401 with the documented error envelope for every route when nobody is logged in", async () => {
     const app = createApp();
-    const open = ["/webhooks/", "/catalog/", "/store/", "/banners", "/waitlist", "/track/"];
+    const open = ["/webhooks/", "/catalog/", "/store/", "/banners", "/waitlist", "/track/", "/tips/options"];
     for (const route of routes.filter(r => !open.some(prefix => r.path.startsWith(prefix)))) {
       const url = `/api/v1${route.path.replace(/:[A-Za-z]+/g, "a".repeat(24))}`;
       const res = await request(app)[route.method](url);
@@ -172,7 +172,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("lets guests browse the catalog: a call with no zone is a 400, never a 401", async () => {
     const app = createApp();
-    for (const path of ["/catalog/home", "/catalog/categories", "/catalog/products", "/catalog/search?q=tomato", "/catalog/changes?since=0", "/store/status", "/banners"]) {
+    for (const path of ["/catalog/home", "/catalog/categories", "/catalog/products", "/catalog/search?q=tomato", "/catalog/changes?since=0", "/store/status", "/banners", "/tips/options"]) {
       expect((await request(app).get(`/api/v1${path}`)).status, path).toBe(400);
     }
     expect((await request(app).post("/api/v1/waitlist").send({})).status).toBe(400);

@@ -1,6 +1,7 @@
 import type { Connection } from "mongoose";
 import { Types } from "mongoose";
 import { noGeography, type Geography } from "../../platform/geography.js";
+import { settingsProvider, type SettingsProvider } from "../../platform/settings.js";
 import { AppError, noCustomers, type CustomerResolver } from "../catalog/catalog.public.js";
 import { createCartService } from "./application/cart-service.js";
 import { createQuoteService } from "./application/quote-service.js";
@@ -28,13 +29,13 @@ export const alwaysOpen: HoursSource = {
 export interface CartModuleOptions {
   connection: Connection;
   lines: LineSource; addresses: AddressSource; pricing: PricingSource; travel: TravelTime;
-  geography?: Geography; customers?: CustomerPolicy; hours?: HoursSource; settings?: Partial<CartSettings>; customer?: CustomerResolver;
+  geography?: Geography; customers?: CustomerPolicy; hours?: HoursSource; settings?: Partial<CartSettings> | SettingsProvider<CartSettings>; customer?: CustomerResolver;
 }
 
 /** Builds the server cart and quotes (F10). Call `store.ensureIndexes()` once after the database connects. */
 export function createCartModule(options: CartModuleOptions) {
   const { connection, geography = noGeography, customers = anyoneMayPayCash, hours = alwaysOpen, customer = noCustomers } = options;
-  const settings: CartSettings = { ...DEFAULT_CART_SETTINGS, ...options.settings };
+  const settings = settingsProvider(DEFAULT_CART_SETTINGS, options.settings);
   const store = createMongoCartStore(connection);
   const deps = {
     store, lines: options.lines, addresses: options.addresses, geography, pricing: options.pricing, travel: options.travel, customers, hours, settings,

@@ -8,7 +8,7 @@ const now = new Date("2026-11-05T10:00:00Z");
 const at = (iso: string) => new Date(iso);
 const wh = (id: string, over: Partial<GeoWarehouse> = {}): GeoWarehouse => ({ id, zoneId: "z1", isEnabled: true, isOpenNow: true, ...over });
 const ctx = (warehouses: GeoWarehouse[], over: Partial<ZoneContext> = {}): ZoneContext => ({
-  warehouses: new Map(warehouses.map(w => [w.id, w])), zoneOpen: warehouses.some(w => w.isEnabled && w.isOpenNow), now, maxQtyPerItem: null, ...over,
+  warehouses: new Map(warehouses.map(w => [w.id, w])), brands: new Map(), zoneOpen: warehouses.some(w => w.isEnabled && w.isOpenNow), now, maxQtyPerItem: null, ...over,
 });
 const line = (variantId: string, over: Partial<OfferingVariant> = {}): OfferingVariant => ({
   variantId, price: 3200, mrp: 4000, salePrice: null, saleStart: null, saleEnd: null, stock: null, maxQtyPerOrder: null, isActive: true, ...over,
@@ -20,7 +20,8 @@ const offering = (warehouseId: string, over: Partial<Offering> = {}): Offering =
 const product = (over: Partial<Product> = {}): Product => ({
   id: "p1", vendorId: null, name: "Tomato", nameKey: "tomato", slug: "tomato", description: "", categoryId: "c1", type: "loose", stockMode: "pooled_weight", tags: [],
   images: [], highlights: [], keyInfo: [], nutrition: null, infoSections: [], gstRate: 0, hsnCode: null, status: "active", sortOrder: 0,
-  variants: [{ id: "v500", label: "500 g", weightGrams: 500, sku: "TOM-500", barcode: null, isActive: true }], createdAt: now, updatedAt: now, ...over,
+  brandId: null, foodType: "not_applicable", extraCategoryIds: [], badge: null, isReturnable: true,
+  variants: [{ id: "v500", label: "500 g", weightGrams: 500, sku: "TOM-500", barcode: null, isActive: true, attributes: [] }], createdAt: now, updatedAt: now, ...over,
 });
 const resolve = (p: Product, offerings: Offering[], c: ZoneContext) => resolveProduct(p, offerings, c, {});
 
@@ -46,7 +47,7 @@ describe("one entry for a zone", () => {
   it("is available when an open warehouse has stock, with prices worked out on the server", () => {
     const entry = resolve(product(), [offering("a")], ctx([wh("a")]))!;
     expect(entry).toMatchObject({ id: "p1", available: true, availability: "in_stock", rev: 10 });
-    expect(entry.variants).toEqual([{ variantId: "v500", label: "500 g", weightGrams: 500, price: 3200, mrp: 4000, discountAmount: 800, discountPercent: 20, onSale: false, saleEndsAt: null, available: true, maxQty: null }]);
+    expect(entry.variants).toEqual([{ variantId: "v500", label: "500 g", weightGrams: 500, attributes: [], price: 3200, mrp: 4000, discountAmount: 800, discountPercent: 20, onSale: false, saleEndsAt: null, available: true, maxQty: null }]);
   });
 
   it("shows the sale price while it runs, with the end time, and the plain price otherwise", () => {
@@ -85,7 +86,7 @@ describe("one entry for a zone", () => {
   });
 
   it("reads units for a per-variant product", () => {
-    const salt = product({ type: "packaged", stockMode: "per_variant", variants: [{ id: "v1", label: "1 kg", weightGrams: 1000, sku: "S", barcode: null, isActive: true }] });
+    const salt = product({ type: "packaged", stockMode: "per_variant", variants: [{ id: "v1", label: "1 kg", weightGrams: 1000, sku: "S", barcode: null, isActive: true, attributes: [] }] });
     const o = (stock: number) => offering("a", { stockGrams: null, variants: [line("v1", { stock })] });
     expect(resolve(salt, [o(3)], ctx([wh("a")]))!.available).toBe(true);
     expect(resolve(salt, [o(0)], ctx([wh("a")]))!.available).toBe(false);

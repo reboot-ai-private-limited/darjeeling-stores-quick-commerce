@@ -7,6 +7,7 @@ import { createRiderService } from "./application/rider-service.js";
 import type { RiderLoads, RiderMedia } from "./application/ports.js";
 import { DEFAULT_RIDER_SETTINGS, type RiderSettings } from "./domain/rider.js";
 import { createMongoRiderStore } from "./infrastructure/mongo-rider-store.js";
+import { liveSettings } from "../../platform/settings.js";
 import { noRiders, riderGuarded, riderRoutes, type RiderResolver } from "./interface/routes.js";
 
 export type { RiderService } from "./application/rider-service.js";
@@ -39,7 +40,7 @@ export interface RidersModuleOptions {
 /** Builds rider profiles, shifts and attendance (F19). Call `store.ensureIndexes()` once after the database connects. */
 export function createRidersModule(options: RidersModuleOptions) {
   const { connection, geography = noGeography, identity = unavailableRiderIdentity, media, loads = noLoads, rider = noRiders, auth = denyAll } = options;
-  const settings: RiderSettings = { ...DEFAULT_RIDER_SETTINGS, ...options.settings };
+  const settings: RiderSettings = liveSettings(DEFAULT_RIDER_SETTINGS, options.settings);
   const store = createMongoRiderStore(connection);
   const service = createRiderService({ store, geography, identity, media, loads, settings, now: () => new Date(), newId: () => new Types.ObjectId().toHexString() });
   return { store, service, settings, routes: riderRoutes(service, rider, auth) };

@@ -14,6 +14,7 @@ The app keeps the cart on the device (instant taps) and syncs it to the server i
 | `DELETE` | `/cart/coupon` | Customer | Remove the coupon |
 | `POST` | `/quotes` | Customer | Create a quote (bill + ETA per delivery) |
 | `GET` | `/quotes/:id` | Customer | Read a quote |
+| `GET` | `/tips/options` | Public | Quick tip amounts and the limit for a zone |
 
 ## Object: cart
 
@@ -94,7 +95,7 @@ Body:
   "acceptZoneChange": false
 }
 ```
-`scheduledWindow` is used for pre-orders: `{ "start": "2026-11-06T07:00:00+05:30", "end": "2026-11-06T09:00:00+05:30" }` ([F17](F17-hours-preorders-and-ops-mode.md)). `paymentMethod` (`cod` or `online`) only checks eligibility.
+`scheduledWindow` is used for pre-orders: `{ "start": "2026-11-06T07:00:00+05:30", "end": "2026-11-06T09:00:00+05:30" }` ([F17](F17-hours-preorders-and-ops-mode.md)). `paymentMethod` (`cod` or `online`) only checks eligibility. `tipAmount` (whole paise, default 0) adds a rider tip, see below.
 
 201:
 ```json
@@ -163,3 +164,10 @@ Errors:
 - **The bill.** One delivery fee for the group, split between the deliveries pro-rata (kept on the stored quote as `allocatedDiscount` and `allocatedCharges`, which add up to the totals). ETA per delivery is pack 5 + rider arrival 5 + travel + the extra minutes of any surcharge. The minimum order is the zone's fee rule `minOrder`.
 - **Quote** is kept for 300 s and for a day afterwards (so a late order is told it expired). It is private to the customer (`404` for anyone else). `scheduledWindow` is stored but pre-order slots are checked by the hours module (F17).
 - **For Dev 1 (orders).** Place an order from `cart.quotes.get(userId, quoteId)`, re-run `cart.quotes.build(...)` and compare to detect `QUOTE_CHANGED`, hold the coupon with `pricing.service.hold`, and take the quote with the store's `claimQuote`. `POST /orders/:id/reorder` uses `cart.cart.reorder`.
+
+## Rider tips
+`GET /tips/options?zoneId=` (no login) returns `{ "data": { "enabled": true, "presets": [1000, 2000, 5000], "max": 20000 } }` for the checkout screen. A customer may pick a preset or type any amount up to `max`.
+
+Send `tipAmount` when creating the quote. It appears in `pricing.charges` as `{ "type": "tip", "label": "Rider tip", "amount": 2000 }`, is included in `pricing.total`, is paid with the order (online, or in cash at the door), and is shared over the deliveries of a split order like a fee, so each rider's tip matches their own delivery. A tip is never waived by free delivery and is not capped like a surcharge. Errors: `400 VALIDATION_ERROR` (`details.field = "tipAmount"`) when tips are switched off or the amount is above `max`.
+
+If an order is cancelled before pickup, its tip is refunded with it, even when another delivery of the same group goes ahead. A tip is the rider's, not the shop's: it is left out of the dashboard revenue, the sales report and a customer's lifetime value. The owner controls it in settings: `delivery.tipsEnabled`, `tipPreset1`, `tipPreset2`, `tipPreset3` and `tipMaxAmount` ([F25](F25-admin-panel-settings-and-reports.md)).
