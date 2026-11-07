@@ -20,7 +20,7 @@ function decodeCursor(cursor: string | undefined): string | undefined {
 }
 
 export function createOfferingsService(deps: OfferingsDeps) {
-  const { store, warehouses, products, events, now, newId, thresholds } = deps;
+  const { store, warehouses, products, events, now, newId, thresholds, priceConflictMode } = deps;
 
   async function publish(list: StockEvent[]) { await Promise.allSettled(list.map(async event => events.publish(event))); }
 
@@ -148,7 +148,7 @@ export function createOfferingsService(deps: OfferingsDeps) {
       const applyTo = new Set(patch.applyToWarehouseIds ?? []);
       for (const wanted of applyTo) if (!others.some(o => o.warehouseId === wanted)) throw validation("applyToWarehouseIds must be other warehouses of this zone that sell the product", { warehouseId: wanted });
       const conflicts = findPriceConflicts(changedLines, others, at);
-      if (conflicts.some(c => c.conflicts.some(x => !applyTo.has(x.warehouseId)))) throw priceConflictError(conflicts, true);
+      if (conflicts.some(c => c.conflicts.some(x => !applyTo.has(x.warehouseId))) && (await priceConflictMode()) === "block") throw priceConflictError(conflicts, true);
       for (const other of others.filter(o => applyTo.has(o.warehouseId))) {
         assertWarehouseScope(ctx.actor, other.warehouseId);
         for (const line of changedLines) {
@@ -168,7 +168,7 @@ export function createOfferingsService(deps: OfferingsDeps) {
     await tx.insertMovements(moves);
     await tx.insertPriceHistory(history);
     await tx.audit(ctx, { action: "offering.update", entityType: "warehouse_product", entityId: next.id, warehouseId: next.warehouseId });
-    await stockSideEffects(tx, thresholds, product, before, next, out, { revAlreadyBumped: true });
+    await stockSideEffects(tx, await thresholds({ warehouseId: next.warehouseId }), product, before, next, out, { revAlreadyBumped: true });
     return next;
   }
 
@@ -194,7 +194,7 @@ export function createOfferingsService(deps: OfferingsDeps) {
     const row = movement(offering, product, variantId, delta, applied.after, reason, note, ctx, at);
     await tx.insertMovements([row]);
     const after = variantId === null ? { ...offering, stockGrams: applied.after } : { ...offering, variants: offering.variants.map(v => (v.variantId === variantId ? { ...v, stock: applied.after } : v)) };
-    await stockSideEffects(tx, thresholds, product, offering, after, out);
+    await stockSideEffects(tx, await thresholds({ warehouseId: offering.warehouseId }), product, offering, after, out);
     return { delta, balanceAfter: applied.after, movementId: row.id };
   }
 
@@ -237,7 +237,7 @@ export function createOfferingsService(deps: OfferingsDeps) {
         await tx.lockZoneProduct(warehouse.zoneId, product.id);
         const lines: OfferingVariant[] = input.variants.map(v => ({ ...v, isActive: true }));
         const conflicts = findPriceConflicts(lines, await tx.listByZoneProduct(warehouse.zoneId, product.id), at);
-        if (conflicts.length > 0) throw priceConflictError(conflicts, false);
+        if (conflicts.length > 0 && (await priceConflictMode()) === "block") throw priceConflictError(conflicts, false);
         const offering: Offering = {
           id: newId(), warehouseId: input.warehouseId, productId: input.productId, zoneId: warehouse.zoneId, status: "active",
           stockGrams: pooled ? input.stockGrams : null, variants: lines, isOutOfStockOverride: false, rev: await tx.nextRevision(),
@@ -250,7 +250,7 @@ export function createOfferingsService(deps: OfferingsDeps) {
         await tx.insertMovements(moves);
         await tx.insertPriceHistory(lines.map(l => ({ id: newId(), warehouseId: offering.warehouseId, productId: offering.productId, variantId: l.variantId, oldPrice: 0, newPrice: l.price, oldMrp: 0, newMrp: l.mrp, by: ctx.actor.userId, at })));
         await tx.audit(ctx, { action: "offering.create", entityType: "warehouse_product", entityId: offering.id, warehouseId: offering.warehouseId });
-        await stockSideEffects(tx, thresholds, product, withZeroStock(product, offering), offering, out, { revAlreadyBumped: true });
+        await stockSideEffects(tx, await thresholds({ warehouseId: offering.warehouseId }), product, withZeroStock(product, offering), offering, out, { revAlreadyBumped: true });
         return offering;
       });
       await publish(out);
@@ -278,11 +278,12 @@ export function createOfferingsService(deps: OfferingsDeps) {
       const page = rows.slice(0, filters.limit);
       const info = new Map((await products.getMany(page.map(o => o.productId))).map(p => [p.id, p]));
       // shortcut: lowStock filters the current page, so a page can hold fewer than `limit` rows. Upgrade with a stored low-stock flag if needed.
+      const limits = await thresholds({ warehouseId });
       const items = page.flatMap(o => {
         const product = info.get(o.productId);
         if (!product) return [];
         if (filters.lowStock) {
-          const low = product.stockMode === "pooled_weight" ? isLow(product, o.stockGrams ?? 0, thresholds) : o.variants.some(v => isLow(product, v.stock ?? 0, thresholds));
+          const low = product.stockMode === "pooled_weight" ? isLow(product, o.stockGrams ?? 0, limits) : o.variants.some(v => isLow(product, v.stock ?? 0, limits));
           if (!low) return [];
         }
         return [toView(o, product)];
@@ -371,9 +372,12 @@ export function createOfferingsService(deps: OfferingsDeps) {
       const rows = await store.listOfferings({ warehouseIds: ids, limit: filters.limit + 1, ...(afterId !== undefined && { afterId }) });
       const page = rows.slice(0, filters.limit);
       const info = new Map((await products.getMany(page.map(o => o.productId))).map(p => [p.id, p]));
+      // Thresholds can differ per warehouse, so each warehouse on the page is read once.
+      const limitsOf = new Map(await Promise.all([...new Set(page.map(o => o.warehouseId))].map(async id => [id, await thresholds({ warehouseId: id })] as const)));
       const items = page.flatMap(o => {
         const product = info.get(o.productId);
         if (!product || o.status === "archived") return [];
+        const thresholds = limitsOf.get(o.warehouseId)!;
         const make = (variantId: string | null, label: string | null, stock: number) => {
           const threshold = product.stockMode === "pooled_weight" ? thresholds.grams : thresholds.units;
           return { warehouseId: o.warehouseId, productId: o.productId, name: product.name, variantId, variantLabel: label, unit: product.stockMode === "pooled_weight" ? "grams" : "units", stock, lowStockThreshold: threshold, isLow: isLow(product, stock, thresholds) };

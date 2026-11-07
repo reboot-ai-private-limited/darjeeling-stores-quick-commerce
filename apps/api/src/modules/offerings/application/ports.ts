@@ -1,3 +1,4 @@
+import type { SettingsProvider } from "../../../platform/settings.js";
 import type { Ctx } from "../../catalog/catalog.public.js";
 import type { Offering, OfferingStatus, ProductInfo, StockThresholds } from "../domain/stock.js";
 
@@ -118,5 +119,7 @@ export interface ImportPreview {
 
 export interface OfferingsDeps {
   store: OfferingsStore; warehouses: WarehouseDirectory; products: ProductDirectory; events: EventPublisher;
-  now: () => Date; newId: () => string; thresholds: StockThresholds;
+  now: () => Date; newId: () => string; thresholds: SettingsProvider<StockThresholds>;
+  /** `block` refuses a price that differs from another warehouse of the zone; `warn` lets it through (the import preview still lists it). */
+  priceConflictMode: () => Promise<"block" | "warn">;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertDistinctSkus, assertTypeMatchesStockMode, buildTree, nameKey, similarNames, slugify, toCsv, wouldCreateCycle,
+  assertDistinctSkus, assertExtraCategories, assertTypeMatchesStockMode, assertVariantAttributes, buildTree, nameKey, similarNames, slugify, toCsv, wouldCreateCycle,
   type Category, type Product,
 } from "../src/modules/catalog/domain/product.js";
 
@@ -61,8 +61,9 @@ describe("CSV export", () => {
   const product: Product = {
     id: "p1", vendorId: null, name: "=cmd|' /C calc'!A0", nameKey: "x", slug: "x", description: "", categoryId: "veg",
     type: "loose", stockMode: "pooled_weight", tags: [], highlights: [], keyInfo: [], nutrition: null, infoSections: [], images: [], gstRate: 0, hsnCode: null, status: "active", sortOrder: 0,
+    brandId: null, foodType: "not_applicable", extraCategoryIds: [], badge: null, isReturnable: true,
     createdAt: at, updatedAt: at,
-    variants: [{ id: "v1", label: "500 g, fresh", weightGrams: 500, sku: "TOM-500", barcode: null, isActive: true }],
+    variants: [{ id: "v1", label: "500 g, fresh", weightGrams: 500, sku: "TOM-500", barcode: null, isActive: true, attributes: [] }],
   };
   it("quotes commas and neutralises spreadsheet formulas", () => {
     const csv = toCsv([cat("veg", null, "Vegetables")], [product]);
@@ -71,5 +72,21 @@ describe("CSV export", () => {
     expect(row).toContain("'=cmd|' /C calc'!A0");
     expect(row).toContain('"500 g, fresh"');
     expect(row?.startsWith("p1,")).toBe(true);
+  });
+});
+
+describe("variant attributes and extra categories", () => {
+  it("allows a few distinct attributes and rejects a repeated name in any case", () => {
+    expect(() => assertVariantAttributes([])).not.toThrow();
+    expect(() => assertVariantAttributes([{ name: "Flavour", value: "Chocolate" }, { name: "Pack", value: "Tetra" }])).not.toThrow();
+    expect(() => assertVariantAttributes([{ name: "Flavour", value: "A" }, { name: " flavour ", value: "B" }])).toThrow(/twice/);
+    expect(() => assertVariantAttributes(Array.from({ length: 6 }, (_, i) => ({ name: `n${i}`, value: "v" })))).toThrow(/at most 5/);
+  });
+  it("keeps extra categories distinct, few, and away from the main category", () => {
+    expect(() => assertExtraCategories("a", ["b", "c"])).not.toThrow();
+    expect(() => assertExtraCategories("a", [])).not.toThrow();
+    expect(() => assertExtraCategories("a", ["a"])).toThrow(/main category/);
+    expect(() => assertExtraCategories("a", ["b", "b"])).toThrow(/twice/);
+    expect(() => assertExtraCategories("a", ["b", "c", "d", "e", "f", "g"])).toThrow(/at most 5/);
   });
 });

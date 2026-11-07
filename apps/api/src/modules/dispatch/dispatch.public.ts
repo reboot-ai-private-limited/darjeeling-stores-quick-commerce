@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { Types } from "mongoose";
 import { noGeography, type Geography } from "../../platform/geography.js";
 import { noOrders, type OrdersPort } from "../../platform/orders.js";
@@ -45,7 +46,7 @@ export interface DispatchModuleOptions {
 /** Builds dispatch and the rider's delivery steps (F18, F19). Call `store.ensureIndexes()` once after the database connects. */
 export function createDispatchModule(options: DispatchModuleOptions) {
   const { connection, riders, orders = noOrders, geography = noGeography, notifier = silentNotifier, evidence = noEvidenceMedia, rider = noRiders, auth = denyAll } = options;
-  const settings: DispatchSettings = { ...DEFAULT_DISPATCH_SETTINGS, ...options.settings };
+  const settings: DispatchSettings = liveSettings(DEFAULT_DISPATCH_SETTINGS, options.settings);
   const store = createMongoDispatchStore(connection);
   const deps: DispatchDeps = { store, riders, orders, geography, notifier, evidence, settings, now: () => new Date(), newId: () => new Types.ObjectId().toHexString() };
   const batches = createBatchService(deps);

@@ -51,6 +51,11 @@ const warehouseSnapshot = z.object({
     until: z.string().max(64).nullable().optional(),
   }).nullable().optional(),
 }).strict();
+const settingSnapshot = z.object({
+  group: z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,31}$/), key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,63}$/),
+  scope: z.object({ type: z.enum(["global", "zone", "warehouse"]), id: z.string().max(64).nullable() }).strict(), value: z.unknown(),
+}).strict();
+const customerSnapshot = z.object({ status: z.string().max(32), codAllowed: z.boolean(), noteAdded: z.boolean().optional() }).strict();
 const auditEvent = z.object({
   actorId: z.string().min(1).max(128),
   actorRole: z.string().min(1).max(128),
@@ -59,6 +64,9 @@ const auditEvent = z.object({
   entityId: z.string().min(1).max(128),
   requestId: z.string().uuid(),
   warehouseId: z.string().min(1).max(128).optional(),
+  reason: z.string().trim().min(1).max(500).optional(),
+  settingChange: z.object({ before: settingSnapshot.nullable(), after: settingSnapshot.nullable() }).strict().optional(),
+  customerChange: z.object({ before: customerSnapshot.nullable(), after: customerSnapshot }).strict().optional(),
   roleChange: z.object({ before: roleSnapshot.nullable(), after: roleSnapshot.nullable() }).strict().optional(),
   staffChange: z.object({ before: staffSnapshot.nullable(), after: staffSnapshot }).strict().optional(),
   cityChange: z.object({ before: citySnapshot.nullable(), after: citySnapshot.nullable() }).strict().optional(),
@@ -68,6 +76,8 @@ const auditEvent = z.object({
 }).strict();
 
 export type AuditEvent = z.infer<typeof auditEvent>;
+
+export { createAuditReader, type AuditReader, type AuditQuery, type AuditEntryView } from "./audit-reader.js";
 
 export function createAuditWriter(connection: Connection) {
   return async function writeAudit(event: AuditEvent, session: ClientSession): Promise<void> {

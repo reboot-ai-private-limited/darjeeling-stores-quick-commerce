@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { Types } from "mongoose";
 import { denyAll, noCustomers, type AuthResolver, type CustomerResolver } from "../catalog/catalog.public.js";
 import { createPaymentService } from "./application/payment-service.js";
@@ -25,7 +26,7 @@ export interface PaymentsModuleOptions {
 /** Builds online payments, the Razorpay webhook and reconciliation (F15). Call `store.ensureIndexes()` once after the database connects. */
 export function createPaymentsModule(options: PaymentsModuleOptions) {
   const store = createMongoPaymentStore(options.connection);
-  const settings: PaymentSettings = { ...DEFAULT_PAYMENT_SETTINGS, ...options.settings };
+  const settings: PaymentSettings = liveSettings(DEFAULT_PAYMENT_SETTINGS, options.settings);
   const service = createPaymentService({
     store, provider: options.provider ?? razorpayFromEnv(process.env), groups: options.groups, refunds: options.refunds, notifier: options.notifier ?? silentPaymentNotifier,
     settings, now: () => new Date(), newId: () => new Types.ObjectId().toHexString(),

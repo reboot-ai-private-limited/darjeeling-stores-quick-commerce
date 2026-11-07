@@ -4,7 +4,21 @@ export type ProductType = "loose" | "packaged";
 export type StockMode = "pooled_weight" | "per_variant";
 export type ProductStatus = "active" | "inactive" | "archived";
 
-export interface Variant { id: string; label: string; weightGrams: number; sku: string; barcode: string | null; isActive: boolean }
+/** What a customer must show on a food product by law in India (the green or brown mark), and a filter ("Pure veg"). Non-food items use not_applicable. */
+export type FoodType = "veg" | "non_veg" | "egg" | "vegan" | "not_applicable";
+export const FOOD_TYPES: readonly FoodType[] = ["veg", "non_veg", "egg", "vegan", "not_applicable"];
+/** The pill shown on a product card. Chosen by staff; the app styles each one. */
+export type Badge = "bestseller" | "trending" | "new_launch" | "imported" | "organic";
+export const BADGES: readonly Badge[] = ["bestseller", "trending", "new_launch", "imported", "organic"];
+/** One way a variant differs beyond weight, for example Flavour: Chocolate or Colour: Red. */
+export interface VariantAttribute { name: string; value: string }
+export const MAX_VARIANT_ATTRIBUTES = 5;
+export const MAX_EXTRA_CATEGORIES = 5;
+
+export interface Variant { id: string; label: string; weightGrams: number; sku: string; barcode: string | null; isActive: boolean; attributes: VariantAttribute[] }
+export interface Brand {
+  id: string; name: string; slug: string; logoMediaId: string | null; sortOrder: number; isActive: boolean; createdAt: Date; updatedAt: Date;
+}
 export interface ProductImage { mediaId: string; alt: string; sortOrder: number }
 export interface KeyInfoRow { label: string; value: string }
 export type NutritionUnit = "g" | "mg" | "mcg" | "kcal" | "kJ" | "ml";
@@ -20,6 +34,13 @@ export interface Product {
   categoryId: string; type: ProductType; stockMode: StockMode; tags: string[]; images: ProductImage[];
   highlights: string[]; keyInfo: KeyInfoRow[]; nutrition: Nutrition | null; infoSections: InfoSection[];
   variants: Variant[]; gstRate: number; hsnCode: string | null; status: ProductStatus; sortOrder: number;
+  /** Null when the product has no brand (loose vegetables, for example). */
+  brandId: string | null; foodType: FoodType;
+  /** The product shows under its main category and under these too. Never contains the main category. */
+  extraCategoryIds: string[];
+  badge: Badge | null;
+  /** False for items that cannot come back once delivered (eggs, cut vegetables, personal care). A damaged or missing item is still refunded. */
+  isReturnable: boolean;
   createdAt: Date; updatedAt: Date;
 }
 export interface CategoryNode extends Category { children: CategoryNode[] }
@@ -58,6 +79,24 @@ export function assertProductInfo(info: { keyInfo: readonly KeyInfoRow[]; nutrit
   nutrition.rows.forEach((row, i) => {
     if (nutrition.rows.findIndex(other => same(other.name, row.name)) !== i) throw validation(`Nutrient "${row.name}" is used twice`, { field: "nutrition.rows", name: row.name });
   });
+}
+
+/** Attribute names are compared without regard to case; a variant may not list one twice. */
+export function assertVariantAttributes(attributes: readonly VariantAttribute[]): void {
+  if (attributes.length > MAX_VARIANT_ATTRIBUTES) throw validation(`A variant has at most ${MAX_VARIANT_ATTRIBUTES} attributes`, { field: "attributes" });
+  const seen = new Set<string>();
+  for (const { name } of attributes) {
+    const key = name.trim().toLowerCase();
+    if (seen.has(key)) throw validation(`Attribute ${name} is listed twice`, { field: "attributes", name });
+    seen.add(key);
+  }
+}
+
+/** Extra categories must be distinct and must not repeat the main one. */
+export function assertExtraCategories(primaryId: string, extraIds: readonly string[]): void {
+  if (extraIds.length > MAX_EXTRA_CATEGORIES) throw validation(`A product can show in at most ${MAX_EXTRA_CATEGORIES} extra categories`, { field: "extraCategoryIds" });
+  if (new Set(extraIds).size !== extraIds.length) throw validation("An extra category is listed twice", { field: "extraCategoryIds" });
+  if (extraIds.includes(primaryId)) throw validation("The main category does not need to be listed again", { field: "extraCategoryIds" });
 }
 
 export function assertDistinctSkus(variants: readonly { sku: string }[]): void {
@@ -110,11 +149,14 @@ export function toCsv(categories: readonly Category[], products: readonly Produc
   const rows: (string | number | boolean | null)[][] = [[
     "productId", "name", "category", "type", "stockMode", "status", "variantId", "variantLabel",
     "weightGrams", "sku", "barcode", "variantActive", "gstRate", "hsnCode",
+    "brandId", "foodType", "badge", "returnable", "extraCategories", "attributes",
   ]];
   for (const product of products) {
     for (const variant of product.variants) {
       rows.push([product.id, product.name, names.get(product.categoryId) ?? "", product.type, product.stockMode, product.status,
-        variant.id, variant.label, variant.weightGrams, variant.sku, variant.barcode, variant.isActive, product.gstRate, product.hsnCode]);
+        variant.id, variant.label, variant.weightGrams, variant.sku, variant.barcode, variant.isActive, product.gstRate, product.hsnCode,
+        product.brandId, product.foodType, product.badge, product.isReturnable, product.extraCategoryIds.map(id => names.get(id) ?? id).join("; "),
+        variant.attributes.map(a => `${a.name}: ${a.value}`).join("; ")]);
     }
   }
   return `${rows.map(row => row.map(csvCell).join(",")).join("\n")}\n`;

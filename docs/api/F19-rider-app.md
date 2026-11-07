@@ -175,6 +175,7 @@ These endpoints are needed by the admin panel but were not spelled out in the F1
 | `POST` | `/admin/riders/:id/force-offline` | Admin `riders:manage` | End the rider's shift 🔒 |
 | `GET` | `/admin/riders/:id/shifts` | Admin `riders:view` | A rider's shifts |
 | `GET` | `/admin/shifts` | Admin `riders:view` | Attendance across riders |
+| `GET` | `/rider/tips` | Rider | My tips: totals and the deliveries behind them |
 
 The live map is `GET /admin/riders/live` ([F18](F18-dispatch-and-assignment.md)).
 
@@ -218,3 +219,6 @@ Riders query: `zoneId`, `warehouseId`, `status`, `q`. Shifts query: `riderId`, `
 - **History** pages with `cursor`; `deliveredToday` counts from midnight India time.
 - **Profile photo** is a `rider_photo` media upload; failed-delivery photos are `failed_delivery_photo` uploads claimed against the order.
 - **Elsewhere.** Location pings are in [F20](F20-eta-and-live-tracking.md), the order bundle and offline sync in [F21](F21-offline-and-low-network.md), and cash in [F22](F22-rider-cash-and-settlement.md). The rider app screens are not built here.
+
+## GET /rider/tips
+Query: `from`, `to` (Indian days, default the last 7 days), `limit` (default 50, up to 200). 200: `{ "data": { "from": "2026-11-01", "to": "2026-11-07", "totals": { "count": 4, "total": 7000, "owed": 3000, "paid": 4000 }, "items": [{ "orderId": "...", "orderNo": "DS-1042", "amount": 2000, "deliveredAt": "2026-11-07T10:30:00.000Z", "status": "owed", "paidAt": null }] } }`. Amounts are paise. `owed` is what the owner has not yet paid out. See [F22](F22-rider-cash-and-settlement.md).

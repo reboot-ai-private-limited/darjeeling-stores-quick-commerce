@@ -332,3 +332,26 @@ describe("the admin's refunds", () => {
     expect(over.body.error.code).toBe("REFUND_EXCEEDS_AMOUNT");
   });
 });
+
+describe("non-returnable products", () => {
+  it("refuses a change-of-mind request for a product marked non-returnable, but still refunds it when damaged or missing", async () => {
+    const o = await delivered();
+    const { tomato } = await shelves();
+    expect((await f.send("put", `/admin/products/${tomato.id}`, { isReturnable: false })).status).toBe(200);
+    const mediaId = await photo();
+    const other = await ask(o.id, { reason: "other", items: [{ orderItemIndex: 0, qty: 1 }], photoMediaIds: [mediaId] });
+    expect(other.status).toBe(422);
+    expect(other.body.error).toMatchObject({ code: "REFUND_NOT_ALLOWED", details: { reason: "category_not_eligible" } });
+    const damaged = await ask(o.id, { reason: "damaged_item", items: [{ orderItemIndex: 0, qty: 1 }], customerNote: "Crushed", photoMediaIds: [mediaId] });
+    expect(damaged.status, JSON.stringify(damaged.body)).toBe(201);
+  });
+
+  it("allows a change-of-mind request again once the product is returnable", async () => {
+    const o = await delivered();
+    const { tomato } = await shelves();
+    await f.send("put", `/admin/products/${tomato.id}`, { isReturnable: false });
+    await f.send("put", `/admin/products/${tomato.id}`, { isReturnable: true });
+    const res = await ask(o.id, { reason: "other", items: [{ orderItemIndex: 0, qty: 1 }], photoMediaIds: [await photo()] });
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+  });
+});

@@ -1,11 +1,11 @@
 import { AppError, conflict, notFound, validation } from "../domain/errors.js";
 import {
-  assertDistinctSkus, assertProductInfo, assertTypeMatchesStockMode, buildTree, nameKey, similarNames, slugify, toCsv, wouldCreateCycle,
-  type Category, type CategoryNode, type Product, type ProductImage, type Variant,
+  assertDistinctSkus, assertExtraCategories, assertProductInfo, assertTypeMatchesStockMode, assertVariantAttributes, buildTree, nameKey, similarNames, slugify, toCsv, wouldCreateCycle,
+  type Brand, type Category, type CategoryNode, type Product, type ProductImage, type Variant,
 } from "../domain/product.js";
 import type { CatalogDeps, CatalogTx, Ctx } from "./ports.js";
 import type {
-  CategoryInput, CategoryPatch, ProductInput, ProductListQuery, ProductPatch, ProductView, VariantInput, VariantPatch,
+  BrandInput, BrandPatch, BrandView, CategoryInput, CategoryPatch, ProductInput, ProductListQuery, ProductPatch, ProductView, VariantInput, VariantPatch,
 } from "./types.js";
 
 const encodeCursor = (id: string) => Buffer.from(id).toString("base64url");
@@ -21,8 +21,9 @@ export function createCatalogService(deps: CatalogDeps) {
 
   async function view(product: Product): Promise<ProductView> {
     const urls = await media.urls(product.images.map(image => image.mediaId));
+    const brand = product.brandId ? await store.getBrand(product.brandId) : null;
     const { nameKey: _unused, ...rest } = product;
-    return { ...rest, images: product.images.map(image => ({ ...image, urls: urls[image.mediaId] ?? {} })) };
+    return { ...rest, brand: brand ? { id: brand.id, name: brand.name } : null, images: product.images.map(image => ({ ...image, urls: urls[image.mediaId] ?? {} })) };
   }
 
   function requireProduct(product: Product | null): Product {
@@ -33,6 +34,13 @@ export function createCatalogService(deps: CatalogDeps) {
   async function assertSkusFree(tx: CatalogTx, skus: string[], excludeProductId?: string) {
     const owners = await tx.findSkuOwners(skus, excludeProductId);
     if (owners.length > 0) throw conflict(`SKU ${owners[0]!.sku} is already used by another product`, { field: "sku", sku: owners[0]!.sku });
+  }
+
+  /** A product's brand must exist and be active; its extra categories must all exist. */
+  async function assertTaxonomy(tx: CatalogTx, brandId: string | null, primaryId: string, extraIds: readonly string[]) {
+    if (brandId) { const brand = await tx.getBrand(brandId); if (!brand) throw notFound("Brand"); if (!brand.isActive) throw conflict("That brand is switched off", { field: "brandId" }); }
+    assertExtraCategories(primaryId, extraIds);
+    for (const categoryId of extraIds) if (!(await tx.getCategory(categoryId))) throw notFound("Category");
   }
 
   /** Re-read the saved product, apply a change, bump delta-sync revisions afterwards. */
@@ -104,10 +112,64 @@ export function createCatalogService(deps: CatalogDeps) {
       });
     },
 
+    // ---------- brands ----------
+    async listBrands(): Promise<BrandView[]> {
+      const brands = await store.listBrands();
+      const urls = await media.urls(brands.flatMap(b => (b.logoMediaId ? [b.logoMediaId] : [])));
+      return brands.map(b => ({ ...b, logoUrls: b.logoMediaId ? urls[b.logoMediaId] ?? {} : {} }));
+    },
+
+    async createBrand(input: BrandInput): Promise<BrandView> {
+      const at = now();
+      const brand: Brand = { id: newId(), name: input.name, slug: slugify(input.name), logoMediaId: input.logoMediaId, sortOrder: input.sortOrder, isActive: true, createdAt: at, updatedAt: at };
+      if (input.logoMediaId) {
+        if (!(await media.describe(input.logoMediaId))) throw notFound("Media");
+        await media.claim?.(input.logoMediaId, { type: "brand", id: brand.id });
+      }
+      await store.transaction(tx => tx.insertBrand(brand));
+      return { ...brand, logoUrls: input.logoMediaId ? (await media.urls([input.logoMediaId]))[input.logoMediaId] ?? {} : {} };
+    },
+
+    async updateBrand(id: string, patch: BrandPatch): Promise<BrandView> {
+      const current = await store.getBrand(id);
+      if (!current) throw notFound("Brand");
+      if (patch.logoMediaId && patch.logoMediaId !== current.logoMediaId) {
+        if (!(await media.describe(patch.logoMediaId))) throw notFound("Media");
+        await media.claim?.(patch.logoMediaId, { type: "brand", id });
+      }
+      const saved = await store.transaction(async tx => {
+        const brand = await tx.getBrand(id);
+        if (!brand) throw notFound("Brand");
+        if (patch.name !== undefined && patch.name !== brand.name) { brand.name = patch.name; brand.slug = slugify(patch.name); }
+        if (patch.logoMediaId !== undefined) brand.logoMediaId = patch.logoMediaId;
+        if (patch.sortOrder !== undefined) brand.sortOrder = patch.sortOrder;
+        if (patch.isActive !== undefined) brand.isActive = patch.isActive;
+        brand.updatedAt = now();
+        await tx.saveBrand(brand);
+        return brand;
+      });
+      if (patch.logoMediaId !== undefined && current.logoMediaId && current.logoMediaId !== patch.logoMediaId) await media.remove(current.logoMediaId, "brand_logo_replaced");
+      return { ...saved, logoUrls: saved.logoMediaId ? (await media.urls([saved.logoMediaId]))[saved.logoMediaId] ?? {} : {} };
+    },
+
+    async deleteBrand(ctx: Ctx, id: string): Promise<void> {
+      let logo: string | null = null;
+      await store.transaction(async tx => {
+        const brand = await tx.getBrand(id);
+        if (!brand) throw notFound("Brand");
+        if ((await tx.countProductsOfBrand(id)) > 0) throw conflict("Products still use this brand; switch it off instead", { reason: "has_products" });
+        logo = brand.logoMediaId;
+        await tx.deleteBrand(id);
+        await tx.audit(ctx, { action: "catalog.brand.delete", entityType: "brand", entityId: id });
+      });
+      if (logo) await media.remove(logo, "brand_deleted");
+    },
+
     // ---------- products ----------
     async createProduct(input: ProductInput): Promise<ProductView> {
       assertTypeMatchesStockMode(input.type, input.stockMode);
       assertDistinctSkus(input.variants);
+      for (const v of input.variants) assertVariantAttributes(v.attributes);
       assertProductInfo(input);
       const at = now();
       const product: Product = {
@@ -115,11 +177,13 @@ export function createCatalogService(deps: CatalogDeps) {
         description: input.description, categoryId: input.categoryId, type: input.type, stockMode: input.stockMode,
         tags: input.tags, highlights: input.highlights, keyInfo: input.keyInfo, nutrition: input.nutrition, infoSections: input.infoSections,
         images: [], gstRate: input.gstRate, hsnCode: input.hsnCode, status: input.status, sortOrder: input.sortOrder,
-        variants: input.variants.map(v => ({ id: newId(), label: v.label, weightGrams: v.weightGrams, sku: v.sku, barcode: v.barcode, isActive: true })),
+        brandId: input.brandId, foodType: input.foodType, extraCategoryIds: input.extraCategoryIds, badge: input.badge, isReturnable: input.isReturnable,
+        variants: input.variants.map(v => ({ id: newId(), label: v.label, weightGrams: v.weightGrams, sku: v.sku, barcode: v.barcode, isActive: true, attributes: v.attributes })),
         createdAt: at, updatedAt: at,
       };
       await store.transaction(async tx => {
         if (!(await tx.getCategory(input.categoryId))) throw notFound("Category");
+        await assertTaxonomy(tx, input.brandId, input.categoryId, input.extraCategoryIds);
         await assertSkusFree(tx, product.variants.map(v => v.sku));
         await tx.insertProduct(product);
       });
@@ -134,6 +198,7 @@ export function createCatalogService(deps: CatalogDeps) {
         limit: query.limit + 1,
         ...(query.q !== undefined && { q: query.q }), ...(query.categoryId !== undefined && { categoryId: query.categoryId }),
         ...(query.status !== undefined && { status: query.status }), ...(query.type !== undefined && { type: query.type }),
+        ...(query.brandId !== undefined && { brandId: query.brandId }), ...(query.foodType !== undefined && { foodType: query.foodType }),
         ...(afterId !== undefined && { afterId }),
       });
       const page = rows.slice(0, query.limit);
@@ -154,7 +219,17 @@ export function createCatalogService(deps: CatalogDeps) {
         if (patch.categoryId !== undefined && patch.categoryId !== current.categoryId) {
           if (!(await tx.getCategory(patch.categoryId))) throw notFound("Category");
           current.categoryId = patch.categoryId;
+          // The new main category is no longer an extra one.
+          current.extraCategoryIds = current.extraCategoryIds.filter(id => id !== patch.categoryId);
         }
+        if (patch.extraCategoryIds !== undefined) current.extraCategoryIds = patch.extraCategoryIds;
+        if (patch.brandId !== undefined) current.brandId = patch.brandId;
+        if (patch.brandId !== undefined || patch.extraCategoryIds !== undefined || patch.categoryId !== undefined) {
+          await assertTaxonomy(tx, patch.brandId !== undefined ? patch.brandId : null, current.categoryId, current.extraCategoryIds);
+        }
+        if (patch.foodType !== undefined) current.foodType = patch.foodType;
+        if (patch.badge !== undefined) current.badge = patch.badge;
+        if (patch.isReturnable !== undefined) current.isReturnable = patch.isReturnable;
         if (patch.name !== undefined && patch.name !== current.name) { current.name = patch.name; current.nameKey = nameKey(patch.name); current.slug = slugify(patch.name); }
         if (patch.description !== undefined) current.description = patch.description;
         if (patch.tags !== undefined) current.tags = patch.tags;
@@ -203,8 +278,9 @@ export function createCatalogService(deps: CatalogDeps) {
     async addVariant(id: string, input: VariantInput): Promise<ProductView> {
       return view(await changeProduct(id, async (product, tx) => {
         if (product.variants.some(v => v.sku === input.sku)) throw validation(`SKU ${input.sku} is used twice in this product`, { field: "sku" });
+        assertVariantAttributes(input.attributes);
         await assertSkusFree(tx, [input.sku], id);
-        product.variants.push({ id: newId(), label: input.label, weightGrams: input.weightGrams, sku: input.sku, barcode: input.barcode, isActive: true });
+        product.variants.push({ id: newId(), label: input.label, weightGrams: input.weightGrams, sku: input.sku, barcode: input.barcode, isActive: true, attributes: input.attributes });
       }));
     },
 
@@ -225,6 +301,7 @@ export function createCatalogService(deps: CatalogDeps) {
         }
         if (patch.label !== undefined) variant.label = patch.label;
         if (patch.barcode !== undefined) variant.barcode = patch.barcode;
+        if (patch.attributes !== undefined) { assertVariantAttributes(patch.attributes); variant.attributes = patch.attributes; }
         if (patch.isActive !== undefined) variant.isActive = patch.isActive;
       }));
     },

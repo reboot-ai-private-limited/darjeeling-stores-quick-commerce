@@ -24,5 +24,8 @@ export interface PreorderSource {
   }[]>;
 }
 
-export interface HoursSettings { slotLookaheadDays: number }
-export const DEFAULT_HOURS_SETTINGS: HoursSettings = { slotLookaheadDays: 1 };
+/** What a warehouse gets when the admin leaves a field out. A warehouse's own saved values always win. */
+export interface HoursSettings {
+  lastOrderMinutesBeforeClose: number; afterHoursMode: "closed" | "pre_order"; cutoffMinutesBeforeSlot: number; packLeadMinutes: number;
+}
+export const DEFAULT_HOURS_SETTINGS: HoursSettings = { lastOrderMinutesBeforeClose: 15, afterHoursMode: "closed", cutoffMinutesBeforeSlot: 60, packLeadMinutes: 45 };

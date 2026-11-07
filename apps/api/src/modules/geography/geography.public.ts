@@ -114,6 +114,8 @@ export {
   type GeographyErrorCode,
 };
 
+export { createGeographyPort } from "./geography-port.js";
+
 export function warehouseDirectoryFrom(geography: { warehouseStore: WarehouseStore }): {
   get(id: string): Promise<{ id: string; zoneId: string; isEnabled: boolean } | null>;
 } {

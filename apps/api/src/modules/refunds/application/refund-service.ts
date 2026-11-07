@@ -78,7 +78,7 @@ export function createRefundService(deps: RefundDeps) {
         if (!item || item.status === "unavailable") throw validation("That item is not in the order", { field: "items", orderItemIndex: wanted.orderItemIndex });
         if (wanted.qty < 1 || wanted.qty > item.qty) throw validation("The quantity is more than was delivered", { field: "items", orderItemIndex: wanted.orderItemIndex });
         if (taken.has(wanted.orderItemIndex)) throw conflict("A refund was already asked for this item", { orderItemIndex: wanted.orderItemIndex });
-        if (!(await eligibility.eligible(item.productId))) throw refuse("category_not_eligible", `${item.name} cannot be refunded after delivery`);
+        if (!(await eligibility.eligible(item.productId, input.reason))) throw refuse("category_not_eligible", `${item.name} cannot be returned. A refund is possible only if it arrived damaged or missing`);
         value += item.unitPrice * wanted.qty;
       }
       if (new Set(input.items.map(i => i.orderItemIndex)).size !== input.items.length) throw validation("Each item can be listed once", { field: "items" });

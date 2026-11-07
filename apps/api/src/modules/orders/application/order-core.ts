@@ -41,8 +41,10 @@ export function refundOnCancel(order: Order, siblings: readonly Order[]): number
   const net = order.items.reduce((sum, i) => sum + (i.status === "unavailable" ? 0 : i.lineTotal), 0) - order.allocatedDiscount;
   const others = siblings.filter(s => s.id !== order.id);
   const wholeGroup = others.every(s => s.status === "CANCELLED" || (ACTIVE_BEFORE_PICKUP as readonly string[]).includes(s.status));
-  const fees = order.allocatedCharges.reduce((sum, c) => sum + c.amount, 0);
-  return Math.min(order.paidAmount, Math.max(0, net) + (wholeGroup && others.every(s => s.status === "CANCELLED") ? fees : 0));
+  const fees = order.allocatedCharges.filter(c => c.type !== "tip").reduce((sum, c) => sum + c.amount, 0);
+  // A tip is for the rider of this delivery, so it comes back with this order even when the other deliveries of the group still go ahead.
+  const tip = order.allocatedCharges.filter(c => c.type === "tip").reduce((sum, c) => sum + c.amount, 0);
+  return Math.min(order.paidAmount, Math.max(0, net) + tip + (wholeGroup && others.every(s => s.status === "CANCELLED") ? fees : 0));
 }
 
 /** The single writer of order status (F14) and the effects that follow a change. */
@@ -103,8 +105,9 @@ export function createOrderCore(deps: OrderDeps) {
       if (refund) await store.patch(order.id, { refundStatus: "pending" });
     }
     await notifier.cancelled(order.userId, order, reason).catch(() => undefined);
-    const fees = order.allocatedCharges.reduce((sum, c) => sum + c.amount, 0);
-    return { refund, feesRefunded: Boolean(refund) && fees > 0 && amount >= order.itemsSubtotal - order.allocatedDiscount + fees };
+    const fees = order.allocatedCharges.filter(c => c.type !== "tip").reduce((sum, c) => sum + c.amount, 0);
+    const tip = order.allocatedCharges.filter(c => c.type === "tip").reduce((sum, c) => sum + c.amount, 0);
+    return { refund, feesRefunded: Boolean(refund) && fees > 0 && amount >= order.itemsSubtotal - order.allocatedDiscount + fees + tip };
   }
 
   /** The one function that changes `status`. Illegal moves are refused unless `force` is set. */

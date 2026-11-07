@@ -1,4 +1,5 @@
 import type { Geography } from "../../../platform/geography.js";
+import type { SettingsProvider } from "../../../platform/settings.js";
 import type { Cart } from "../domain/cart.js";
 
 export interface QuoteLine { productId: string; variantId: string; name: string; variantLabel: string; weightGrams: number; qty: number; unitPrice: number; lineTotal: number }
@@ -61,12 +62,15 @@ export interface HoursSource {
 export interface CartSettings {
   quoteValiditySeconds: number; maxItemsPerOrder: number; maxQtyPerItem: number; maxSplitsPerOrder: number;
   packMinutes: number; riderArrivalMinutes: number; codMaxAmount: number; defaultMinOrder: number; taxInclusive: boolean;
+  /** Rider tips added at checkout (paise). `tipPresets` are the quick amounts; `tipMaxAmount` is the most allowed. */
+  tipsEnabled: boolean; tipMaxAmount: number; tipPresets: number[];
 }
 export const DEFAULT_CART_SETTINGS: CartSettings = {
   quoteValiditySeconds: 300, maxItemsPerOrder: 40, maxQtyPerItem: 10, maxSplitsPerOrder: 2, packMinutes: 5, riderArrivalMinutes: 5, codMaxAmount: 200_000, defaultMinOrder: 0, taxInclusive: true,
+  tipsEnabled: true, tipMaxAmount: 20_000, tipPresets: [1000, 2000, 5000],
 };
 
 export interface CartDeps {
   store: CartStore; lines: LineSource; addresses: AddressSource; geography: Geography; pricing: PricingSource; travel: TravelTime; customers: CustomerPolicy;
-  hours: HoursSource; settings: CartSettings; now: () => Date; newId: () => string;
+  hours: HoursSource; settings: SettingsProvider<CartSettings>; now: () => Date; newId: () => string;
 }

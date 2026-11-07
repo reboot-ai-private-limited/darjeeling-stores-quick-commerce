@@ -1,5 +1,5 @@
 import type { Geography, GeoZone } from "../../../platform/geography.js";
-import { notFound, validation, type Category, type Product } from "../../catalog/catalog.public.js";
+import { notFound, validation, type Category, type FoodType, type Product } from "../../catalog/catalog.public.js";
 import type { Offering } from "../../offerings/offerings.public.js";
 import type { BannerSource, CatalogReader, DiscoverySettings, MediaUrls, StoreSettings, ZoneOfferingsSource } from "./ports.js";
 import { latestRev, resolveProduct, sellersOf, type ZoneContext, type ZoneProduct } from "./zone-product.js";
@@ -30,9 +30,9 @@ export function createZoneCatalogService(deps: {
     return zone;
   }
   async function contextFor(zoneId: string): Promise<ZoneContext> {
-    const warehouses = await geography.warehousesOfZone(zoneId);
+    const [warehouses, brands] = await Promise.all([geography.warehousesOfZone(zoneId), catalog.listBrands()]);
     return {
-      warehouses: new Map(warehouses.map(w => [w.id, w])), zoneOpen: warehouses.some(w => w.isEnabled && w.isOpenNow), now: now(), maxQtyPerItem: settings.maxQtyPerItem,
+      warehouses: new Map(warehouses.map(w => [w.id, w])), brands: new Map(brands.filter(b => b.isActive).map(b => [b.id, { id: b.id, name: b.name }])), zoneOpen: warehouses.some(w => w.isEnabled && w.isOpenNow), now: now(), maxQtyPerItem: settings.maxQtyPerItem,
     };
   }
   const byProduct = (offerings: readonly Offering[]) => {
@@ -59,6 +59,8 @@ export function createZoneCatalogService(deps: {
     return { zone, ctx, resolved };
   }
 
+  /** A product belongs to its main category and to any extra ones. */
+  const inCategories = (entry: ZoneProduct, ids: ReadonlySet<string>) => entry.categoryIds.some(id => ids.has(id));
   const visible = (entry: ZoneProduct) => settings.showOutOfStockItems || entry.available;
 
   /** Active categories that have something to sell somewhere beneath them, as a tree. */
@@ -85,9 +87,9 @@ export function createZoneCatalogService(deps: {
     }
     return ids;
   }
-  async function categoryView(categories: Category[], resolved: { product: Product }[]) {
+  async function categoryView(categories: Category[], resolved: { product: Product; entry: ZoneProduct }[]) {
     const urls = await imageUrls([], categories.map(c => c.imageMediaId));
-    return categoryTree(categories, new Set(resolved.map(r => r.product.categoryId)), c => (c.imageMediaId ? urls[c.imageMediaId]?.["320"] ?? null : null));
+    return categoryTree(categories, new Set(resolved.flatMap(r => r.entry.categoryIds)), c => (c.imageMediaId ? urls[c.imageMediaId]?.["320"] ?? null : null));
   }
 
   return {
@@ -100,7 +102,7 @@ export function createZoneCatalogService(deps: {
       const bannerUrls = await imageUrls([], bannerList.map(b => b.imageMediaId));
       const sections = tree.slice(0, HOME_SECTIONS).flatMap(root => {
         const ids = subtree(categories, root.id);
-        const products = resolved.filter(r => ids.has(r.product.categoryId) && visible(r.entry)).slice(0, SECTION_SIZE).map(r => r.entry);
+        const products = resolved.filter(r => inCategories(r.entry, ids) && visible(r.entry)).slice(0, SECTION_SIZE).map(r => r.entry);
         return products.length > 0 ? [{ title: root.name, categoryId: root.id, products }] : [];
       });
       return {
@@ -118,15 +120,19 @@ export function createZoneCatalogService(deps: {
       return (await categoryView(await catalog.listCategories(), resolved)).tree;
     },
 
-    async products(zoneId: string, query: { categoryId?: string | undefined; limit?: number | undefined; cursor?: string | undefined; inStockOnly?: boolean | undefined }) {
+    async products(zoneId: string, query: {
+      categoryId?: string | undefined; brandId?: string | undefined; foodType?: FoodType | undefined; limit?: number | undefined; cursor?: string | undefined; inStockOnly?: boolean | undefined;
+    }) {
       const { resolved } = await snapshot(zoneId);
       let list = resolved;
       if (query.categoryId !== undefined) {
         const categories = await catalog.listCategories();
         if (!categories.some(c => c.id === query.categoryId && c.isActive)) throw notFound("Category");
         const ids = subtree(categories, query.categoryId);
-        list = list.filter(r => ids.has(r.product.categoryId));
+        list = list.filter(r => inCategories(r.entry, ids));
       }
+      if (query.brandId !== undefined) list = list.filter(r => r.product.brandId === query.brandId);
+      if (query.foodType !== undefined) list = list.filter(r => r.product.foodType === query.foodType);
       list = list.filter(r => visible(r.entry) && (!query.inStockOnly || r.entry.available));
       let start = 0;
       if (query.cursor !== undefined) {
@@ -140,6 +146,16 @@ export function createZoneCatalogService(deps: {
       return { items: page.map(r => r.entry), nextCursor: start + limit < list.length ? encodeCursor(page[page.length - 1]!.product.id) : null };
     },
 
+    /** The brands that have something to sell in the zone, for a brand page. Switched-off brands are left out. */
+    async brands(zoneId: string) {
+      const { ctx, resolved } = await snapshot(zoneId);
+      const counts = new Map<string, number>();
+      for (const { entry } of resolved) if (entry.brand && visible(entry)) counts.set(entry.brand.id, (counts.get(entry.brand.id) ?? 0) + 1);
+      const brands = (await catalog.listBrands()).filter(b => b.isActive && counts.has(b.id) && ctx.brands.has(b.id));
+      const urls = await imageUrls([], brands.map(b => b.logoMediaId));
+      return brands.map(b => ({ id: b.id, name: b.name, slug: b.slug, logoUrl: b.logoMediaId ? urls[b.logoMediaId]?.["320"] ?? null : null, productCount: counts.get(b.id)! }));
+    },
+
     async product(zoneId: string, productId: string): Promise<ProductDetail> {
       await zoneOrThrow(zoneId);
       const [product] = await catalog.getProducts([productId]);
@@ -151,13 +167,14 @@ export function createZoneCatalogService(deps: {
     },
 
     async search(zoneId: string, q: string, limit: number) {
-      const { resolved } = await snapshot(zoneId);
+      const { ctx, resolved } = await snapshot(zoneId);
       const key = squash(q);
       if (!key) return [];
       const lower = q.trim().toLowerCase();
       const score = (p: Product): number => {
         if (p.nameKey.startsWith(key)) return 0;
         if (p.nameKey.includes(key)) return 1;
+        if (p.brandId && squash(ctx.brands.get(p.brandId)?.name ?? "").includes(key)) return 2;
         if (p.tags.some(t => squash(t).includes(key))) return 2;
         if (p.variants.some(v => v.sku.toLowerCase().includes(lower))) return 3;
         return 9;

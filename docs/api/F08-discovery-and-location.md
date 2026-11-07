@@ -10,7 +10,8 @@ Location → zone resolution is in [F03](F03-zones-and-warehouses.md) (`POST /lo
 |---|---|---|---|
 | `GET` | `/catalog/home` | Public | Home screen payload for a zone |
 | `GET` | `/catalog/categories` | Public | Category tree for a zone |
-| `GET` | `/catalog/products` | Public | Products of a category (zone catalog) |
+| `GET` | `/catalog/products` | Public | Products of a category, brand or food type (zone catalog) |
+| `GET` | `/catalog/brands` | Public | Brands that have something to sell in the zone |
 | `GET` | `/catalog/products/:id` | Public | One product with all sizes |
 | `GET` | `/catalog/search` | Public | Instant search |
 | `GET` | `/catalog/changes` | Public | Delta sync since a revision |
@@ -150,3 +151,6 @@ Body: `{ "phone": "+919876543210", "location": { "lat": 27.2, "lng": 88.4 }, "lo
 - **Revisions.** Every offering has a `rev` taken from one counter inside the same transaction as the change, so revisions are handed out in commit order and a client that has seen revision N has seen every change up to N. Changes to the master product (rename, images, sizes, archive) bump the `rev` of its offerings too.
 - **Settings** (module options for now): `showOutOfStockItems` (true), `maxQtyPerItem` (none), and the 500-product limit before a full reload.
 - **Known shortcuts.** Each catalog call reads the zone's offerings and products once and works in memory, which is fine for a few thousand products; add a short cache when catalogs grow. Search is a simple contains match on names, tags and SKUs, not a text index. Lists are ordered by shelf position and name with an opaque cursor, so a product added mid-way can shift later pages by one.
+
+## Brand, food type, badge and categories on products
+Every product card and the detail view now also carry `brand: { id, name } | null`, `foodType`, `badge`, `isReturnable`, `categoryIds` (the main category first, then the extra ones) and, on each variant, `attributes` ([F04](F04-master-catalog.md)). `GET /catalog/products` accepts `brandId` and `foodType` (`veg`, `non_veg`, `egg`, `vegan`) next to `categoryId`; a product listed under extra categories appears in each of them. `GET /catalog/brands?zoneId=` returns `[{ id, name, slug, logoUrl, productCount }]` for brands that sell something in the zone, for a brand page. Search also matches the brand name.

@@ -26,6 +26,17 @@ const schema = sessionSettings.extend({
   mockOTP: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
   JWT_SECRET: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
   STAFF_TOTP_KEY: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  /** Locks delivery codes at rest. When left out, a separate key is derived from JWT_SECRET, so it still never falls back to a built-in key. */
+  ORDER_OTP_KEY: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  /** Signs the customer's public tracking links. Derived from JWT_SECRET when left out. */
+  TRACKING_TOKEN_SECRET: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  /** Where customers open a tracking link, for example https://darjeelingstores.in (a link is /track/<token> under it). Without it there are no links. */
+  TRACKING_BASE_URL: z.url().refine(value => value.startsWith("http://") || value.startsWith("https://"), "must be an HTTP(S) URL").optional(),
+  /** Doorstep UPI details for the rider app's QR code. */
+  UPI_VPA: z.string().regex(/^[A-Za-z0-9._-]{2,64}@[A-Za-z0-9]{2,32}$/).optional(),
+  UPI_PAYEE_NAME: z.string().trim().min(1).max(60).optional(),
+  /** Road travel times for ETAs (Google Routes). Without it the straight-line estimate is used. */
+  GOOGLE_MAPS_API_KEY: z.string().trim().min(10).max(200).optional(),
   PUBLIC_APP_CONFIG_JSON: z.string().default("{}").transform((value, context) => {
     try { return JSON.parse(value) as unknown; }
     catch { context.addIssue({ code: "custom", message: "Must be valid JSON" }); return z.NEVER; }
@@ -40,6 +51,7 @@ const schema = sessionSettings.extend({
   if (config.mockOTP && config.NODE_ENV !== "development") context.addIssue({ code: "custom", path: ["mockOTP"], message: "Mock OTP requires development mode" });
   if (config.mockOTP && !config.JWT_SECRET) context.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "JWT signing key required" });
   if (!config.mockOTP && config.JWT_SECRET && !config.STAFF_TOTP_KEY) context.addIssue({ code: "custom", path: ["STAFF_TOTP_KEY"], message: "Staff authentication requires a separate encryption key" });
+  if (config.UPI_VPA && !config.UPI_PAYEE_NAME) context.addIssue({ code: "custom", path: ["UPI_PAYEE_NAME"], message: "Name the UPI payee together with the UPI address" });
   if (config.STAFF_TOTP_KEY && config.STAFF_TOTP_KEY === config.JWT_SECRET) context.addIssue({ code: "custom", path: ["STAFF_TOTP_KEY"], message: "Use an independent encryption key" });
   if (durationSeconds(config.ACCESS_TOKEN_TTL) >= durationSeconds(config.REFRESH_TOKEN_TTL)) context.addIssue({ code: "custom", path: ["REFRESH_TOKEN_TTL"], message: "Refresh lifetime must exceed access lifetime" });
   const secure = config.AUTH_COOKIE_SECURE === undefined ? config.NODE_ENV === "production" : config.AUTH_COOKIE_SECURE === "true";

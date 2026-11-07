@@ -1,6 +1,8 @@
 import request from "supertest";
 import { expect } from "vitest";
 import { createDev2Modules } from "../../../src/composition/dev2.js";
+import { createSettingsProviders } from "../../../src/composition/settings-providers.js";
+import { createSettingsModule } from "../../../src/modules/settings/settings.public.js";
 import type { StockEvent } from "../../../src/modules/offerings/offerings.public.js";
 import type { Banner, StoreSettingsValue } from "../../../src/modules/discovery/discovery.public.js";
 import { createFakeGeography, type FakeGeography } from "./fake-geography.js";
@@ -67,8 +69,10 @@ export interface Fixture {
 }
 
 /** `realOrders`: use the real orders module instead of the in-memory fake (the cart, order and delivery tests that run the whole journey). */
-export async function startFixture(databaseName: string, options: { realOrders?: boolean; realMoney?: boolean } = {}): Promise<Fixture> {
+export async function startFixture(databaseName: string, options: { realOrders?: boolean; realMoney?: boolean; liveSettings?: boolean } = {}): Promise<Fixture> {
   const h = await startHarness(databaseName);
+  /** `liveSettings`: the modules read the admin settings on every request and the settings routes are mounted, as in the real server. */
+  const live = options.liveSettings ? (() => { const settings = createSettingsModule({ connection: h.connection, auth: actorFromHeader }); return { routes: settings.routes, providers: createSettingsProviders(settings.service) }; })() : null;
   const events: StockEvent[] = [];
   const storage = createFakeStorage();
   const msg = createFakeMessaging();
@@ -92,10 +96,11 @@ export async function startFixture(databaseName: string, options: { realOrders?:
     ...(options.realOrders ? {} : { orders: orders.port }), ...(options.realMoney ? {} : { money: money.port }), paymentProvider: paymentsFake.provider, riderIdentity: accounts.identity, rider: riderFromHeader,
     trackingTokenSecret: "test-secret", syncSettings: { upi: { vpa: "darjeelingstores@bank", payeeName: "Darjeeling Stores" }, otpIterations: 1000 },
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,
+    ...(live && { cartSettings: live.providers.cart, pricingSettings: live.providers.pricing, stockThresholds: live.providers.stockThresholds, priceConflictMode: live.providers.priceConflictMode, hoursSettings: live.providers.hours }),
     warehouses: { get: async id => WAREHOUSES[id] ?? null },
     events: { publish: event => { events.push(event); } },
   });
-  const app = h.appWith(mods.routes);
+  const app = h.appWith([...mods.routes, ...(live?.routes ?? [])]);
   let counter = 0;
   const get = (path: string, who: Record<string, string> = admin) => request(app).get(api + path).set(who);
   const send: Fixture["send"] = (method, path, body, who = admin) => {

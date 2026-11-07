@@ -1,4 +1,4 @@
-import type { Category, Product, ProductStatus, ProductType } from "../domain/product.js";
+import type { Brand, Category, FoodType, Product, ProductStatus, ProductType } from "../domain/product.js";
 
 export interface Actor {
   userId: string; role: string; permissions: readonly string[];
@@ -8,13 +8,17 @@ export interface Actor {
 export interface Ctx { actor: Actor; requestId: string }
 export interface AuditEntry { action: string; entityType: string; entityId: string; warehouseId?: string }
 
-export interface ProductQuery { q?: string; categoryId?: string; status?: ProductStatus; type?: ProductType; afterId?: string; limit: number }
+export interface ProductQuery { q?: string; categoryId?: string; brandId?: string; foodType?: FoodType; status?: ProductStatus; type?: ProductType; afterId?: string; limit: number }
 
 export interface CatalogReads {
   getCategory(id: string): Promise<Category | null>;
   listCategories(): Promise<Category[]>;
   countChildren(id: string): Promise<number>;
   countProductsInCategory(id: string): Promise<number>;
+  getBrand(id: string): Promise<Brand | null>;
+  getBrands(ids: readonly string[]): Promise<Brand[]>;
+  listBrands(): Promise<Brand[]>;
+  countProductsOfBrand(id: string): Promise<number>;
   getProduct(id: string): Promise<Product | null>;
   getProducts(ids: readonly string[]): Promise<Product[]>;
   listProducts(query: ProductQuery): Promise<Product[]>;
@@ -28,6 +32,9 @@ export interface CatalogTx extends CatalogReads {
   insertCategory(category: Category): Promise<void>;
   saveCategory(category: Category): Promise<void>;
   deleteCategory(id: string): Promise<void>;
+  insertBrand(brand: Brand): Promise<void>;
+  saveBrand(brand: Brand): Promise<void>;
+  deleteBrand(id: string): Promise<void>;
   setCategoryOrder(updates: readonly { id: string; sortOrder: number }[], at: Date): Promise<void>;
   insertProduct(product: Product): Promise<void>;
   saveProduct(product: Product): Promise<void>;
@@ -47,7 +54,7 @@ export interface MediaPort {
   /** Ask for every stored size of the file to be deleted. */
   remove(mediaId: string, reason: string): Promise<void>;
   /** Record that the file now belongs to this owner (it then stops being "unattached"). Throws if the file cannot be used for it. */
-  claim?(mediaId: string, owner: { type: "product" | "category" | "banner"; id: string }): Promise<void>;
+  claim?(mediaId: string, owner: { type: "product" | "category" | "banner" | "brand"; id: string }): Promise<void>;
 }
 
 /** Implemented by the offerings module so the catalog can protect products that are already for sale. */

@@ -1,4 +1,5 @@
 import type { Connection } from "mongoose";
+import { liveSettings } from "../../platform/settings.js";
 import { Types } from "mongoose";
 import { AppError, denyAll, noCustomers, type AuthResolver, type CustomerResolver } from "../catalog/catalog.public.js";
 import { createRefundService } from "./application/refund-service.js";
@@ -25,7 +26,7 @@ export interface RefundsModuleOptions {
 /** Builds customer cancellation, refund requests and the admin refund list (F16). Call `store.ensureIndexes()` once after the database connects. */
 export function createRefundsModule(options: RefundsModuleOptions) {
   const store = createMongoRefundStore(options.connection);
-  const settings: RefundSettings = { ...DEFAULT_REFUND_SETTINGS, ...options.settings };
+  const settings: RefundSettings = liveSettings(DEFAULT_REFUND_SETTINGS, options.settings);
   const service = createRefundService({
     store, orders: options.orders, media: options.media ?? noRefundMedia, eligibility: options.eligibility ?? everythingEligible, notifier: options.notifier ?? silentRefundNotifier,
     settings, now: () => new Date(), newId: () => new Types.ObjectId().toHexString(),

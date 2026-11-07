@@ -44,7 +44,7 @@ const asOfferingVariant = ({ label: _label, ...v }: PlannedVariant): OfferingVar
 
 /** Copy products from one warehouse into another: a preview that saves nothing, then a commit of the (edited) rows (F06). */
 export function createImportService(deps: OfferingsDeps) {
-  const { store, warehouses, products, events, now, newId, thresholds } = deps;
+  const { store, warehouses, products, events, now, newId, thresholds, priceConflictMode } = deps;
 
   async function checkWarehouses(ctx: Ctx, sourceId: string, targetId: string) {
     if (sourceId === targetId) throw validation("The source and target warehouse must be different", { field: "targetWarehouseId" });
@@ -212,7 +212,7 @@ export function createImportService(deps: OfferingsDeps) {
           for (const c of findPriceConflicts(item.lines.variants.map(asOfferingVariant), others, at)) allConflicts.push({ productId: item.plan.productId, ...c });
           staged.push({ item, existing });
         }
-        if (allConflicts.length > 0) {
+        if (allConflicts.length > 0 && (await priceConflictMode()) === "block") {
           const first = allConflicts[0]!;
           throw new AppError("PRICE_CONFLICT", "Price differs from another warehouse in this zone", {
             productId: first.productId, variantId: first.variantId, conflicts: first.conflicts, canApplyToOthers: false, variants: allConflicts,
@@ -265,7 +265,7 @@ export function createImportService(deps: OfferingsDeps) {
           await tx.insertMovements(moves);
           await tx.insertPriceHistory(history);
           await tx.audit(ctx, { action: "offering.import", entityType: "warehouse_product", entityId: next.id, warehouseId: next.warehouseId });
-          await stockSideEffects(tx, thresholds, product, before, next, out, { revAlreadyBumped: true });
+          await stockSideEffects(tx, await thresholds({ warehouseId: next.warehouseId }), product, before, next, out, { revAlreadyBumped: true });
           offeringIds.push(next.id);
         }
         return { created, overwritten, offeringIds };
