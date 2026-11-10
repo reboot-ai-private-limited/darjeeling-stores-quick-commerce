@@ -47,6 +47,8 @@ const schema = sessionSettings.extend({
     try { const url = new URL(origin); return ["http:", "https:"].includes(url.protocol) && url.origin === origin; } catch { return false; }
   }), "must be comma-separated HTTP origins"),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
+  /** Requests one client address may make per minute before getting 429. 0 turns it off. */
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).max(100_000).default(600),
 }).superRefine((config, context) => {
   if (config.mockOTP && config.NODE_ENV !== "development") context.addIssue({ code: "custom", path: ["mockOTP"], message: "Mock OTP requires development mode" });
   if (config.mockOTP && !config.JWT_SECRET) context.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "JWT signing key required" });

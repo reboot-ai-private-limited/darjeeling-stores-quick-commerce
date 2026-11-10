@@ -105,6 +105,26 @@ export function createHoursService(deps: HoursDeps) {
       };
     },
 
+    /**
+     * What an editor needs for one warehouse: its saved hours and pre-order slots (or the defaults it would get on the first save), and any pause
+     * that is on now. `configured` is false until the first save, when the warehouse simply follows the geography module's own open flag.
+     */
+    async details(ctx: Ctx, warehouseId: string) {
+      const warehouse = await warehouseOf(ctx, warehouseId);
+      const [saved, pause, defaults] = await Promise.all([store.getHours(warehouseId), store.getPause("warehouse", warehouseId), deps.settings({ warehouseId })]);
+      const view = saved
+        ? hoursView(saved)
+        : {
+          warehouseId, hours: [] as HoursRule[], lastOrderMinutesBeforeClose: defaults.lastOrderMinutesBeforeClose, afterHoursMode: defaults.afterHoursMode,
+          preOrder: { ...DEFAULT_PREORDER, cutoffMinutesBeforeSlot: defaults.cutoffMinutesBeforeSlot, packLeadMinutes: defaults.packLeadMinutes },
+        };
+      const active = pause && pauseActive(pause, now()) ? pause : null;
+      return {
+        ...view, warehouse: { id: warehouse.id, name: warehouse.name, zoneId: warehouse.zoneId }, configured: saved !== null,
+        pause: active ? { active: true, message: active.message, until: active.until?.toISOString() ?? null } : null,
+      };
+    },
+
     async getHours(ctx: Ctx, warehouseId: string) { await warehouseOf(ctx, warehouseId); const h = await store.getHours(warehouseId); return h ? hoursView(h) : null; },
 
     async setHours(ctx: Ctx, warehouseId: string, body: { hours: HoursRule[]; lastOrderMinutesBeforeClose?: number | undefined; afterHoursMode?: "closed" | "pre_order" | undefined }) {

@@ -8,7 +8,7 @@ import { api, principalFromHeader } from "./support/harness.js";
 
 let f: Fixture;
 beforeAll(async () => { f = await startFixture("media_integration_test"); }, 180_000);
-afterAll(async () => { await f?.h.stop(); });
+afterAll(async () => { await f?.h.stop(); }, 60_000);
 beforeEach(async () => { await f.reset(); });
 
 const ANNA = "c1".repeat(12);

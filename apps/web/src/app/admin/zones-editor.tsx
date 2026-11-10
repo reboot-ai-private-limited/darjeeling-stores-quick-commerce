@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { GOOGLE_MAPS_KEY, GoogleZoneMap } from "./google-map";
 import { adminFetch, type AdminSession } from "./session-client";
 
 interface GeoPolygon {
@@ -402,7 +403,7 @@ export default function ZonesEditor({ session }: Props) {
                   width: "100%",
                   maxWidth: 360,
                   padding: 10,
-                  border: "1px solid #bacbbd",
+                  border: "1px solid #cbc5ba",
                   borderRadius: 6,
                   marginTop: 7,
                 }}
@@ -439,7 +440,7 @@ export default function ZonesEditor({ session }: Props) {
               Interactive Boundary Map (GeoJSON Polygon)
             </h3>
             <div className="admin-map-container">
-              <svg
+              {GOOGLE_MAPS_KEY ? <GoogleZoneMap coords={coords} onChange={setCoords} enabled={isEnabled} disabled={busy} /> : <svg
                 ref={svgRef}
                 className="admin-map-svg"
                 viewBox="0 0 400 300"
@@ -449,17 +450,17 @@ export default function ZonesEditor({ session }: Props) {
                 style={{ touchAction: "none", cursor: draggedIndex !== null ? "grabbing" : "crosshair" }}
               >
                 {/* Background grid lines */}
-                <line x1="0" y1="100" x2="400" y2="100" stroke="#e0e6e0" strokeWidth="0.5" />
-                <line x1="0" y1="200" x2="400" y2="200" stroke="#e0e6e0" strokeWidth="0.5" />
-                <line x1="133" y1="0" x2="133" y2="300" stroke="#e0e6e0" strokeWidth="0.5" />
-                <line x1="266" y1="0" x2="266" y2="300" stroke="#e0e6e0" strokeWidth="0.5" />
+                <line x1="0" y1="100" x2="400" y2="100" stroke="#e6e4e0" strokeWidth="0.5" />
+                <line x1="0" y1="200" x2="400" y2="200" stroke="#e6e4e0" strokeWidth="0.5" />
+                <line x1="133" y1="0" x2="133" y2="300" stroke="#e6e4e0" strokeWidth="0.5" />
+                <line x1="266" y1="0" x2="266" y2="300" stroke="#e6e4e0" strokeWidth="0.5" />
 
                 {/* Drawn polygon */}
                 {coords.length >= 3 && (
                   <polygon
                     points={svgPoints}
                     fill={isEnabled ? "rgba(40, 92, 70, 0.25)" : "rgba(100, 100, 100, 0.2)"}
-                    stroke={isEnabled ? "#285c46" : "#68716d"}
+                    stroke={isEnabled ? "#c62828" : "#716e68"}
                     strokeWidth="2"
                   />
                 )}
@@ -474,7 +475,7 @@ export default function ZonesEditor({ session }: Props) {
                         cx={toSvgX(lng)}
                         cy={toSvgY(lat)}
                         r={isDragged ? 8 : isEndpoint ? 6 : 5}
-                        fill={isDragged ? "#0b57d0" : i === 0 ? "#137333" : "#285c46"}
+                        fill={isDragged ? "#0b57d0" : i === 0 ? "#137333" : "#c62828"}
                         stroke="#fff"
                         strokeWidth={isDragged ? 2.5 : 1.5}
                         style={{ cursor: isDragged ? "grabbing" : "grab" }}
@@ -484,7 +485,7 @@ export default function ZonesEditor({ session }: Props) {
                         x={toSvgX(lng) + 8}
                         y={toSvgY(lat) + 3}
                         fontSize="9"
-                        fill="#252b29"
+                        fill="#2b2925"
                         fontFamily="monospace"
                         style={{ pointerEvents: "none", userSelect: "none" }}
                       >
@@ -493,10 +494,10 @@ export default function ZonesEditor({ session }: Props) {
                     </g>
                   );
                 })}
-              </svg>
+              </svg>}
               <div className="admin-map-overlay">
                 Lng: [{mapBounds.minX.toFixed(3)}, {mapBounds.maxX.toFixed(3)}] · Lat: [
-                {mapBounds.minY.toFixed(3)}, {mapBounds.maxY.toFixed(3)}] · Drag any point to reposition
+                {mapBounds.minY.toFixed(3)}, {mapBounds.maxY.toFixed(3)}] · Drag points to reposition, drag edge midpoints to add, right-click a point to delete
               </div>
             </div>
 
@@ -512,7 +513,7 @@ export default function ZonesEditor({ session }: Props) {
                   fontSize: 11,
                   padding: "4px 8px",
                   borderRadius: 4,
-                  border: "1px solid #bacbbd",
+                  border: "1px solid #cbc5ba",
                   background: "#fff",
                   cursor: "pointer",
                 }}

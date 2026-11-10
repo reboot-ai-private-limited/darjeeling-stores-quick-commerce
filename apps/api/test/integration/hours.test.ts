@@ -311,3 +311,30 @@ describe("ordering for a slot", () => {
     expect((await f.get(`/admin/preorders?date=${date}`, {})).status).toBe(401);
   });
 });
+
+describe("reading a warehouse's hours (for the admin editor)", () => {
+  it("shows the defaults before the first save, then what was saved, and any pause", async () => {
+    const before = await f.get(`/admin/warehouses/${W1}/hours`, admin);
+    expect(before.status, JSON.stringify(before.body)).toBe(200);
+    expect(before.body.data).toMatchObject({ configured: false, hours: [], lastOrderMinutesBeforeClose: 15, afterHoursMode: "closed", pause: null, warehouse: { id: W1 } });
+    expect(before.body.data.preOrder).toMatchObject({ enabled: false, slots: [], cutoffMinutesBeforeSlot: 60, packLeadMinutes: 45 });
+
+    expect((await setHours(W1, ALWAYS)).status).toBe(200);
+    expect((await setPreorder(W1, SLOTS)).status).toBe(200);
+    const saved = (await f.get(`/admin/warehouses/${W1}/hours`, admin)).body.data;
+    expect(saved).toMatchObject({ configured: true, lastOrderMinutesBeforeClose: 0, afterHoursMode: "pre_order", pause: null });
+    expect(saved.hours).toEqual(ALWAYS.hours);
+    expect(saved.preOrder.slots).toHaveLength(2);
+
+    expect((await f.send("post", "/admin/ops/pause", { scope: "warehouse", id: W1, message: "Road blocked", until: new Date(Date.now() + 3_600_000).toISOString() })).status).toBe(200);
+    expect((await f.get(`/admin/warehouses/${W1}/hours`, admin)).body.data.pause).toMatchObject({ active: true, message: "Road blocked" });
+    await f.send("post", "/admin/ops/resume", { scope: "warehouse", id: W1 });
+    expect((await f.get(`/admin/warehouses/${W1}/hours`, admin)).body.data.pause).toBeNull();
+  });
+
+  it("keeps staff to their own warehouses and needs a login", async () => {
+    expect((await f.get(`/admin/warehouses/${W2}/hours`, scoped(W1))).status).toBe(403);
+    expect((await f.get(`/admin/warehouses/${W1}/hours`, {})).status).toBe(401);
+    expect((await f.get(`/admin/warehouses/${"e".repeat(24)}/hours`, admin)).status).toBe(404);
+  });
+});

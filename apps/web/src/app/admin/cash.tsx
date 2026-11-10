@@ -454,9 +454,9 @@ function DepositFormTab({
           style={{
             flex: 1,
             padding: "8px 12px",
-            border: "1px solid #bacbbd",
+            border: "1px solid #cbc5ba",
             borderRadius: 6,
-            background: mode === "deposit" ? "#eef3ee" : "#fff",
+            background: mode === "deposit" ? "#f3f1ee" : "#fff",
             color: mode === "deposit" ? "var(--admin-accent)" : "inherit",
             fontWeight: mode === "deposit" ? 600 : 400,
             cursor: "pointer",
@@ -470,9 +470,9 @@ function DepositFormTab({
           style={{
             flex: 1,
             padding: "8px 12px",
-            border: "1px solid #bacbbd",
+            border: "1px solid #cbc5ba",
             borderRadius: 6,
-            background: mode === "adjust" ? "#eef3ee" : "#fff",
+            background: mode === "adjust" ? "#f3f1ee" : "#fff",
             color: mode === "adjust" ? "var(--admin-accent)" : "inherit",
             fontWeight: mode === "adjust" ? 600 : 400,
             cursor: "pointer",
@@ -500,7 +500,7 @@ function DepositFormTab({
             value={riderId}
             onChange={(e) => setRiderId(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           >
             <option value="">— Select Rider —</option>
             {riders.map((r) => (
@@ -516,7 +516,7 @@ function DepositFormTab({
             value={warehouseId}
             onChange={(e) => setWarehouseId(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           >
             <option value="">— Select Warehouse —</option>
             {warehouses.map((w) => (
@@ -535,7 +535,7 @@ function DepositFormTab({
             value={amountRs}
             onChange={(e) => setAmountRs(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           />
           {mode === "adjust" && (
             <small style={{ color: "var(--admin-muted)" }}>Negative number reduces rider liability; positive increases liability.</small>
@@ -551,7 +551,7 @@ function DepositFormTab({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", minHeight: 70, padding: 8, border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+            style={{ display: "block", marginTop: 4, width: "100%", minHeight: 70, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           />
         </label>
       </div>
@@ -692,9 +692,9 @@ function ReconciliationTab() {
           onClick={() => setReconSubTab("upi")}
           style={{
             padding: "8px 14px",
-            border: "1px solid #bacbbd",
+            border: "1px solid #cbc5ba",
             borderRadius: 6,
-            background: reconSubTab === "upi" ? "#eef3ee" : "#fff",
+            background: reconSubTab === "upi" ? "#f3f1ee" : "#fff",
             color: reconSubTab === "upi" ? "var(--admin-accent)" : "inherit",
             fontWeight: reconSubTab === "upi" ? 600 : 400,
             cursor: "pointer",
@@ -708,9 +708,9 @@ function ReconciliationTab() {
           onClick={() => setReconSubTab("offline")}
           style={{
             padding: "8px 14px",
-            border: "1px solid #bacbbd",
+            border: "1px solid #cbc5ba",
             borderRadius: 6,
-            background: reconSubTab === "offline" ? "#eef3ee" : "#fff",
+            background: reconSubTab === "offline" ? "#f3f1ee" : "#fff",
             color: reconSubTab === "offline" ? "var(--admin-accent)" : "inherit",
             fontWeight: reconSubTab === "offline" ? 600 : 400,
             cursor: "pointer",
@@ -738,7 +738,7 @@ function ReconciliationTab() {
                 value={reconOutcome}
                 onChange={(e) => setReconOutcome(e.target.value as typeof reconOutcome)}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="verified">Verified (Bank statement matched)</option>
                 <option value="not_received">Not Received (Rider owes as cash)</option>
@@ -755,7 +755,7 @@ function ReconciliationTab() {
                   onChange={(e) => setBankRef(e.target.value)}
                   placeholder="e.g. 329019283019"
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
             )}
@@ -766,7 +766,7 @@ function ReconciliationTab() {
                 onChange={(e) => setReconNote(e.target.value)}
                 placeholder="Optional explanation"
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
           </div>
@@ -795,7 +795,7 @@ function ReconciliationTab() {
                 value={reviewOutcome}
                 onChange={(e) => setReviewOutcome(e.target.value as "accepted" | "rejected")}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="accepted">Accept Delivery (Mark Order Completed)</option>
                 <option value="rejected">Reject Delivery (Send Order to Failed)</option>
@@ -808,7 +808,7 @@ function ReconciliationTab() {
                 onChange={(e) => setReviewNote(e.target.value)}
                 placeholder="Document your check (e.g. verified with customer over call)"
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 70, padding: 8, border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 70, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
           </div>

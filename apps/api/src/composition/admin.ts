@@ -50,5 +50,5 @@ export function createAdminModules({ connection, resolveStaff, trustedOrigins, e
   const audit = createAuditAdminModule({ connection, auth });
 
   const providers = createSettingsProviders(settings.service);
-  return { routes: [...settings.routes, ...reports.routes, ...customers.routes, ...audit.routes], ensureIndexes: () => settings.store.ensureIndexes(), auth, providers, settings: settings.service };
+  return { routes: [...settings.routes, ...reports.routes, ...customers.routes, ...audit.routes], ensureIndexes: async () => { await settings.store.ensureIndexes(); await audit.ensureIndexes(); }, auth, providers, settings: settings.service };
 }

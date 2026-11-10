@@ -327,7 +327,7 @@ function TemplatesTab() {
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
                   disabled={busy || editing !== "new"}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
               <label style={{ flex: 1, fontSize: 12 }}>
@@ -336,7 +336,7 @@ function TemplatesTab() {
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as typeof channel)}
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 >
                   <option value="push">Push (FCM)</option>
                   <option value="whatsapp">WhatsApp</option>
@@ -352,7 +352,7 @@ function TemplatesTab() {
                   value={category}
                   onChange={(e) => setCategory(e.target.value as typeof category)}
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 >
                   <option value="utility">Utility</option>
                   <option value="marketing">Marketing</option>
@@ -367,7 +367,7 @@ function TemplatesTab() {
                   onChange={(e) => setLanguage(e.target.value)}
                   placeholder="en or en_US"
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
             </div>
@@ -381,7 +381,7 @@ function TemplatesTab() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
             )}
@@ -396,7 +396,7 @@ function TemplatesTab() {
                   value={whatsappTemplateName}
                   onChange={(e) => setWhatsappTemplateName(e.target.value)}
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
             )}
@@ -410,7 +410,7 @@ function TemplatesTab() {
                 value={bodyText}
                 onChange={(e) => setBodyText(e.target.value)}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 90, padding: 8, border: "1px solid #bacbbd", borderRadius: 6, font: "inherit", resize: "vertical" }}
+                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 90, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", resize: "vertical" }}
               />
             </label>
 
@@ -481,7 +481,7 @@ function TemplatesTab() {
                       )}
                     </td>
                     <td>
-                      <span className="admin-badge" style={{ background: "#eef3ee", color: "#285c46" }}>
+                      <span className="admin-badge" style={{ background: "#f3f1ee", color: "#c62828" }}>
                         {t.channel}
                       </span>
                     </td>
@@ -498,7 +498,7 @@ function TemplatesTab() {
                     <td>
                       <button
                         onClick={() => startEdit(t)}
-                        style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                        style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
                       >
                         Edit
                       </button>
@@ -644,7 +644,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           />
         </label>
 
@@ -657,7 +657,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
             value={bodyText}
             onChange={(e) => setBodyText(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", minHeight: 80, padding: 8, border: "1px solid #bacbbd", borderRadius: 6, font: "inherit", resize: "vertical" }}
+            style={{ display: "block", marginTop: 4, width: "100%", minHeight: 80, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", resize: "vertical" }}
           />
         </label>
 
@@ -669,7 +669,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
             value={deepLink}
             onChange={(e) => setDeepLink(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           />
           <small style={{ color: "var(--admin-muted)" }}>Format: ds://[section]/[optional-id]</small>
         </label>
@@ -810,7 +810,7 @@ function LogsTab() {
                   <tr key={log.id}>
                     <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>{fmtDate(log.createdAt)}</td>
                     <td>
-                      <span className="admin-badge" style={{ background: "#eef3ee", color: "#285c46" }}>
+                      <span className="admin-badge" style={{ background: "#f3f1ee", color: "#c62828" }}>
                         {log.channel}
                       </span>
                     </td>
@@ -832,7 +832,7 @@ function LogsTab() {
                         <button
                           disabled={busy}
                           onClick={() => retryDelivery(log.id)}
-                          style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "var(--admin-accent)" }}
+                          style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "var(--admin-accent)" }}
                         >
                           Retry
                         </button>

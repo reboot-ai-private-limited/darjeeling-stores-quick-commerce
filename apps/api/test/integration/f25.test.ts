@@ -389,3 +389,13 @@ describe("audit search", () => {
     expect((await get("/admin/audit", "nobody")).status).toBe(403);
   });
 });
+
+describe("audit log indexes", () => {
+  it("are created so the audit search does not scan the whole log", async () => {
+    const audit = createAuditAdminModule({ connection: h.connection, auth: actor });
+    await audit.ensureIndexes();
+    await audit.ensureIndexes();
+    const keys = (await col("audit_log").indexes()).map(i => Object.keys(i.key).join(","));
+    expect(keys).toEqual(expect.arrayContaining(["entityType,entityId,_id", "actorId,_id", "action,_id", "warehouseId,_id", "at"]));
+  });
+});
