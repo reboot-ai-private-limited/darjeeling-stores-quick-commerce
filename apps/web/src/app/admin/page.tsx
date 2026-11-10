@@ -17,6 +17,8 @@ import Notifications from "./notifications";
 import Overview from "./overview";
 import Orders from "./orders";
 import Settings from "./settings";
+import Coupons from "./coupons";
+import Banners from "./banners";
 import { readAdminSession, type AdminSession } from "./session-client";
 import "./admin.css";
 
@@ -25,7 +27,7 @@ const groups = [
   { label: "Operations", items: ["Dispatch board"] },
   { label: "Fleet", items: ["Riders & fleet"] },
   { label: "Finance", items: ["Cash & settlement"] },
-  { label: "Engagement", items: ["Notifications & demand"] },
+  { label: "Engagement", items: ["Notifications & demand", "Coupons", "Banners"] },
   { label: "Organization", items: ["Warehouses", "Zones & localities", "Staff", "Roles & permissions"] },
   { label: "Catalog", items: ["Products & categories"] },
   { label: "Inventory", items: ["Offerings & stock"] },
@@ -46,6 +48,8 @@ const iconPaths: Record<string, string> = {
   "Offerings & stock": "M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z M4 13h2v-2H4z M18 13h2v-2h-2z M7 13h10v-2H7z",
   Security: "M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2",
   Settings: "M4 7h16 M4 17h16 M8 4v6 M16 14v6",
+  Coupons: "M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z M14 6v12",
+  Banners: "M3 5h18v14H3z M3 15l5-5 4 4 3-3 6 6",
   "Audit log": "M6 3h12v18H6z M9 7h6 M9 11h6 M9 15h4",
   Menu: "M4 6h16 M4 12h16 M4 18h16",
   Lock: "M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2",
@@ -64,6 +68,20 @@ export default function AdminPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [sessionCheckError, setSessionCheckError] = useState("");
   const [checkAttempt, setCheckAttempt] = useState(0);
+  const [navRestored, setNavRestored] = useState(false);
+  // Keep the current page across refreshes via the URL hash.
+  useEffect(() => {
+    try {
+      const h = decodeURIComponent(window.location.hash.slice(1));
+      if (h) setSection(h);
+    } catch { /* ignore malformed hash */ }
+    setNavRestored(true);
+  }, []);
+  useEffect(() => {
+    if (!navRestored) return;
+    const hash = section === "Overview" ? "" : `#${encodeURIComponent(section)}`;
+    if (window.location.hash !== hash) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+  }, [section, navRestored]);
   useEffect(() => {
     let active = true;
     setCheckingSession(true);
@@ -103,6 +121,7 @@ export default function AdminPage() {
     (item === "Dispatch board" && can("dispatch:manage")) ||
     (item === "Riders & fleet" && (can("riders:manage") || can("riders:view"))) ||
     (item === "Cash & settlement" && can("cash:manage")) ||
+    ((item === "Coupons" || item === "Banners") && can("pricing:manage")) ||
     (item === "Notifications & demand" && (can("notifications:manage") || can("notify_demand:view")));
   return <div className="admin-shell">
     <a className="admin-skip" href="#admin-main">Skip to content</a>
@@ -136,7 +155,7 @@ export default function AdminPage() {
             </button>
           </div>
           {geoTab === "zones" ? <ZonesEditor session={session} /> : <CitiesLocalities />}
-        </div> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : section === "Offerings & stock" ? <Inventory session={session} /> : section === "Dispatch board" ? <Dispatch session={session} /> : section === "Riders & fleet" ? <Riders session={session} /> : section === "Cash & settlement" ? <CashDesk session={session} /> : section === "Notifications & demand" ? <Notifications session={session} /> : section === "Orders" ? <Orders session={session} /> : section === "Settings" ? <Settings session={session} /> : <Overview session={session} onNavigate={setSection} />}
+        </div> : section === "Coupons" ? <Coupons session={session} /> : section === "Banners" ? <Banners session={session} /> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : section === "Offerings & stock" ? <Inventory session={session} /> : section === "Dispatch board" ? <Dispatch session={session} /> : section === "Riders & fleet" ? <Riders session={session} /> : section === "Cash & settlement" ? <CashDesk session={session} /> : section === "Notifications & demand" ? <Notifications session={session} /> : section === "Orders" ? <Orders session={session} /> : section === "Settings" ? <Settings session={session} /> : <Overview session={session} onNavigate={setSection} />}
         <footer className="admin-footer"><span>Darjeeling Stores</span><span>Administration workspace</span></footer>
       </main>
     </div>
