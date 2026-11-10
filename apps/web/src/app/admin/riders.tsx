@@ -251,7 +251,7 @@ function RiderDirectory({
       {editing && (
         <form className="admin-panel admin-role-form" onSubmit={saveRider} style={{ marginBottom: 20 }}>
           <h2>{editing === "new" ? "Onboard Delivery Partner" : `Edit Rider — ${(editing as Rider).name}`}</h2>
-          <div style={{ display: "grid", gap: 12, maxWidth: 540 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16, maxWidth: 860, alignItems: "start" }}>
             <label style={{ fontSize: 12 }}>
               Full Name *
               <input
@@ -295,7 +295,19 @@ function RiderDirectory({
               </select>
             </label>
 
-            <fieldset style={{ border: "1px solid var(--admin-border)", borderRadius: 6, padding: "10px 14px", margin: 0 }}>
+            <label style={{ fontSize: 12 }}>
+              Vehicle Details (optional)
+              <input
+                maxLength={40}
+                value={formVehicle}
+                onChange={(e) => setFormVehicle(e.target.value)}
+                disabled={busy}
+                placeholder="e.g. Hero Splendor Plus (WB-74-1234)"
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
+              />
+            </label>
+
+            <fieldset style={{ gridColumn: "1 / -1", border: "1px solid var(--admin-border)", borderRadius: 6, padding: "10px 14px", margin: 0 }}>
               <legend style={{ fontSize: 12, fontWeight: 600 }}>Permitted Fulfillment Warehouses *</legend>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8, marginTop: 6 }}>
                 {warehouses.map((w) => {
@@ -318,17 +330,6 @@ function RiderDirectory({
               </div>
             </fieldset>
 
-            <label style={{ fontSize: 12 }}>
-              Vehicle Details (optional)
-              <input
-                maxLength={40}
-                value={formVehicle}
-                onChange={(e) => setFormVehicle(e.target.value)}
-                disabled={busy}
-                placeholder="e.g. Hero Splendor Plus (WB-74-1234)"
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
-              />
-            </label>
           </div>
 
           {formError && <p role="alert" className="admin-role-error" style={{ marginTop: 10 }}>{formError}</p>}
