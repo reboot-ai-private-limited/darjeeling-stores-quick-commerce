@@ -43,6 +43,8 @@ export function createMongoOrderStore(connection: Connection): OrderStore {
       await orders().createIndex({ warehouseId: 1, status: 1, createdAt: -1 });
       await orders().createIndex({ userId: 1, createdAt: -1 });
       await orders().createIndex({ status: 1, createdAt: 1 });
+      // The dashboard and the sales reports read a day or a range of days across every warehouse.
+      await orders().createIndex({ createdAt: -1 });
       await events().createIndex({ orderId: 1, at: 1 });
       await changes().createIndex({ warehouseId: 1, _id: 1 });
     },

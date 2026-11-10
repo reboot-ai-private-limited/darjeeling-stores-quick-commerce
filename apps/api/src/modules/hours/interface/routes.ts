@@ -29,6 +29,7 @@ export function hoursRoutes(service: HoursService, staff: AuthResolver, customer
   const orders = (h: Parameters<typeof guarded>[2]) => guarded(staff, "orders:view", h);
   return [
     { method: "get", path: "/preorder/slots", handler: customerGuarded(customer, async (_who, req, res) => sendData(res, await service.slots(parse(slotsQuery, req.query).zoneId))) },
+    { method: "get", path: "/admin/warehouses/:id/hours", handler: guarded(staff, "warehouses:view", async (ctx, req, res) => sendData(res, await service.details(ctx, pathId(req, "id", "Warehouse")))) },
     { method: "put", path: "/admin/warehouses/:id/hours", handler: warehouses(async (ctx, req, res) => sendData(res, await service.setHours(ctx, pathId(req, "id", "Warehouse"), parse(hoursBody, req.body)))) },
     { method: "put", path: "/admin/warehouses/:id/preorder", handler: warehouses(async (ctx, req, res) => sendData(res, await service.setPreorder(ctx, pathId(req, "id", "Warehouse"), parse(preorderBody, req.body)))) },
     { method: "post", path: "/admin/ops/pause", handler: ops(async (ctx, req, res) => {

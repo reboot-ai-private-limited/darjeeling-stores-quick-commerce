@@ -66,7 +66,7 @@ async function main() {
   if (config.mockOTP) console.warn(JSON.stringify({ event: "development_mock_otp_enabled" }));
   const appConfig = createAppConfigModule(config.PUBLIC_APP_CONFIG_JSON);
   additionalRoutes.push(...appConfig.routes);
-  const app = createApp({ isReady: isDatabaseReady, corsOrigins: config.CORS_ORIGINS, trustProxyHops: config.TRUST_PROXY_HOPS, additionalRoutes, ...(dev2 && { dev2Routes: dev2 }), maintenance: appConfig.maintenance });
+  const app = createApp({ isReady: isDatabaseReady, corsOrigins: config.CORS_ORIGINS, trustProxyHops: config.TRUST_PROXY_HOPS, rateLimitPerMinute: config.RATE_LIMIT_PER_MINUTE, additionalRoutes, ...(dev2 && { dev2Routes: dev2 }), maintenance: appConfig.maintenance });
   const server = app.listen(config.PORT, config.mockOTP ? "127.0.0.1" : "0.0.0.0", () => console.info(JSON.stringify({ event: "server_listening", port: config.PORT })));
   server.on("error", () => { console.error(JSON.stringify({ event: "server_error" })); process.exit(1); });
   let shuttingDown = false;

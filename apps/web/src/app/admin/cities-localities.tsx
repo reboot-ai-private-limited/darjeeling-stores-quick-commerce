@@ -439,7 +439,7 @@ export default function CitiesLocalities() {
                       width: "100%",
                       maxWidth: 360,
                       padding: 10,
-                      border: "1px solid #bacbbd",
+                      border: "1px solid #cbc5ba",
                       borderRadius: 6,
                       marginTop: 7,
                     }}
@@ -506,7 +506,7 @@ export default function CitiesLocalities() {
                       width: "100%",
                       maxWidth: 360,
                       padding: 10,
-                      border: "1px solid #bacbbd",
+                      border: "1px solid #cbc5ba",
                       borderRadius: 6,
                       marginTop: 7,
                     }}

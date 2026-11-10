@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { GOOGLE_MAPS_KEY, GoogleLocationPicker, pointInRing, ringCentroid, type LngLat } from "./google-map";
 import { adminFetch, type AdminSession } from "./session-client";
 
 interface Warehouse {
@@ -22,6 +23,7 @@ interface Warehouse {
 interface ZoneOption {
   id: string;
   name: string;
+  ring: LngLat[];
 }
 
 interface Props {
@@ -98,7 +100,7 @@ export default function Warehouses({ session }: Props) {
         const res = await adminFetch("/api/v1/admin/zones", { signal: controller.signal });
         if (res.ok) {
           const body = await res.json();
-          setZones((body.data ?? []).map((z: { id: string; name: string }) => ({ id: z.id, name: z.name })));
+          setZones((body.data ?? []).map((z: { id: string; name: string; polygon?: { coordinates?: LngLat[][] } }) => ({ id: z.id, name: z.name, ring: z.polygon?.coordinates?.[0] ?? [] })));
         }
       } catch {}
     }
@@ -169,6 +171,27 @@ export default function Warehouses({ session }: Props) {
       setPauseActive(wh.pause?.active ?? false);
       setPauseMessage(wh.pause?.message ?? "");
       setPauseUntil(toLocalInputDate(wh.pause?.until));
+    }
+  }
+
+  function chooseZone(id: string) {
+    setZoneId(id);
+    const z = zones.find((x) => x.id === id);
+    if (!z || z.ring.length < 3) return;
+    const la = parseFloat(lat), ln = parseFloat(lng);
+    if (Number.isNaN(la) || Number.isNaN(ln) || !pointInRing(ln, la, z.ring)) {
+      const c = ringCentroid(z.ring);
+      setLat(c.lat.toFixed(6));
+      setLng(c.lng.toFixed(6));
+    }
+  }
+
+  function pickLocation(la: number, ln: number) {
+    setLat(la.toFixed(6));
+    setLng(ln.toFixed(6));
+    if (editing === "new") {
+      const hit = zones.find((z) => z.ring.length >= 3 && pointInRing(ln, la, z.ring));
+      if (hit && hit.id !== zoneId) setZoneId(hit.id);
     }
   }
 
@@ -312,13 +335,13 @@ export default function Warehouses({ session }: Props) {
                 <select
                   id="wh-zone"
                   value={zoneId}
-                  onChange={(e) => setZoneId(e.target.value)}
+                  onChange={(e) => chooseZone(e.target.value)}
                   required
                   disabled={busy}
                   style={{
                     width: "100%",
                     padding: 10,
-                    border: "1px solid #bacbbd",
+                    border: "1px solid #cbc5ba",
                     borderRadius: 6,
                     marginTop: 7,
                   }}
@@ -337,7 +360,7 @@ export default function Warehouses({ session }: Props) {
                 <input
                   value={zones.find((z) => z.id === editing.zoneId)?.name ?? editing.zoneId}
                   disabled
-                  style={{ marginTop: 7, background: "#f5f7f3" }}
+                  style={{ marginTop: 7, background: "#f7f6f3" }}
                 />
               </div>
             )}
@@ -355,7 +378,7 @@ export default function Warehouses({ session }: Props) {
                 style={{
                   marginTop: 7,
                   textTransform: "uppercase",
-                  background: editing !== "new" ? "#f5f7f3" : "#fff",
+                  background: editing !== "new" ? "#f7f6f3" : "#fff",
                 }}
               />
             </div>
@@ -373,6 +396,14 @@ export default function Warehouses({ session }: Props) {
             disabled={busy}
             placeholder="e.g. Chowrasta Store"
           />
+
+          {GOOGLE_MAPS_KEY && (
+            <div style={{ marginTop: 14, maxWidth: 640 }}>
+              <label>Choose location on map</label>
+              <GoogleLocationPicker lat={lat.trim() === "" || Number.isNaN(parseFloat(lat)) ? null : parseFloat(lat)} lng={lng.trim() === "" || Number.isNaN(parseFloat(lng)) ? null : parseFloat(lng)} zones={zones.filter((z) => z.ring.length >= 3)} selectedZoneId={zoneId} onPick={pickLocation} disabled={busy} />
+              <small style={{ color: "#716e68" }}>Click the map or drag the pin. Latitude, longitude and (when creating) the zone update automatically; typing coordinates moves the pin.</small>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 16, marginTop: 14, maxWidth: 460 }}>
             <div style={{ flex: 1 }}>
@@ -420,7 +451,7 @@ export default function Warehouses({ session }: Props) {
               maxWidth: 540,
               minHeight: 70,
               padding: 10,
-              border: "1px solid #bacbbd",
+              border: "1px solid #cbc5ba",
               borderRadius: 6,
               marginTop: 7,
               font: "inherit",

@@ -9,6 +9,7 @@ Spec: [F17](../orders/17-hours-preorders-and-ops-mode.md) · Conventions: [00](0
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/preorder/slots` | Customer | Next-morning slots with remaining capacity |
+| `GET` | `/admin/warehouses/:id/hours` | Admin `warehouses:view` | Saved hours, pre-order slots and pause of a warehouse |
 | `PUT` | `/admin/warehouses/:id/hours` | Admin `warehouses:manage` | Opening hours and after-hours mode |
 | `PUT` | `/admin/warehouses/:id/preorder` | Admin `warehouses:manage` | Pre-order slots and cutoff |
 | `POST` | `/admin/ops/pause` | Admin `ops_mode:manage` | Pause orders for a zone or warehouse 🔒 |
@@ -32,6 +33,9 @@ Query: `zoneId`. Only meaningful when the zone is closed and pre-order is on (ot
 `remaining: 0` = full (show disabled). Pass the chosen `start` and `end` as `scheduledWindow` when requesting a quote.
 
 Errors when requesting a quote or order for a slot: `409 CONFLICT` with `details.reason: "slot_full"` or `"cutoff_passed"`.
+
+## GET /admin/warehouses/:id/hours
+200: the warehouse's saved settings, for the editor: `{ "data": { "warehouseId", "warehouse": { "id", "name", "zoneId" }, "configured": true, "hours": [...], "lastOrderMinutesBeforeClose": 15, "afterHoursMode": "closed", "preOrder": { "enabled", "slots", "cutoffMinutesBeforeSlot", "packLeadMinutes" }, "pause": null | { "active": true, "message", "until" } } }`. Before the first save `configured` is false and the values are the defaults from settings (`hours.*` and `preOrder.*`), with no opening hours, so the warehouse follows the geography module's own open flag. `403` for a warehouse outside the caller's scope.
 
 ## PUT /admin/warehouses/:id/hours
 Body:

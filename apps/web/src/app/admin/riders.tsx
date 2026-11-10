@@ -261,7 +261,7 @@ function RiderDirectory({
                 onChange={(e) => setFormName(e.target.value)}
                 disabled={busy}
                 placeholder="e.g. Tenzing Sherpa"
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
 
@@ -274,7 +274,7 @@ function RiderDirectory({
                   onChange={(e) => setFormPhone(e.target.value)}
                   disabled={busy}
                   placeholder="+919876543210 or 9876543210"
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
             )}
@@ -286,7 +286,7 @@ function RiderDirectory({
                 value={formZoneId}
                 onChange={(e) => setFormZoneId(e.target.value)}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="">— Select primary zone —</option>
                 {zones.map((z) => (
@@ -326,7 +326,7 @@ function RiderDirectory({
                 onChange={(e) => setFormVehicle(e.target.value)}
                 disabled={busy}
                 placeholder="e.g. Hero Splendor Plus (WB-74-1234)"
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
           </div>
@@ -420,7 +420,7 @@ function RiderDirectory({
                         <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
                           <button
                             onClick={() => onViewShifts(r.id, r.name)}
-                            style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
                           >
                             Shifts
                           </button>
@@ -428,7 +428,7 @@ function RiderDirectory({
                             <>
                               <button
                                 onClick={() => startEdit(r)}
-                                style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                                style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
                               >
                                 Edit
                               </button>
@@ -436,7 +436,7 @@ function RiderDirectory({
                                 <button
                                   disabled={busy}
                                   onClick={() => forceOffline(r)}
-                                  style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "#b06000" }}
+                                  style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "#b06000" }}
                                 >
                                   Force offline
                                 </button>
@@ -444,7 +444,7 @@ function RiderDirectory({
                               <button
                                 disabled={busy}
                                 onClick={() => toggleActive(r)}
-                                style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: r.isActive ? "#a73535" : "#137333" }}
+                                style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: r.isActive ? "#a73535" : "#137333" }}
                               >
                                 {r.isActive ? "Deactivate" : "Reactivate"}
                               </button>
@@ -630,7 +630,7 @@ function ShiftsTab({
   return (
     <section className="admin-panel" aria-labelledby="shifts-title">
       {targetRiderId && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: "#f5f7f3", borderBottom: "1px solid var(--admin-border)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: "#f7f6f3", borderBottom: "1px solid var(--admin-border)" }}>
           <span style={{ fontSize: 13 }}>
             Showing shift history for <strong>{targetRiderName || targetRiderId}</strong>
           </span>

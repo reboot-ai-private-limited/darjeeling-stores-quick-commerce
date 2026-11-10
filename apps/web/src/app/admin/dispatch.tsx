@@ -478,7 +478,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                 value={toRiderId}
                 onChange={(e) => setToRiderId(e.target.value)}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="">— Select an active rider —</option>
                 {riders.filter((r) => r.id !== handoverTarget.riderId).map((r) => (
@@ -495,7 +495,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                 value={handoverReason}
                 onChange={(e) => setHandoverReason(e.target.value)}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
           </div>
@@ -521,7 +521,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                 value={resolveAction}
                 onChange={(e) => setResolveAction(e.target.value as "redispatch" | "cancel_return")}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="redispatch">Re-dispatch Order (Send back to Ready)</option>
                 <option value="cancel_return">Cancel &amp; Return Goods</option>
@@ -534,7 +534,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                   value={goodsCondition}
                   onChange={(e) => setGoodsCondition(e.target.value as "good" | "spoiled")}
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 >
                   <option value="good">Good (Restockable)</option>
                   <option value="spoiled">Spoiled / Damaged</option>
@@ -549,7 +549,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                 maxLength={500}
                 placeholder="Optional explanation of failure resolution"
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 60, padding: 8, border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 60, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
           </div>
@@ -627,7 +627,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                           <button
                             disabled={busy}
                             onClick={() => unassignOrder(a.orderId)}
-                            style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "#a73535" }}
+                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "#a73535" }}
                           >
                             Unassign
                           </button>
@@ -636,7 +636,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                           <button
                             disabled={busy}
                             onClick={() => setHandoverTarget(a)}
-                            style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
                           >
                             Handover
                           </button>
@@ -644,7 +644,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                         <button
                           disabled={busy}
                           onClick={() => setResolveTarget(a)}
-                          style={{ border: "1px solid #bacbbd", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                          style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
                         >
                           Resolve
                         </button>
@@ -770,7 +770,7 @@ function BatchesTab() {
                 value={riderId}
                 onChange={(e) => setRiderId(e.target.value)}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #bacbbd", borderRadius: 6, font: "inherit" }}
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="">— Select an active rider —</option>
                 {riders.map((r) => (
@@ -786,7 +786,7 @@ function BatchesTab() {
                 onChange={(e) => setOrderIdsText(e.target.value)}
                 placeholder="64b8a2e1d0f9a2b3c4d5e6f7&#10;64b8a2e1d0f9a2b3c4d5e6f8"
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 90, padding: 8, border: "1px solid #bacbbd", borderRadius: 6, font: "inherit", resize: "vertical" }}
+                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 90, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", resize: "vertical" }}
               />
             </label>
           </div>
@@ -831,7 +831,7 @@ function BatchesTab() {
                   <button
                     disabled={busy}
                     onClick={() => cancelBatch(b.id)}
-                    style={{ border: "1px solid #bacbbd", borderRadius: 6, padding: "6px 12px", background: "#fff", cursor: "pointer", fontSize: 12, color: "#a73535" }}
+                    style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "6px 12px", background: "#fff", cursor: "pointer", fontSize: 12, color: "#a73535" }}
                   >
                     Cancel Batch
                   </button>

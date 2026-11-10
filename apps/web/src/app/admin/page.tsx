@@ -14,6 +14,9 @@ import Dispatch from "./dispatch";
 import Riders from "./riders";
 import CashDesk from "./cash";
 import Notifications from "./notifications";
+import Overview from "./overview";
+import Orders from "./orders";
+import Settings from "./settings";
 import { readAdminSession, type AdminSession } from "./session-client";
 import "./admin.css";
 
@@ -53,6 +56,7 @@ function Icon({ name }: { name: string }) {
 
 export default function AdminPage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navClosed, setNavClosed] = useState(false);
   const [section, setSection] = useState("Overview");
   const [geoTab, setGeoTab] = useState<"zones" | "cities">("zones");
   const [session, setSession] = useState<AdminSession | null>(null);
@@ -88,6 +92,8 @@ export default function AdminPage() {
   const available = (item: string) =>
     item === "Overview" ||
     item === "Security" ||
+    (item === "Orders" && can("orders:view")) ||
+    (item === "Settings" && (can("settings:view") || can("delivery_rules:manage") || can("warehouses:view") || can("warehouses:manage"))) ||
     (item === "Staff" && can("staff:manage")) ||
     (item === "Roles & permissions" && can("roles:manage") && session.user.scope.all) ||
     (item === "Zones & localities" && can("zones:manage") && session.user.scope.all) ||
@@ -100,9 +106,9 @@ export default function AdminPage() {
     (item === "Notifications & demand" && (can("notifications:manage") || can("notify_demand:view")));
   return <div className="admin-shell">
     <a className="admin-skip" href="#admin-main">Skip to content</a>
-    <aside id="admin-navigation" className={`admin-sidebar ${menuOpen ? "is-open" : ""}`} aria-label="Admin navigation">
+    <aside id="admin-navigation" className={`admin-sidebar ${menuOpen ? "is-open" : ""} ${navClosed ? "is-closed" : ""}`} aria-label="Admin navigation" onMouseLeave={() => setNavClosed(false)}>
       <a className="admin-brand" href="/admin"><span className="admin-brand-mark">ds.</span><span>Darjeeling Stores<small>Administration</small></span></a>
-      <nav aria-label="Workspace sections">{groups.map(group => <div className="admin-nav-group" key={group.label}><p>{group.label}</p>{group.items.map(item => <button key={item} disabled={!available(item)} aria-current={item === section ? "page" : undefined} onClick={() => { setSection(item); setMenuOpen(false); }}><Icon name={item} /><span>{item}</span>{!available(item) && <small>Soon<span className="admin-sr-only"> — Coming soon</span></small>}</button>)}</div>)}</nav>
+      <nav aria-label="Workspace sections">{groups.map(group => <div className="admin-nav-group" key={group.label}><p>{group.label}</p>{group.items.map(item => <button key={item} disabled={!available(item)} aria-current={item === section ? "page" : undefined} onClick={(e) => { setSection(item); setMenuOpen(false); setNavClosed(true); e.currentTarget.blur(); }}><Icon name={item} /><span>{item}</span>{!available(item) && <small>Soon<span className="admin-sr-only"> — Coming soon</span></small>}</button>)}</div>)}</nav>
       <div className="admin-sidebar-note"><Icon name="Lock" /><span>Staff session<small>Secure administration access</small></span></div>
       <div className="admin-account"><span className="admin-avatar" aria-hidden="true">DS</span><div>{session.user.name}<small>{session.user.phone} · {session.user.role}</small><button className="admin-signout" onClick={logout}>Sign out</button></div></div>
     </aside>
@@ -130,16 +136,7 @@ export default function AdminPage() {
             </button>
           </div>
           {geoTab === "zones" ? <ZonesEditor session={session} /> : <CitiesLocalities />}
-        </div> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : section === "Offerings & stock" ? <Inventory session={session} /> : section === "Dispatch board" ? <Dispatch session={session} /> : section === "Riders & fleet" ? <Riders session={session} /> : section === "Cash & settlement" ? <CashDesk session={session} /> : section === "Notifications & demand" ? <Notifications session={session} /> : <>
-        <div className="admin-heading"><div><h1>Overview</h1><p>Your store operations, in one place.</p></div><label className="admin-warehouse"><Icon name="Warehouses" /><select disabled aria-label="Warehouse selection unavailable"><option>Warehouses unavailable</option></select></label></div>
-        <section className="admin-panel" aria-labelledby="admin-unavailable">
-          <div className="admin-panel-toolbar"><h2>Workspace activity</h2><span>Awaiting connection</span></div>
-          <div className="admin-empty"><span className="admin-empty-icon"><Icon name="Overview" /></span><h2 id="admin-unavailable">A clear view starts here.</h2><p>Orders, warehouses and team activity will appear here when admin services are connected.</p><span className="admin-empty-status"><Icon name="Lock" />Signed in securely</span></div>
-          <div className="admin-panel-bottom"><span>No data has been loaded.</span><span>Admin features are coming soon.</span></div>
-        </section>
-        <section className="admin-availability" aria-labelledby="admin-availability-title"><div><h2 id="admin-availability-title">Before you get started</h2><p>The workspace is ready for the next stage of setup.</p></div><div className="admin-setup-rows"><div><Icon name="Lock" /><span><strong>Secure sign-in</strong><small>Staff authentication and session management</small></span><span className="admin-pending">Connected</span></div><div><Icon name="Warehouses" /><span><strong>Connect your operation</strong><small>Warehouse access and operational data</small></span><span className="admin-pending">Coming soon</span></div></div></section>
-        <details className="admin-explanation"><summary>Why are the other sections unavailable?</summary><p>Staff sign-in, security, roles and account management are connected. Other operational sections are still being built. Navigation will become available as each service is connected. No sample records or operational metrics are displayed.</p></details>
-        </>}
+        </div> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : section === "Offerings & stock" ? <Inventory session={session} /> : section === "Dispatch board" ? <Dispatch session={session} /> : section === "Riders & fleet" ? <Riders session={session} /> : section === "Cash & settlement" ? <CashDesk session={session} /> : section === "Notifications & demand" ? <Notifications session={session} /> : section === "Orders" ? <Orders session={session} /> : section === "Settings" ? <Settings session={session} /> : <Overview session={session} onNavigate={setSection} />}
         <footer className="admin-footer"><span>Darjeeling Stores</span><span>Administration workspace</span></footer>
       </main>
     </div>

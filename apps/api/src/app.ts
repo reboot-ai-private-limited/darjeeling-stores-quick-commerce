@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import express, { type ErrorRequestHandler } from "express";
 import { API_PREFIX } from "@darjeeling/shared";
 import { createContainer } from "./container.js";
+import { rateLimit } from "./platform/rate-limit.js";
 import type { Route } from "./platform/routes.js";
 
-type AppOptions = { isReady?: () => boolean; corsOrigins?: string[]; trustProxyHops?: number; additionalRoutes?: Route[]; dev2Routes?: Route[]; maintenance?: { active: boolean; message: string | null } };
+type AppOptions = { isReady?: () => boolean; corsOrigins?: string[]; trustProxyHops?: number; additionalRoutes?: Route[]; dev2Routes?: Route[]; rateLimitPerMinute?: number; maintenance?: { active: boolean; message: string | null } };
 const handleError: ErrorRequestHandler = (error: unknown, _req, res, next) => {
   if (res.headersSent) return next(error);
   const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined;
@@ -21,7 +22,7 @@ const handleError: ErrorRequestHandler = (error: unknown, _req, res, next) => {
   res.status(status).json({ error: { code, message, requestId: res.getHeader("X-Request-Id") } });
 };
 
-export function createApp({ isReady = () => false, corsOrigins = [], trustProxyHops = 0, additionalRoutes = [], dev2Routes, maintenance }: AppOptions = {}) {
+export function createApp({ isReady = () => false, corsOrigins = [], trustProxyHops = 0, additionalRoutes = [], dev2Routes, rateLimitPerMinute = 0, maintenance }: AppOptions = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", trustProxyHops);
@@ -29,6 +30,11 @@ export function createApp({ isReady = () => false, corsOrigins = [], trustProxyH
     const requestId = randomUUID();
     const started = Date.now();
     res.setHeader("X-Request-Id", requestId);
+    // The answers are data, never pages: stop browsers guessing a type, framing them or leaking where a link came from.
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000");
     res.on("finish", () => console.info(JSON.stringify({ event: "http_request", requestId, method: req.method, status: res.statusCode, durationMs: Date.now() - started })));
     next();
   });
@@ -40,12 +46,13 @@ export function createApp({ isReady = () => false, corsOrigins = [], trustProxyH
       res.setHeader("Access-Control-Allow-Credentials", "true");
       if (req.method === "OPTIONS" && req.get("Access-Control-Request-Method")) {
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Client");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Client, Idempotency-Key");
         return res.sendStatus(204);
       }
     }
     next();
   });
+  app.use(API_PREFIX, rateLimit({ perWindow: rateLimitPerMinute }));
   app.use(API_PREFIX, (req, res, next) => {
     if (maintenance?.active && !["/health", "/ready", "/app/config"].includes(req.path)) {
       res.setHeader("Cache-Control", "no-store");
