@@ -1,6 +1,6 @@
 import { Redirect, router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import Animated, { Extrapolation, FadeInDown, FadeOutUp, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { categoryPictures, getHome, type Home as HomeData } from "../../api/catalog";
@@ -8,6 +8,7 @@ import { BadgeRails, BrandRow, BudgetRail, PopularSearches, RecentlyViewed, uniq
 import { CategoryFeed } from "../../components/CategoryFeed";
 import { CategoryTabs, LiveOrderCard, OffersRow, OrderAgainCard, SectionHead } from "../../components/home";
 import { BannerCarousel, CategoryTile, ProductCard } from "../../components/shop";
+import { HomeSkeleton } from "../../components/Skeleton";
 import { Button, Icon, Press } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { colors, radius, shadow, space, type } from "../../theme";
@@ -67,7 +68,7 @@ export default function Home() {
           )}
           {data?.notices.map(n => <View key={n.label} style={s.notice}><Icon name="info" size={16} color={colors.amber} /><Text style={[type.small, { flex: 1, color: colors.ink }]}>{n.label}</Text></View>)}
 
-          {!data && !error && <ActivityIndicator color={colors.maroon} style={{ marginTop: 80 }} />}
+          {!data && !error && <HomeSkeleton />}
           {error && (
             <View style={{ alignItems: "center", gap: space.md, marginTop: 60, paddingHorizontal: space.xl }}>
               <Icon name="wifi-off" size={40} color={colors.faint} />
@@ -86,7 +87,7 @@ export default function Home() {
               <View style={{ marginTop: space.lg }}><BannerCarousel banners={data.banners} eta={etaText} /></View>
 
               {data.categories.length > 0 && (
-                <View style={{ paddingHorizontal: space.sm, marginTop: space.sm }}>
+                <View style={{ paddingHorizontal: space.sm, marginTop: space.lg }}>
                   <Text style={[s.sectionTitle, { paddingHorizontal: space.md }]}>Shop by category</Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: space.md }}>
                     {data.categories.map((c, i) => <CategoryTile key={c.id} category={c} picture={pics[c.id]} tint={i} />)}

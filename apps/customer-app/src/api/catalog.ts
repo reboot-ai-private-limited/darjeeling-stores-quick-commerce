@@ -21,8 +21,12 @@ export type Home = {
   rev: number;
 };
 
-export const getHome = (zoneId: string) => api<Home>("GET", `/catalog/home?zoneId=${zoneId}`, undefined, { auth: false }).then(r => r.data);
-export const getCategories = (zoneId: string) => api<Category[]>("GET", `/catalog/categories?zoneId=${zoneId}`, undefined, { auth: false }).then(r => r.data);
+/** The category tree of each zone from the last time it loaded, so screens that need it can draw at once and refresh quietly. */
+const categoryCache = new Map<string, Category[]>();
+export const cachedCategories = (zoneId: string | undefined): Category[] => (zoneId ? categoryCache.get(zoneId) ?? [] : []);
+
+export const getHome = (zoneId: string) => api<Home>("GET", `/catalog/home?zoneId=${zoneId}`, undefined, { auth: false }).then(r => { categoryCache.set(zoneId, r.data.categories); return r.data; });
+export const getCategories = (zoneId: string) => api<Category[]>("GET", `/catalog/categories?zoneId=${zoneId}`, undefined, { auth: false }).then(r => { categoryCache.set(zoneId, r.data); return r.data; });
 export const searchProducts = (zoneId: string, q: string) =>
   api<Product[]>("GET", `/catalog/search?zoneId=${zoneId}&q=${encodeURIComponent(q)}&limit=30`, undefined, { auth: false }).then(r => r.data);
 

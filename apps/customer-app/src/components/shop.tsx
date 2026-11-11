@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { FlatList, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { FlatList, StyleSheet, Text, View, useWindowDimensions, Linking } from "react-native";
 import Animated, { SlideInDown } from "react-native-reanimated";
 import { liftIn } from "../motion";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -51,7 +51,7 @@ export function ProductCard({ product, width = 132, eta, onPress }: { product: P
           <View style={s.addPos}>{out ? <Text style={s.sold}>{product.availability === "closed" ? "Closed" : "Sold out"}</Text> : <AddButton product={product} />}</View>
         </View>
         {eta ? <View style={s.etaPill}><Icon name="clock" size={10} color={colors.muted} /><Text style={s.etaText}>{eta.toUpperCase()}</Text></View> : <View style={{ height: 8 }} />}
-        <Text style={s.name} numberOfLines={2}>{product.name}</Text>
+        <Text style={s.name} numberOfLines={1} ellipsizeMode="tail">{product.name}</Text>
         <Text style={s.label} numberOfLines={1}>{v?.label ?? ""}</Text>
         <View style={s.priceRow}>
           <Text style={s.price}>{v ? rupees(v.price) : ""}</Text>
@@ -87,14 +87,25 @@ export const dayPart = (d = new Date()): { hello: string; line: string } => {
   return { hello: "Late-night cravings?", line: "We've got you covered" };
 };
 
+/** A tap on a banner opens what it points at: a category, a product or a web link. */
+function openBanner(b: Banner) {
+  const l = b.link;
+  if (!l) return;
+  if (l.type === "category" && l.id) router.push({ pathname: "/category/[id]", params: { id: l.id, name: b.title } });
+  else if (l.type === "product" && l.id) router.push(`/product/${l.id}`);
+  else if (l.type === "url" && l.url) void Linking.openURL(l.url).catch(() => undefined);
+}
+
 /** Swipeable promo banners, auto-advancing every few seconds until the customer touches them. The first slide is our delivery-time promise, from the server's ETA. */
 export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: string }) {
   const { width } = useWindowDimensions();
   const w = width - space.lg * 2;
   const [i, setI] = useState(0);
-  const slides: (Banner | "eta")[] = ["eta", ...banners];
+  // The greeting slide is only a fallback for a store with no banners yet; once an admin adds banners they are all that shows.
+  const slides: (Banner | "eta")[] = banners.length > 0 ? banners : ["eta"];
   const ref = useRef<FlatList>(null);
   const touched = useRef(false);
+  const resume = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iRef = useRef(0); iRef.current = i;
   const part = dayPart();
   useEffect(() => {
@@ -103,13 +114,14 @@ export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: strin
       if (touched.current) return;
       const next = (iRef.current + 1) % slides.length;
       ref.current?.scrollToOffset({ offset: next * (w + space.md), animated: true }); setI(next);
-    }, 4500);
-    return () => clearInterval(t);
+    }, 3500);
+    return () => { clearInterval(t); if (resume.current) clearTimeout(resume.current); };
   }, [slides.length, w]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <View>
       <FlatList
-        ref={ref} onScrollBeginDrag={() => { touched.current = true; }} data={slides} horizontal pagingEnabled snapToInterval={w + space.md} decelerationRate="fast" showsHorizontalScrollIndicator={false}
+        ref={ref} onScrollBeginDrag={() => { touched.current = true; if (resume.current) clearTimeout(resume.current); }}
+        onScrollEndDrag={() => { if (resume.current) clearTimeout(resume.current); resume.current = setTimeout(() => { touched.current = false; }, 5000); }} data={slides} horizontal pagingEnabled snapToInterval={w + space.md} decelerationRate="fast" showsHorizontalScrollIndicator={false}
         keyExtractor={(b) => (b === "eta" ? "eta" : b.id)} contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.md }}
         onMomentumScrollEnd={e => setI(Math.round(e.nativeEvent.contentOffset.x / (w + space.md)))}
         renderItem={({ item }) => item === "eta" ? (
@@ -119,13 +131,15 @@ export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: strin
             <Text style={s.bannerTitle}>{part.line}</Text>
           </LinearGradient>
         ) : (
-          <View style={[s.banner, { width: w, backgroundColor: colors.yellow }]}>
-            {item.image?.urls && <Image source={{ uri: item.image.urls["640"] ?? Object.values(item.image.urls)[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />}
-            {!item.image && <Text style={[s.bannerTitle, { color: colors.maroon }]}>{item.title}</Text>}
-          </View>
+          <Press onPress={() => openBanner(item)} disabled={!item.link}>
+            <View style={[s.banner, { width: w, backgroundColor: colors.yellow }]}>
+              {item.image?.urls && <Image source={{ uri: item.image.urls["1080"] ?? item.image.urls["640"] ?? Object.values(item.image.urls)[0] }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />}
+              {!item.image && <Text style={[s.bannerTitle, { color: colors.maroon }]}>{item.title}</Text>}
+            </View>
+          </Press>
         )}
       />
-      {slides.length > 1 && <View style={s.dots}>{slides.map((_, k) => <View key={k} style={[s.dot, k === i && s.dotOn]} />)}</View>}
+      {slides.length > 1 && <View pointerEvents="none" style={s.dots}>{slides.map((_, k) => <View key={k} style={[s.dot, k === i && s.dotOn]} />)}</View>}
     </View>
   );
 }
@@ -159,7 +173,7 @@ const s = StyleSheet.create({
   offText: { fontSize: 10, fontWeight: "900", color: colors.maroon },
   etaPill: { flexDirection: "row", alignItems: "center", gap: 3, alignSelf: "flex-start", backgroundColor: colors.creamDeep, borderRadius: 6, paddingHorizontal: 5, height: 18, marginTop: 18 },
   etaText: { fontSize: 9, fontWeight: "800", color: colors.muted, letterSpacing: 0.3 },
-  name: { fontSize: 13, fontWeight: "700", color: colors.ink, marginTop: 4, minHeight: 34, lineHeight: 17 },
+  name: { fontSize: 13, fontWeight: "700", color: colors.ink, marginTop: 4, minHeight: 17, lineHeight: 17 },
   label: { fontSize: 12, color: colors.muted },
   priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 2 },
   price: { fontSize: 14, fontWeight: "900", color: colors.ink },
@@ -172,9 +186,9 @@ const s = StyleSheet.create({
   bannerTitle: { color: colors.white, fontSize: 24, fontWeight: "900", letterSpacing: -0.6, lineHeight: 28 },
   etaBadge: { position: "absolute", top: space.lg, left: space.xl, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 10, height: 26 },
   etaBadgeText: { fontSize: 12, fontWeight: "900", color: colors.maroon },
-  dots: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: space.md },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.line },
-  dotOn: { width: 18, backgroundColor: colors.maroon },
+  dots: { position: "absolute", bottom: 10, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.6)" },
+  dotOn: { width: 18, backgroundColor: colors.yellow },
   bar: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", alignItems: "center", backgroundColor: colors.maroon, borderRadius: radius.lg, paddingVertical: 8, paddingLeft: space.lg, paddingRight: 8, ...shadow.lift },
   barTop: { color: colors.white, fontWeight: "800", fontSize: 13 },
   barSub: { color: "rgba(255,255,255,0.7)", fontSize: 11, marginTop: 1 },

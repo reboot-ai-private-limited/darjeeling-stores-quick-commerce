@@ -48,7 +48,7 @@ export default function ProductScreen() {
 
   const v = p ? p.variants[vi] ?? p.variants[0] : undefined;
   const qty = v ? qtyOf(v.variantId) : 0;
-  const images = p ? p.images.map(i => i.urls["640"] ?? Object.values(i.urls)[0]).filter((u): u is string => !!u) : [];
+  const images = p ? p.images.map(i => i.urls["1080"] ?? i.urls["640"] ?? Object.values(i.urls)[0]).filter((u): u is string => !!u) : [];
   const soldOut = !v || !v.available;
   const etaLabel = "15-20 MINS";
   const hasDetails = !!p && !!(p.description || p.highlights?.length || p.keyInfo?.length || p.nutrition || p.infoSections?.length);
@@ -85,7 +85,7 @@ export default function ProductScreen() {
                     <FlatList
                       ref={gallery} data={images} horizontal pagingEnabled showsHorizontalScrollIndicator={false} keyExtractor={(u, i) => u + i}
                       onMomentumScrollEnd={e => setImg(Math.round(e.nativeEvent.contentOffset.x / width))}
-                      renderItem={({ item }) => <View style={{ width, height: width * 0.62, alignItems: "center", justifyContent: "center" }}><Image source={{ uri: item }} style={{ width: "72%", height: "92%" }} contentFit="contain" transition={150} /></View>}
+                      renderItem={({ item }) => <View style={{ width, height: width * 0.9, alignItems: "center", justifyContent: "center" }}><Image source={{ uri: item }} style={{ width: "100%", height: "100%" }} contentFit="contain" transition={150} /></View>}
                     />
                   ) : <View style={{ height: width * 0.5, alignItems: "center", justifyContent: "center" }}><Icon name="package" size={56} color={colors.faint} /></View>}
                   {images.length > 1 && (
