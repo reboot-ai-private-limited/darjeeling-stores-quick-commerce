@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Darjeeling Stores",
+    "slug": "darjeeling-customer",
+    "scheme": "darjeelingstores",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "in.darjeelingstores.customer",
+      "adaptiveIcon": {
+        "backgroundColor": "#401815",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "ios": { "bundleIdentifier": "in.darjeelingstores.customer", "supportsTablet": false },
+    "web": { "bundler": "metro", "favicon": "./assets/favicon.png" },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      ["expo-splash-screen", { "image": "./assets/splash-icon.png", "backgroundColor": "#401815", "imageWidth": 200 }],
+      "expo-secure-store",
+      ["expo-location", { "locationWhenInUsePermission": "Darjeeling Stores uses your location to find the nearest store and deliver to your door." }]
+    ]
+  }
+}
