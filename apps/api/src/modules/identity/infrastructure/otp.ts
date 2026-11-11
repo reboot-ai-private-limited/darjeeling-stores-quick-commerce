@@ -14,6 +14,8 @@ type Challenge = { _id: string; nonce: string; phone: string; app: "customer" | 
   hash: string; mock: boolean; attempts: number; expiresAt: Date; purgeAt: Date; lockedUntil: Date | null;
   consumedAt: Date | null; sent: boolean };
 const ttlSeconds = 300, maxAttempts = 5, maxPerHour = 5;
+/** A fixed demo customer for testing. Like the development owner it is exempt from the code request limit, and it only exists while the development login (mockOTP) is on. */
+export const DEMO_CUSTOMER_PHONE = "+919000000002";
 type Failure = { error: IdentityError };
 
 export function createOtpService(connection: Connection, jwtSecret: string, options: ConsumerOptions, settings = sessionSettings.parse({})) {
@@ -72,7 +74,8 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
   async function request(input: { phone: string; app: Challenge["app"]; channel: "sms" | "whatsapp" }, ip: string, user?: IdentityUser) {
     unavailable();
     const developmentOwner = options.mockOTP && input.app === "admin";
-    if (!developmentOwner) await quota(input.phone, ip, user?._id);
+    const demoCustomer = options.mockOTP && input.app === "customer" && input.phone === DEMO_CUSTOMER_PHONE && !user;
+    if (!developmentOwner && !demoCustomer) await quota(input.phone, ip, user?._id);
     const existing = await users.findOne({ phone: input.phone });
     if (user) {
       if (existing) throw new IdentityError(409, "CONFLICT", "Phone number is already in use");

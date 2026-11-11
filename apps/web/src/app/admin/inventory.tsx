@@ -1,22 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { adminFetch, type AdminSession } from "./session-client";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type WarehouseOption = { id: string; name: string; code: string };
 
-type Offering = {
-  id: string;
-  productId: string;
-  productTitle: string;
-  variantId: string;
-  sku: string;
-  mrp: number;
-  sellingPrice: number;
-  isActive: boolean;
-};
+type OfferingVariant = { variantId: string; label: string; price: number; mrp: number; stock: number | null; isActive: boolean };
+type Offering = { id: string; rev: number; productId: string; status: string; stockGrams: number | null; product: { name: string; type: string; stockMode: string }; variants: OfferingVariant[] };
+const toPaise = (rupees: string) => Math.round(parseFloat(rupees) * 100);
 
 type PriceEntry = {
   id: string;
@@ -30,21 +23,13 @@ type PriceEntry = {
 };
 
 type StockLevel = {
-  warehouseId: string;
-  sku: string;
-  productTitle: string;
-  onHand: number;
-  reserved: number;
-  available: number;
+  warehouseId: string; productId: string; name: string; variantId: string | null; variantLabel: string | null;
+  unit: "units" | "grams"; stock: number; isLow?: boolean;
 };
 
 type StockMovement = {
-  id: string;
-  sku: string;
-  type: string;
-  qty: number;
-  note: string;
-  createdAt: string;
+  id: string; productId: string; variantId: string | null; mode: "grams" | "units";
+  delta: number; balanceAfter: number; reason: string; note: string | null; createdAt: string;
 };
 
 type ImportPreviewRow = {
@@ -65,7 +50,7 @@ async function api<T = unknown>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function fmt(n: number) {
-  return `₹${n.toFixed(2)}`;
+  return `₹${(n / 100).toFixed(2)}`; // API money is whole paise
 }
 
 function fmtDate(iso: string) {
@@ -112,21 +97,14 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
 
-  // Activate single
-  const [activating, setActivating] = useState(false);
-  const [aProductId, setAProductId] = useState("");
-  const [aVariantId, setAVariantId] = useState("");
-  const [aMrp, setAMrp] = useState("");
-  const [aSellingPrice, setASellingPrice] = useState("");
-  const [activateError, setActivateError] = useState("");
-
-  // Bulk activate
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkText, setBulkText] = useState("");
-  const [bulkMrp, setBulkMrp] = useState("");
-  const [bulkSelling, setBulkSelling] = useState("");
-  const [bulkError, setBulkError] = useState("");
-  const [bulkBusy, setBulkBusy] = useState(false);
+  // Add products (one panel: pick products, set price + stock, save once)
+  type Vals = { mrp: string; price: string; stock: string };
+  const [adding, setAdding] = useState(false);
+  const [catalog, setCatalog] = useState<{ id: string; name: string; stockMode: string; variants: { id: string; label: string; sku: string }[] }[]>([]);
+  const [sel, setSel] = useState<Record<string, boolean>>({});
+  const [vals, setVals] = useState<Record<string, Vals>>({});
+  const [fill, setFill] = useState<Vals>({ mrp: "", price: "", stock: "" });
+  const [addError, setAddError] = useState("");
 
   // Edit offering
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -149,51 +127,67 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
     return () => controller.abort();
   }, [warehouseId, cursor, attempt]);
 
-  async function activate(e: FormEvent) {
+  useEffect(() => {
+    if (!adding || catalog.length) return;
+    api<{ data: typeof catalog }>("products?limit=100&status=active").then((b) => setCatalog(b.data)).catch(() => setCatalog([]));
+  }, [adding, catalog.length]);
+
+  const have = new Set(offerings.map((o) => o.productId));
+  const available = catalog.filter((p) => !have.has(p.id));
+  const chosen = available.filter((p) => sel[p.id]);
+  const valOf = (variantId: string): Vals => vals[variantId] ?? { mrp: fill.mrp, price: fill.price, stock: fill.stock };
+
+  function toggleProduct(p: { id: string; variants: { id: string }[] }, on: boolean) {
+    setSel((m) => ({ ...m, [p.id]: on }));
+    if (on) setVals((m) => { const n = { ...m }; for (const v of p.variants) n[v.id] = n[v.id] ?? { mrp: fill.mrp, price: fill.price, stock: fill.stock }; return n; });
+  }
+  function applyFill() {
+    setVals((m) => { const n = { ...m }; for (const p of chosen) for (const v of p.variants) n[v.id] = { ...fill }; return n; });
+  }
+
+  async function saveAdd(e: FormEvent) {
     e.preventDefault();
-    setBusy(true); setActivateError("");
+    setBusy(true); setAddError("");
+    let done = 0;
     try {
-      await api("warehouse-products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
-        body: JSON.stringify({ warehouseId, productId: aProductId.trim(), variantId: aVariantId.trim() || undefined, mrp: parseFloat(aMrp), sellingPrice: parseFloat(aSellingPrice) }),
-      });
-      setActivating(false); setAProductId(""); setAVariantId(""); setAMrp(""); setASellingPrice("");
-      setNotice("Product activated in warehouse."); setAttempt((v) => v + 1);
+      if (chosen.length === 0) throw new Error("Tick at least one product.");
+      for (const p of chosen) {
+        const variants = p.variants.map((v) => {
+          const x = valOf(v.id);
+          const mrp = toPaise(x.mrp), price = toPaise(x.price);
+          if (!(mrp >= 1) || !(price >= 1)) throw new Error(`${p.name} (${v.label}): enter MRP and selling price.`);
+          if (price > mrp) throw new Error(`${p.name} (${v.label}): selling price cannot exceed MRP.`);
+          // per-variant products need a stock figure (0 if left blank); pooled-weight products keep stock on the product
+          const stock = p.stockMode === "pooled_weight" ? null : Math.max(0, Math.floor(Number(x.stock) || 0));
+          return { variantId: v.id, price, mrp, stock };
+        });
+        const stockGrams = p.stockMode === "pooled_weight" ? Math.max(0, Math.floor(Number(valOf(`g:${p.id}`).stock) || 0)) : null;
+        await api("warehouse-products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
+          body: JSON.stringify({ warehouseId, productId: p.id, stockGrams, variants }),
+        });
+        done++;
+      }
+      setAdding(false); setSel({}); setVals({}); setFill({ mrp: "", price: "", stock: "" });
+      setNotice(`${done} product${done === 1 ? "" : "s"} added to the warehouse.`); setAttempt((v) => v + 1);
     } catch (err) {
-      setActivateError(err instanceof Error ? err.message : "Could not activate.");
+      setAddError((done ? `${done} added before the error. ` : "") + (err instanceof Error ? err.message : "Could not add products."));
+      if (done) setAttempt((v) => v + 1);
     } finally {
       setBusy(false);
     }
   }
 
-  async function bulkActivate(e: FormEvent) {
-    e.preventDefault();
-    setBulkBusy(true); setBulkError("");
-    try {
-      const lines = bulkText.split(/[\n,]+/).map((l) => l.trim()).filter(Boolean);
-      const items = lines.map((id) => ({ productId: id, mrp: parseFloat(bulkMrp), sellingPrice: parseFloat(bulkSelling) }));
-      await api("warehouse-products/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
-        body: JSON.stringify({ warehouseId, items }),
-      });
-      setBulkOpen(false); setBulkText(""); setBulkMrp(""); setBulkSelling("");
-      setNotice(`${items.length} products activated.`); setAttempt((v) => v + 1);
-    } catch (err) {
-      setBulkError(err instanceof Error ? err.message : "Bulk activation failed.");
-    } finally {
-      setBulkBusy(false);
-    }
-  }
-
-  async function saveEdit(offeringId: string) {
+  async function saveEdit(o: Offering, variantId: string) {
     setBusy(true); setEditError("");
     try {
-      await api(`warehouse-products/${offeringId}`, {
+      const mrpP = toPaise(editMrp), priceP = toPaise(editSelling);
+      if (!(mrpP >= 1) || !(priceP >= 1) || priceP > mrpP) throw new Error("Enter valid prices (selling price cannot exceed MRP).");
+      await api(`warehouse-products/${o.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
-        body: JSON.stringify({ mrp: parseFloat(editMrp), sellingPrice: parseFloat(editSelling), isActive: editActive }),
+        body: JSON.stringify({ rev: o.rev, variants: [{ variantId, price: priceP, mrp: mrpP, isActive: editActive }] }),
       });
       setEditingId(null); setNotice("Offering updated."); setAttempt((v) => v + 1);
     } catch (err) {
@@ -203,8 +197,8 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
     }
   }
 
-  function startEdit(o: Offering) {
-    setEditingId(o.id); setEditMrp(String(o.mrp)); setEditSelling(String(o.sellingPrice)); setEditActive(o.isActive); setEditError("");
+  function startEdit(o: Offering, v: OfferingVariant) {
+    setEditingId(`${o.id}:${v.variantId}`); setEditMrp(String(v.mrp / 100)); setEditSelling(String(v.price / 100)); setEditActive(v.isActive); setEditError("");
   }
 
   return (
@@ -214,66 +208,67 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
         {error && <p role="alert" className="admin-role-error" style={{ margin: 0 }}>{error}</p>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button className="admin-text-button" disabled={loading || busy} onClick={() => setAttempt((v) => v + 1)}>Reload</button>
-          {canManage && <>
-            <button className="admin-role-button" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => { setActivating(!activating); setBulkOpen(false); }}>Activate product</button>
-            <button style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "8px 14px", background: "#fff", cursor: "pointer", fontSize: 12 }} onClick={() => { setBulkOpen(!bulkOpen); setActivating(false); }}>Bulk activate</button>
-          </>}
+          {canManage && (
+            <button className="admin-role-button" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setAdding(!adding)}>{adding ? "Close" : "+ Add products"}</button>
+          )}
         </div>
       </div>
 
-      {activating && (
-        <form className="admin-panel admin-role-form" onSubmit={activate} style={{ marginBottom: 16 }}>
-          <h2>Activate product in warehouse</h2>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", maxWidth: 600 }}>
-            <label style={{ flex: 1, minWidth: 160, fontSize: 12 }}>Product ID *
-              <input required value={aProductId} disabled={busy} onChange={(e) => setAProductId(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
-            </label>
-            <label style={{ flex: 1, minWidth: 160, fontSize: 12 }}>Variant ID (optional)
-              <input value={aVariantId} disabled={busy} onChange={(e) => setAVariantId(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
-            </label>
-            <label style={{ width: 120, fontSize: 12 }}>MRP (₹) *
-              <input type="number" min="0" step="0.01" required value={aMrp} disabled={busy} onChange={(e) => setAMrp(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
-            </label>
-            <label style={{ width: 140, fontSize: 12 }}>Selling price (₹) *
-              <input type="number" min="0" step="0.01" required value={aSellingPrice} disabled={busy} onChange={(e) => setASellingPrice(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
-            </label>
-          </div>
-          {activateError && <p role="alert" className="admin-role-error" style={{ marginTop: 8 }}>{activateError}</p>}
+      {adding && (
+        <form className="admin-panel" onSubmit={saveAdd} style={{ marginBottom: 16, padding: 20 }}>
+          <h2 style={{ margin: "0 0 4px", fontSize: 16 }}>Add products to this warehouse</h2>
+          <p style={{ fontSize: 12, color: "var(--admin-muted)", margin: "0 0 14px" }}>Tick the products, set price and starting stock, then save once. Use “Fill selected” to set the same values for every ticked product.</p>
+          {available.length === 0 ? (
+            <p className="admin-roles-message">{catalog.length === 0 ? "Loading products…" : "Every active product is already in this warehouse."}</p>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12, fontSize: 12 }}>
+                <strong>Fill selected:</strong>
+                <input type="number" min="0" step="0.01" placeholder="MRP ₹" value={fill.mrp} onChange={(e) => setFill({ ...fill, mrp: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
+                <input type="number" min="0" step="0.01" placeholder="Price ₹" value={fill.price} onChange={(e) => setFill({ ...fill, price: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
+                <input type="number" min="0" step="1" placeholder="Stock" value={fill.stock} onChange={(e) => setFill({ ...fill, stock: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
+                <button type="button" onClick={applyFill} disabled={chosen.length === 0} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "6px 12px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Apply</button>
+              </div>
+              <div style={{ overflowX: "auto", maxHeight: 380, overflowY: "auto", border: "1px solid var(--admin-border)", borderRadius: 8 }}>
+                <table className="admin-stock-table">
+                  <thead><tr>
+                    <th style={{ width: 36 }}><input type="checkbox" aria-label="Select all" checked={chosen.length === available.length} onChange={(e) => available.forEach((p) => toggleProduct(p, e.target.checked))} /></th>
+                    <th>Product / variant</th><th>MRP ₹</th><th>Price ₹</th><th>Stock</th>
+                  </tr></thead>
+                  <tbody>
+                    {available.map((p) => (
+                      <Fragment key={p.id}>
+                        <tr style={{ background: "#faf8f4" }}>
+                          <td><input type="checkbox" aria-label={`Select ${p.name}`} checked={!!sel[p.id]} onChange={(e) => toggleProduct(p, e.target.checked)} /></td>
+                          <td colSpan={p.stockMode === "pooled_weight" && sel[p.id] ? 3 : 4} style={{ fontWeight: 600 }}>{p.name}{p.stockMode === "pooled_weight" && <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}> — sold by weight</small>}</td>
+                          {p.stockMode === "pooled_weight" && sel[p.id] && (
+                            <td><input type="number" min="0" step="1" placeholder="Stock (g)" value={valOf(`g:${p.id}`).stock} onChange={(e) => setVals((m) => ({ ...m, [`g:${p.id}`]: { ...valOf(`g:${p.id}`), stock: e.target.value } }))} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} /></td>
+                          )}
+                        </tr>
+                        {sel[p.id] && p.variants.map((v) => {
+                          const x = valOf(v.id);
+                          const set = (patch: Partial<Vals>) => setVals((m) => ({ ...m, [v.id]: { ...valOf(v.id), ...patch } }));
+                          return (
+                            <tr key={v.id}>
+                              <td></td>
+                              <td style={{ fontSize: 12, color: "var(--admin-muted)", paddingLeft: 28 }}>{v.label}</td>
+                              <td><input type="number" min="0" step="0.01" value={x.mrp} onChange={(e) => set({ mrp: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} /></td>
+                              <td><input type="number" min="0" step="0.01" value={x.price} onChange={(e) => set({ price: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} /></td>
+                              <td>{p.stockMode === "pooled_weight" ? <span style={{ fontSize: 11, color: "var(--admin-muted)" }}>shared</span> : <input type="number" min="0" step="1" value={x.stock} onChange={(e) => set({ stock: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />}</td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+          {addError && <p role="alert" className="admin-role-error" style={{ marginTop: 10 }}>{addError}</p>}
           <div className="admin-role-actions" style={{ marginTop: 14, padding: 0 }}>
-            <button className="admin-role-button" type="submit" disabled={busy}>{busy ? "Activating…" : "Activate"}</button>
-            <button type="button" disabled={busy} onClick={() => setActivating(false)}>Cancel</button>
-          </div>
-        </form>
-      )}
-
-      {bulkOpen && (
-        <form className="admin-panel admin-role-form" onSubmit={bulkActivate} style={{ marginBottom: 16 }}>
-          <h2>Bulk activate products</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>Enter one product ID per line (or comma-separated). All products will use the same MRP and selling price.</p>
-          <div style={{ display: "grid", gap: 12, maxWidth: 500 }}>
-            <label htmlFor="bulk-ids" style={{ fontSize: 12 }}>Product IDs *
-              <textarea id="bulk-ids" required value={bulkText} disabled={bulkBusy} onChange={(e) => setBulkText(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", minHeight: 100, padding: 10, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", resize: "vertical" }} />
-            </label>
-            <div style={{ display: "flex", gap: 12 }}>
-              <label style={{ flex: 1, fontSize: 12 }}>MRP (₹) *
-                <input type="number" min="0" step="0.01" required value={bulkMrp} disabled={bulkBusy} onChange={(e) => setBulkMrp(e.target.value)}
-                  style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
-              </label>
-              <label style={{ flex: 1, fontSize: 12 }}>Selling price (₹) *
-                <input type="number" min="0" step="0.01" required value={bulkSelling} disabled={bulkBusy} onChange={(e) => setBulkSelling(e.target.value)}
-                  style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
-              </label>
-            </div>
-          </div>
-          {bulkError && <p role="alert" className="admin-role-error" style={{ marginTop: 8 }}>{bulkError}</p>}
-          <div className="admin-role-actions" style={{ marginTop: 14, padding: 0 }}>
-            <button className="admin-role-button" type="submit" disabled={bulkBusy}>{bulkBusy ? "Activating…" : "Bulk activate"}</button>
-            <button type="button" disabled={bulkBusy} onClick={() => setBulkOpen(false)}>Cancel</button>
+            <button className="admin-role-button" type="submit" disabled={busy || chosen.length === 0}>{busy ? "Saving…" : `Add ${chosen.length || ""} to warehouse`}</button>
+            <button type="button" disabled={busy} onClick={() => setAdding(false)}>Cancel</button>
           </div>
         </form>
       )}
@@ -295,53 +290,54 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>SKU</th>
+                  <th>Variant</th>
                   <th>MRP</th>
                   <th>Selling price</th>
+                  <th>Stock</th>
                   <th>Status</th>
                   {canManage && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {offerings.map((o) => (
-                  <tr key={o.id}>
-                    <td style={{ fontWeight: 500 }}>{o.productTitle}</td>
-                    <td style={{ fontFamily: "monospace", fontSize: 12, color: "var(--admin-muted)" }}>{o.sku}</td>
-                    <td>{editingId === o.id ? (
-                      <input type="number" min="0" step="0.01" value={editMrp} onChange={(e) => setEditMrp(e.target.value)}
-                        style={{ width: 90, padding: "5px 8px", border: "1px solid #cbc5ba", borderRadius: 4, font: "inherit", fontSize: 12 }} />
-                    ) : fmt(o.mrp)}</td>
-                    <td>{editingId === o.id ? (
-                      <input type="number" min="0" step="0.01" value={editSelling} onChange={(e) => setEditSelling(e.target.value)}
-                        style={{ width: 90, padding: "5px 8px", border: "1px solid #cbc5ba", borderRadius: 4, font: "inherit", fontSize: 12 }} />
-                    ) : fmt(o.sellingPrice)}</td>
-                    <td>
-                      {editingId === o.id ? (
-                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                          <input type="checkbox" checked={editActive} onChange={(e) => setEditActive(e.target.checked)} />
-                          Active
-                        </label>
-                      ) : (
-                        <span className={`admin-badge ${o.isActive ? "admin-badge-active" : "admin-badge-disabled"}`}>{o.isActive ? "Active" : "Inactive"}</span>
-                      )}
-                    </td>
-                    {canManage && (
+                {offerings.flatMap((o) => o.variants.map((v) => {
+                  const key = `${o.id}:${v.variantId}`;
+                  const editing = editingId === key;
+                  const small = { width: 90, padding: "5px 8px", border: "1px solid #cbc5ba", borderRadius: 4, font: "inherit", fontSize: 12 } as const;
+                  const live = v.isActive && o.status === "active";
+                  return (
+                    <tr key={key}>
+                      <td style={{ fontWeight: 500 }}>{o.product.name}</td>
+                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{v.label}</td>
+                      <td>{editing ? <input type="number" min="0" step="0.01" value={editMrp} onChange={(e) => setEditMrp(e.target.value)} style={small} /> : fmt(v.mrp)}</td>
+                      <td>{editing ? <input type="number" min="0" step="0.01" value={editSelling} onChange={(e) => setEditSelling(e.target.value)} style={small} /> : fmt(v.price)}</td>
+                      <td>{v.stock ?? "—"}</td>
                       <td>
-                        <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
-                          {editingId === o.id ? (
-                            <>
-                              {editError && <span style={{ color: "#a73535", fontSize: 11 }}>{editError}</span>}
-                              <button disabled={busy} onClick={() => saveEdit(o.id)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12, color: "var(--admin-accent)" }}>{busy ? "…" : "Save"}</button>
-                              <button disabled={busy} onClick={() => setEditingId(null)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Cancel</button>
-                            </>
-                          ) : (
-                            <button onClick={() => startEdit(o)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Edit</button>
-                          )}
-                        </div>
+                        {editing ? (
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                            <input type="checkbox" checked={editActive} onChange={(e) => setEditActive(e.target.checked)} /> Active
+                          </label>
+                        ) : (
+                          <span className={`admin-badge ${live ? "admin-badge-active" : "admin-badge-disabled"}`}>{live ? "Active" : "Inactive"}</span>
+                        )}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      {canManage && (
+                        <td>
+                          <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
+                            {editing ? (
+                              <>
+                                {editError && <span style={{ color: "#a73535", fontSize: 11 }}>{editError}</span>}
+                                <button disabled={busy} onClick={() => saveEdit(o, v.variantId)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12, color: "var(--admin-accent)" }}>{busy ? "Saving…" : "Save"}</button>
+                                <button disabled={busy} onClick={() => setEditingId(null)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Cancel</button>
+                              </>
+                            ) : (
+                              <button onClick={() => startEdit(o, v)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Edit</button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                }))}
               </tbody>
             </table>
           </div>
@@ -444,46 +440,52 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
   const [subTab, setSubTab] = useState<"levels" | "movements" | "adjust" | "count">("levels");
   const [busy, setBusy] = useState(false);
 
-  // Adjust form
-  const [adjSku, setAdjSku] = useState("");
+  // Adjust form. "item" is "productId|variantId" so nobody types SKUs or IDs.
+  const [adjItem, setAdjItem] = useState("");
   const [adjQty, setAdjQty] = useState("");
-  const [adjType, setAdjType] = useState("shrinkage");
-  const [adjReason, setAdjReason] = useState("");
+  const [adjReason, setAdjReason] = useState("purchase");
+  const [adjNote, setAdjNote] = useState("");
   const [adjError, setAdjError] = useState("");
 
-  // Count form: array of {sku, counted}
-  const [countRows, setCountRows] = useState<{ sku: string; counted: string }[]>([{ sku: "", counted: "" }]);
+  // Count form
+  const [countRows, setCountRows] = useState<{ item: string; counted: string }[]>([{ item: "", counted: "" }]);
   const [countError, setCountError] = useState("");
 
+  const itemKey = (l: { productId: string; variantId: string | null }) => `${l.productId}|${l.variantId ?? ""}`;
+  const itemName = (l: { name: string; variantLabel: string | null }) => (l.variantLabel ? `${l.name} — ${l.variantLabel}` : l.name);
+  const byKey = new Map(levels.map((l) => [itemKey(l), l]));
+  const nameOf = (m: { productId: string; variantId: string | null }) => { const l = byKey.get(itemKey(m)); return l ? itemName(l) : m.productId; };
+
   useEffect(() => {
-    if (!warehouseId || subTab === "adjust" || subTab === "count") return;
+    if (!warehouseId) return;
     const controller = new AbortController();
     setLoading(true); setError("");
-    const path = subTab === "levels" ? `stock/levels?warehouseId=${warehouseId}` : `stock/movements?warehouseId=${warehouseId}`;
-    if (subTab === "levels") {
-      api<{ data: StockLevel[] }>(path, { signal: controller.signal })
-        .then((body) => { if (!controller.signal.aborted) setLevels(body.data); })
-        .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Stock levels could not be loaded."); })
-        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    } else {
-      api<{ data: StockMovement[] }>(path, { signal: controller.signal })
+    const lv = api<{ data: StockLevel[] }>(`stock/levels?warehouseId=${warehouseId}&limit=100`, { signal: controller.signal })
+      .then((body) => { if (!controller.signal.aborted) setLevels(body.data); });
+    const mv = subTab === "movements"
+      ? api<{ data: StockMovement[] }>(`stock/movements?warehouseId=${warehouseId}&limit=100`, { signal: controller.signal })
         .then((body) => { if (!controller.signal.aborted) setMovements(body.data); })
-        .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Movements could not be loaded."); })
-        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    }
+      : Promise.resolve();
+    Promise.all([lv, mv])
+      .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Stock could not be loaded."); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [warehouseId, subTab, attempt]);
+
+  function split(key: string) { const [productId, variantId] = key.split("|"); return { productId: productId!, variantId: variantId || null }; }
 
   async function submitAdjust(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setAdjError(""); setNotice("");
     try {
+      const delta = parseInt(adjQty, 10);
+      if (!Number.isInteger(delta) || delta === 0) throw new Error("Enter a quantity other than zero.");
       await api("stock/adjust", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
-        body: JSON.stringify({ warehouseId, sku: adjSku.trim(), qty: parseInt(adjQty, 10), type: adjType, reason: adjReason }),
+        body: JSON.stringify({ warehouseId, ...split(adjItem), delta, reason: adjReason, note: adjNote.trim() || null }),
       });
-      setAdjSku(""); setAdjQty(""); setAdjReason("");
+      setAdjItem(""); setAdjQty(""); setAdjNote("");
       setNotice("Stock adjustment recorded."); setSubTab("levels"); setAttempt((v) => v + 1);
     } catch (err) {
       setAdjError(err instanceof Error ? err.message : "Adjustment failed.");
@@ -496,13 +498,14 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
     e.preventDefault();
     setBusy(true); setCountError(""); setNotice("");
     try {
-      const counts = countRows.filter((r) => r.sku.trim()).map((r) => ({ sku: r.sku.trim(), counted: parseInt(r.counted, 10) || 0 }));
+      const counts = countRows.filter((r) => r.item).map((r) => ({ ...split(r.item), counted: Math.max(0, parseInt(r.counted, 10) || 0) }));
+      if (counts.length === 0) throw new Error("Pick at least one product to count.");
       await api("stock/count", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
         body: JSON.stringify({ warehouseId, counts }),
       });
-      setCountRows([{ sku: "", counted: "" }]);
+      setCountRows([{ item: "", counted: "" }]);
       setNotice("Cycle count submitted."); setSubTab("levels"); setAttempt((v) => v + 1);
     } catch (err) {
       setCountError(err instanceof Error ? err.message : "Count submission failed.");
@@ -517,12 +520,15 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
     ...(canManage ? [{ key: "adjust", label: "Adjustment" }, { key: "count", label: "Cycle count" }] : []),
   ] as { key: typeof subTab; label: string }[];
 
+  const itemOptions = levels.map((l) => <option key={itemKey(l)} value={itemKey(l)}>{itemName(l)} (now {l.stock} {l.unit})</option>);
+  const selected = byKey.get(adjItem);
+
   return (
     <>
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         {subTabs.map((t) => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
-            style={{ padding: "7px 14px", border: "1px solid #cbc5ba", borderRadius: 6, background: subTab === t.key ? "#f3f1ee" : "#fff", color: subTab === t.key ? "var(--admin-accent)" : "var(--admin-text)", fontWeight: subTab === t.key ? 600 : 400, cursor: "pointer", fontSize: 12 }}>
+            style={{ padding: "7px 14px", border: "1px solid #cbc5ba", borderRadius: 6, background: subTab === t.key ? "#f3f1ee" : "#fff", color: subTab === t.key ? "var(--admin-accent)" : "var(--admin-text)", cursor: "pointer", fontSize: 12 }}>
             {t.label}
           </button>
         ))}
@@ -535,23 +541,22 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
 
       {subTab === "levels" && (
         <section className="admin-panel" aria-labelledby="stock-levels-title">
-          <div className="admin-panel-toolbar"><h2 id="stock-levels-title">Stock levels</h2><span>{levels.length} SKUs</span></div>
+          <div className="admin-panel-toolbar"><h2 id="stock-levels-title">Stock levels</h2><span>{levels.length} items</span></div>
           {!warehouseId ? <p className="admin-roles-message">Select a warehouse above.</p>
             : loading ? <p className="admin-roles-message" role="status">Loading…</p>
             : error ? <p className="admin-roles-message" role="alert">{error}</p>
-            : levels.length === 0 ? <p className="admin-roles-message">No stock data for this warehouse.</p>
+            : levels.length === 0 ? <p className="admin-roles-message">No stock data. Activate products in this warehouse first (Offerings tab).</p>
             : (
               <div style={{ overflowX: "auto" }}>
                 <table className="admin-stock-table">
-                  <thead><tr><th>Product</th><th>SKU</th><th>On hand</th><th>Reserved</th><th>Available</th></tr></thead>
+                  <thead><tr><th>Product</th><th>Variant</th><th>In stock</th><th>Status</th></tr></thead>
                   <tbody>
-                    {levels.map((s, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 500 }}>{s.productTitle}</td>
-                        <td style={{ fontFamily: "monospace", fontSize: 12, color: "var(--admin-muted)" }}>{s.sku}</td>
-                        <td>{s.onHand}</td>
-                        <td style={{ color: s.reserved > 0 ? "#b06000" : "inherit" }}>{s.reserved}</td>
-                        <td style={{ fontWeight: 600, color: s.available <= 0 ? "#c5221f" : "#137333" }}>{s.available}</td>
+                    {levels.map((l) => (
+                      <tr key={itemKey(l)}>
+                        <td style={{ fontWeight: 500 }}>{l.name}</td>
+                        <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{l.variantLabel ?? "Pooled weight"}</td>
+                        <td style={{ fontWeight: 600 }}>{l.stock} {l.unit}</td>
+                        <td>{l.stock <= 0 ? <span className="admin-badge admin-badge-disabled">Out of stock</span> : l.isLow ? <span className="admin-badge admin-badge-paused">Low</span> : <span className="admin-badge admin-badge-active">OK</span>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -571,13 +576,14 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
             : (
               <div style={{ overflowX: "auto" }}>
                 <table className="admin-stock-table">
-                  <thead><tr><th>SKU</th><th>Type</th><th>Qty</th><th>Note</th><th>When</th></tr></thead>
+                  <thead><tr><th>Product</th><th>Reason</th><th>Change</th><th>Balance</th><th>Note</th><th>When</th></tr></thead>
                   <tbody>
                     {movements.map((m) => (
                       <tr key={m.id}>
-                        <td style={{ fontFamily: "monospace", fontSize: 12 }}>{m.sku}</td>
-                        <td><span className="admin-badge" style={{ background: "#f3f1ee", color: "#c62828" }}>{m.type}</span></td>
-                        <td style={{ fontWeight: 600, color: m.qty < 0 ? "#c5221f" : "#137333" }}>{m.qty > 0 ? `+${m.qty}` : m.qty}</td>
+                        <td style={{ fontWeight: 500 }}>{nameOf(m)}</td>
+                        <td><span className="admin-badge" style={{ background: "#f3f1ee", color: "#c62828" }}>{m.reason}</span></td>
+                        <td style={{ fontWeight: 600, color: m.delta < 0 ? "#c5221f" : "#137333" }}>{m.delta > 0 ? `+${m.delta}` : m.delta}</td>
+                        <td>{m.balanceAfter}</td>
                         <td style={{ color: "var(--admin-muted)", fontSize: 12 }}>{m.note || "—"}</td>
                         <td style={{ color: "var(--admin-muted)", fontSize: 12 }}>{fmtDate(m.createdAt)}</td>
                       </tr>
@@ -593,24 +599,24 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
         <form className="admin-panel admin-role-form" onSubmit={submitAdjust} style={{ maxWidth: 480 }}>
           <h2>Manual stock adjustment</h2>
           <div style={{ display: "grid", gap: 12 }}>
-            <label htmlFor="adj-sku" style={{ fontSize: 12 }}>SKU *
-              <input id="adj-sku" required value={adjSku} disabled={busy} onChange={(e) => setAdjSku(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
-            </label>
-            <label htmlFor="adj-type" style={{ fontSize: 12 }}>Adjustment type *
-              <select id="adj-type" value={adjType} disabled={busy} onChange={(e) => setAdjType(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}>
-                <option value="shrinkage">Shrinkage</option>
-                <option value="damaged">Damaged goods</option>
-                <option value="restock">Manual restock</option>
+            <label htmlFor="adj-item" style={{ fontSize: 12 }}>Product *
+              <select id="adj-item" required value={adjItem} disabled={busy} onChange={(e) => setAdjItem(e.target.value)} style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}>
+                <option value="">Select a product / variant</option>
+                {itemOptions}
               </select>
             </label>
-            <label htmlFor="adj-qty" style={{ fontSize: 12 }}>Quantity (negative = reduction) *
-              <input id="adj-qty" type="number" required value={adjQty} disabled={busy} onChange={(e) => setAdjQty(e.target.value)}
-                style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
+            <label htmlFor="adj-reason" style={{ fontSize: 12 }}>Reason *
+              <select id="adj-reason" value={adjReason} disabled={busy} onChange={(e) => setAdjReason(e.target.value)} style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}>
+                <option value="purchase">Purchase / new stock received</option>
+                <option value="wastage">Wastage / damaged / expired</option>
+                <option value="correction">Correction</option>
+              </select>
             </label>
-            <label htmlFor="adj-reason" style={{ fontSize: 12 }}>Reason / notes
-              <textarea id="adj-reason" value={adjReason} disabled={busy} onChange={(e) => setAdjReason(e.target.value)} maxLength={500}
+            <label htmlFor="adj-qty" style={{ fontSize: 12 }}>Quantity change{selected ? ` (${selected.unit})` : ""} — use a minus for a reduction *
+              <input id="adj-qty" type="number" step="1" required value={adjQty} disabled={busy} onChange={(e) => setAdjQty(e.target.value)} style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
+            </label>
+            <label htmlFor="adj-note" style={{ fontSize: 12 }}>Note
+              <textarea id="adj-note" value={adjNote} disabled={busy} onChange={(e) => setAdjNote(e.target.value)} maxLength={200}
                 style={{ display: "block", marginTop: 5, width: "100%", minHeight: 70, padding: 10, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", resize: "vertical" }} />
             </label>
           </div>
@@ -624,23 +630,24 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
       {subTab === "count" && (
         <form className="admin-panel admin-role-form" onSubmit={submitCount}>
           <h2>Cycle count / physical audit</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>Enter the physically counted quantity for each SKU. The system will reconcile against on-hand stock.</p>
-          <div style={{ display: "grid", gap: 8, maxWidth: 480 }}>
+          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>Pick each product and enter the quantity you physically counted. The system sets stock to that number.</p>
+          <div style={{ display: "grid", gap: 8, maxWidth: 560 }}>
             {countRows.map((row, i) => (
               <div key={i} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input placeholder="SKU" value={row.sku} disabled={busy}
-                  onChange={(e) => { const r = [...countRows]; r[i] = { ...r[i]!, sku: e.target.value }; setCountRows(r); }}
-                  style={{ flex: 2, padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
-                <input type="number" placeholder="Counted qty" value={row.counted} disabled={busy}
-                  onChange={(e) => { const r = [...countRows]; r[i] = { ...r[i]!, counted: e.target.value }; setCountRows(r); }}
-                  style={{ flex: 1, padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
+                <select value={row.item} disabled={busy} style={{ flex: 2 }}
+                  onChange={(e) => { const r = [...countRows]; r[i] = { ...r[i]!, item: e.target.value }; setCountRows(r); }}>
+                  <option value="">Select a product / variant</option>
+                  {itemOptions}
+                </select>
+                <input type="number" min="0" step="1" placeholder="Counted qty" value={row.counted} disabled={busy} style={{ flex: 1 }}
+                  onChange={(e) => { const r = [...countRows]; r[i] = { ...r[i]!, counted: e.target.value }; setCountRows(r); }} />
                 {countRows.length > 1 && (
                   <button type="button" onClick={() => setCountRows((r) => r.filter((_, j) => j !== i))}
                     style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "7px 10px", background: "#fff", cursor: "pointer", fontSize: 12, color: "#a73535" }}>✕</button>
                 )}
               </div>
             ))}
-            <button type="button" onClick={() => setCountRows((r) => [...r, { sku: "", counted: "" }])}
+            <button type="button" onClick={() => setCountRows((r) => [...r, { item: "", counted: "" }])}
               style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "7px 14px", background: "#fff", cursor: "pointer", fontSize: 12, alignSelf: "flex-start", color: "var(--admin-accent)" }}>
               + Add row
             </button>

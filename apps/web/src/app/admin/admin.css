@@ -168,3 +168,8 @@
 .admin-role-form fieldset { background: #fffdf7; }
 .admin-role-form fieldset label { font-weight: 500; }
 .admin-role-form input::placeholder, .admin-role-form textarea::placeholder { color: #98938a; }
+
+/* Field helper: labels stack at the top of their grid cell and inputs sit flush under the label text */
+.admin-field > input:not([type="checkbox"]):not([type="radio"]), .admin-field > select, .admin-field > textarea { margin-top: 0; }
+.admin-field > select { height: 40px; }
+.admin-field > input[type="datetime-local"] { min-height: 40px; }

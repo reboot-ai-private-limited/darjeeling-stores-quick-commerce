@@ -128,7 +128,7 @@ export function Tabs<K extends string>({ tabs, value, onChange, label }: { tabs:
 
 export function Field({ label, hint, children, wide }: { label: string; hint?: string; children: ReactNode; wide?: boolean }) {
   return (
-    <label style={{ display: "grid", gap: 4, fontSize: 12, ...(wide ? { gridColumn: "1 / -1" } : {}) }}>
+    <label className="admin-field" style={{ display: "grid", gap: 4, alignContent: "start", fontSize: 12, ...(wide ? { gridColumn: "1 / -1", marginTop: 14 } : {}) }}>
       <span style={{ fontWeight: 600 }}>{label}</span>
       {children}
       {hint && <small style={{ color: "var(--admin-muted)" }}>{hint}</small>}

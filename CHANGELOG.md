@@ -18,8 +18,12 @@ This section records the current working-tree foundation and documentation. It d
 - Rider tips: added at checkout, shared over split deliveries, refunded with a cancelled order, and a per-rider list of what the owner still owes (F10, F19, F22).
 - Admin settings with scoped overrides, history and audit; dashboard; nine reports with CSV; customer administration; audit search (F25).
 
+- Customer app: browse, cart, coupons, checkout (cash or online), pre-orders, tracking, cancellation, refund requests and account screens.
+- Rider app connected to the real backend.
+
 ### Limitations
 
-- Customer and rider applications remain reserved directories; web is a placeholder.
-- Business authentication, permissions, catalog, ordering and delivery remain planned.
+- The rider app and the customer app are built against the real backend but have not been tested on real devices or released. The customer app's notifications list is built from orders (no server inbox); online payment is untested with Razorpay keys.
+- The web admin has most screens; the public storefront and tracking page are not built.
+- The API covers authentication, permissions, catalog, ordering, payments, refunds and delivery; production hosting and release automation are not set up.
 - Production hosting, CI release automation, backups and restore verification are not established by this scaffold.

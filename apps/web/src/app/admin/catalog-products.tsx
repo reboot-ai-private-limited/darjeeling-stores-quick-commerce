@@ -122,7 +122,7 @@ function VariantsPanel({ product, canEdit, onChanged }: { product: Product; canE
         {product.variants.map((v) => {
           const d = drafts[v.id];
           if (d) return (
-            <form key={v.id} onSubmit={(e) => { e.preventDefault(); void save(d); }}>
+            <form key={v.id} className="admin-role-form" onSubmit={(e) => { e.preventDefault(); void save(d); }}>
               <VariantFields d={d} productName={product.name} disabled={busy} onChange={(x) => setDrafts((p) => ({ ...p, [v.id]: x }))} />
               <label style={{ ...lbl, display: "flex", gap: 8, alignItems: "center", margin: "8px 0" }}><input type="checkbox" checked={d.isActive} onChange={(e) => setDrafts((p) => ({ ...p, [v.id]: { ...d, isActive: e.target.checked } }))} /> Active (sellable)</label>
               <div style={{ display: "flex", gap: 8 }}>
@@ -149,7 +149,7 @@ function VariantsPanel({ product, canEdit, onChanged }: { product: Product; canE
         })}
       </div>
       {canEdit && (adding ? (
-        <form style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); void run(async () => { await call(`admin/products/${product.id}/variants`, send("POST", variantPayload(adding, product.name))); setAdding(null); }); }}>
+        <form className="admin-role-form" style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); void run(async () => { await call(`admin/products/${product.id}/variants`, send("POST", variantPayload(adding, product.name))); setAdding(null); }); }}>
           <VariantFields d={adding} productName={product.name} disabled={busy} onChange={setAdding} />
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <button className="admin-role-button" disabled={busy}>Add variant</button>
@@ -311,7 +311,33 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
   const [photos, setPhotos] = useState<File[]>([]);
   const [more, setMore] = useState(!isNew);
   const [similar, setSimilar] = useState<{ id: string; name: string; reason: string }[] | null>(null);
+  // Optional: sell it in a warehouse straight away (price + starting stock), so no second page is needed.
+  type OfferVals = { mrp: string; price: string; stock: string };
+  const [whs, setWhs] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [whId, setWhId] = useState("");
+  const [offer, setOffer] = useState<OfferVals[]>([]);
+  const [grams, setGrams] = useState("");
+  useEffect(() => {
+    if (!isNew) return;
+    call<{ data: { id: string; name: string; code: string }[] }>("admin/warehouses").then((b) => setWhs(b.data)).catch(() => setWhs([]));
+  }, [isNew]);
+  const offerOf = (i: number): OfferVals => offer[i] ?? { mrp: "", price: "", stock: "" };
+  const setOfferAt = (i: number, patch: Partial<OfferVals>) => setOffer((o) => { const n = variants.map((_, k) => o[k] ?? { mrp: "", price: "", stock: "" }); n[i] = { ...n[i]!, ...patch }; return n; });
   const readOnly = !canEdit;
+
+  /** Builds the warehouse offer body for the new product's saved variants, or throws a readable message. */
+  function offerBody(productId: string, savedVariantIds: string[]) {
+    const pooled = stockMode === "pooled_weight";
+    const rows = savedVariantIds.map((variantId, i) => {
+      const x = offerOf(i);
+      const mrp = Math.round(parseFloat(x.mrp) * 100), price = Math.round(parseFloat(x.price) * 100);
+      const label = variants[i]?.label || `Variant ${i + 1}`;
+      if (!(mrp >= 1) || !(price >= 1)) throw new Error(`${label}: enter MRP and selling price for the warehouse.`);
+      if (price > mrp) throw new Error(`${label}: selling price cannot exceed MRP.`);
+      return { variantId, mrp, price, stock: pooled ? null : Math.max(0, Math.floor(Number(x.stock) || 0)) };
+    });
+    return { warehouseId: whId, productId, stockGrams: pooled ? Math.max(0, Math.floor(Number(grams) || 0)) : null, variants: rows };
+  }
 
   function payload() {
     const base = {
@@ -338,10 +364,14 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
         if (dup.data.similar.length > 0) { setSimilar(dup.data.similar); return; }
       }
       setSimilar(null);
-      const res = await call<{ data: { id: string } }>(isNew ? "admin/products" : `admin/products/${product.id}`, send(isNew ? "POST" : "PUT", payload()));
+      const res = await call<{ data: { id: string; variants?: { id: string }[] } }>(isNew ? "admin/products" : `admin/products/${product.id}`, send(isNew ? "POST" : "PUT", payload()));
       let failed = 0;
       for (const file of photos) { try { await uploadProductImage(res.data.id, name.trim(), file); } catch { failed++; } }
       if (failed > 0) window.alert(`${photos.length - failed} of ${photos.length} photos uploaded. ${failed} failed — add them again from the Images section below.`);
+      if (isNew && whId) {
+        try { await call("admin/warehouse-products", send("POST", offerBody(res.data.id, (res.data.variants ?? []).map((v) => v.id)))); }
+        catch (err) { window.alert(`The product was saved, but it could not be added to the warehouse: ${err instanceof Error ? err.message : "unknown error"}. Add it from Offerings & stock.`); }
+      }
       onSaved(res.data.id, isNew); // a new product stays open so more can be edited
     } catch (err) {
       setError(err instanceof Error ? err.message : "The product could not be saved.");
@@ -392,6 +422,32 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
               {variants.map((v, i) => <VariantFields key={i} d={v} productName={name} disabled={dis} onChange={(x) => setVariants(variants.map((y, j) => (j === i ? x : y)))} canRemove={variants.length > 1} onRemove={() => setVariants(variants.filter((_, j) => j !== i))} />)}
             </div>
             {variants.length < 20 && <button type="button" style={{ ...smallBtn, marginTop: 10 }} disabled={dis} onClick={() => setVariants([...variants, emptyVariant()])}>+ Add variant</button>}
+          </div>
+        )}
+
+        {isNew && whs.length > 0 && (
+          <div style={{ ...section, margin: "18px 0 0" }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>Sell in a warehouse <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— optional, saves a trip to Offerings &amp; stock</small></h3>
+            <label style={lbl}>Warehouse
+              <select value={whId} disabled={dis} onChange={(e) => setWhId(e.target.value)}>
+                <option value="">Not now — add it later</option>
+                {whs.map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}
+              </select>
+            </label>
+            {whId && (
+              <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                {variants.map((v, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                    <span style={{ width: 130, fontSize: 12, fontWeight: 600 }}>{v.label || `Variant ${i + 1}`}</span>
+                    <label style={{ ...lbl, width: 110 }}>MRP ₹<input type="number" min="0" step="0.01" value={offerOf(i).mrp} disabled={dis} onChange={(e) => setOfferAt(i, { mrp: e.target.value })} /></label>
+                    <label style={{ ...lbl, width: 110 }}>Price ₹<input type="number" min="0" step="0.01" value={offerOf(i).price} disabled={dis} onChange={(e) => setOfferAt(i, { price: e.target.value })} /></label>
+                    {stockMode !== "pooled_weight" && <label style={{ ...lbl, width: 110 }}>Stock<input type="number" min="0" step="1" value={offerOf(i).stock} disabled={dis} onChange={(e) => setOfferAt(i, { stock: e.target.value })} /></label>}
+                  </div>
+                ))}
+                {stockMode === "pooled_weight" && <label style={{ ...lbl, width: 180 }}>Stock (grams, shared by all variants)<input type="number" min="0" step="1" value={grams} disabled={dis} onChange={(e) => setGrams(e.target.value)} /></label>}
+                <p style={{ margin: 0, fontSize: 11, color: "var(--admin-muted)" }}>Customers only see it once the product Status is “Active”.</p>
+              </div>
+            )}
           </div>
         )}
 
