@@ -23,7 +23,7 @@ This section records the current working-tree foundation and documentation. It d
 
 ### Limitations
 
-- The rider app and the customer app are built against the real backend but have not been tested on real devices or released. The customer app lacks the notifications inbox and brand page; online payment is untested with Razorpay keys.
+- The rider app and the customer app are built against the real backend but have not been tested on real devices or released. The customer app's notifications list is built from orders (no server inbox); online payment is untested with Razorpay keys.
 - The web admin has most screens; the public storefront and tracking page are not built.
 - The API covers authentication, permissions, catalog, ordering, payments, refunds and delivery; production hosting and release automation are not set up.
 - Production hosting, CI release automation, backups and restore verification are not established by this scaffold.

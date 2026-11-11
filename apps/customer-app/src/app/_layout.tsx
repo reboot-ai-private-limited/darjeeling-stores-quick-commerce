@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { OfflineBanner } from "../components/OfflineBanner";
 import { CartProvider } from "../state/cart";
 import { StoreProvider, useStore } from "../state/store";
 import { colors } from "../theme";
@@ -22,6 +23,7 @@ export default function RootLayout() {
         <StoreProvider><CartProvider>
           <StatusBar style="dark" />
           <BlockedGate />
+          <OfflineBanner />
           <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", animationDuration: 320, contentStyle: { backgroundColor: colors.cream } }}>
             <Stack.Screen name="index" options={{ animation: "fade" }} />
             <Stack.Screen name="welcome" options={{ animation: "fade", gestureEnabled: false }} />
@@ -41,6 +43,9 @@ export default function RootLayout() {
             <Stack.Screen name="address/edit" />
             <Stack.Screen name="pay/[id]" options={{ gestureEnabled: false }} />
             <Stack.Screen name="closed" />
+            <Stack.Screen name="favourites" />
+            <Stack.Screen name="notifications" />
+            <Stack.Screen name="brand/[id]" />
             <Stack.Screen name="edit-profile" />
             <Stack.Screen name="notification-prefs" />
             <Stack.Screen name="refunds" />

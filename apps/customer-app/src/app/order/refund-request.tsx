@@ -3,13 +3,15 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import { refundMessage, requestRefund } from "../../api/account";
 import { ApiError } from "../../api/http";
+import { uploadMessage, uploadPhoto } from "../../api/media";
+import { PhotoPicker, type Picked } from "../../components/Attach";
 import { getOrderGroup, type OrderItem } from "../../api/orders";
 import { Button, Card, Chip, Header, Icon, Press, Screen } from "../../components/ui";
 import { colors, radius, rupees, space, type } from "../../theme";
 
 const REASONS: [string, string][] = [["damaged_item", "Damaged"], ["missing_item", "Missing"], ["other", "Something else"]];
 
-/** Screen 30: report a missing or damaged item from a delivered order. Photo upload arrives with the media screens. */
+/** Screen 30: report a missing or damaged item from a delivered order. The photo is uploaded privately and attached to the request. */
 export default function RefundRequest() {
   const { id, group } = useLocalSearchParams<{ id: string; group: string }>();
   const [items, setItems] = useState<OrderItem[] | null>(null);
@@ -17,6 +19,7 @@ export default function RefundRequest() {
   const [picked, setPicked] = useState<Record<number, boolean>>({});
   const [reason, setReason] = useState("damaged_item"); const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [done, setDone] = useState(false);
+  const [photo, setPhoto] = useState<Picked>(null);
 
   useEffect(() => {
     void getOrderGroup(group).then(g => { const c = g.children.find(x => x.id === id); setItems(c?.items ?? []); setOrderNo(c?.orderNo ?? g.groupNo); })
@@ -27,7 +30,9 @@ export default function RefundRequest() {
   const submit = async () => {
     setBusy(true); setErr("");
     try {
-      await requestRefund(id, { reason, items: chosen.map(i => ({ orderItemIndex: i, qty: items![i].qty })), ...(note.trim() ? { customerNote: note.trim() } : {}) });
+      let photoMediaIds: string[] | undefined;
+      if (photo) { try { photoMediaIds = [await uploadPhoto("refund_photo", photo.uri)]; } catch (e) { setErr(uploadMessage(e)); setBusy(false); return; } }
+      await requestRefund(id, { reason, items: chosen.map(i => ({ orderItemIndex: i, qty: items![i].qty })), ...(note.trim() ? { customerNote: note.trim() } : {}), ...(photoMediaIds ? { photoMediaIds } : {}) });
       setDone(true);
     } catch (e) {
       const friendly = e instanceof ApiError ? refundMessage(e.code, e.details?.reason) : "";
@@ -71,6 +76,7 @@ export default function RefundRequest() {
             {REASONS.map(([k, l]) => <Chip key={k} label={l} active={reason === k} onPress={() => setReason(k)} />)}
           </View>
           <TextInput value={note} onChangeText={setNote} placeholder="Add a note (optional)" multiline style={s.input} />
+          <View style={{ marginTop: space.lg }}><PhotoPicker label="Photo of the item" hint="A clear photo helps us approve your refund faster." value={photo} onChange={setPhoto} /></View>
         </>
       )}
       {!!err && <Text style={[type.small, { color: colors.red, marginTop: space.md }]}>{err}</Text>}

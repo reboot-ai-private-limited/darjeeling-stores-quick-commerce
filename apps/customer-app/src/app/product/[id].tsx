@@ -8,6 +8,7 @@ import { getProduct, getProducts, notifyMe, type Product, type ProductDetail } f
 import { ProductCard } from "../../components/shop";
 import { ApiError } from "../../api/http";
 import { Button, Icon, Press, tap } from "../../components/ui";
+import { useFavourites } from "../../api/favourites";
 import { useCart } from "../../state/cart";
 import { useStore } from "../../state/store";
 import { colors, radius, rupees, shadow, space, type } from "../../theme";
@@ -20,6 +21,7 @@ export default function ProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { zone, signedIn } = useStore();
   const { qtyOf, add, remove } = useCart();
+  const fav = useFavourites();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
@@ -63,7 +65,12 @@ export default function ProductScreen() {
       {/* Back and share sit on top of the page */}
       <View style={[s.topBtns, { top: insets.top + 8 }]}>
         <Press onPress={() => router.back()} haptic style={s.iconBtn}><Icon name="arrow-left" size={20} /></Press>
-        {p && <Press onPress={() => void Share.share({ message: `${p.name} on Darjeeling Stores` })} haptic style={s.iconBtn}><Icon name="share-2" size={18} /></Press>}
+        {p && (
+          <View style={{ flexDirection: "row", gap: space.sm }}>
+            <Press onPress={() => void fav.toggle(p)} haptic style={s.iconBtn}><Icon name="heart" size={18} color={fav.has(p.id) ? colors.red : colors.ink} /></Press>
+            <Press onPress={() => void Share.share({ message: `${p.name} on Darjeeling Stores` })} haptic style={s.iconBtn}><Icon name="share-2" size={18} /></Press>
+          </View>
+        )}
       </View>
 
       {error ? (

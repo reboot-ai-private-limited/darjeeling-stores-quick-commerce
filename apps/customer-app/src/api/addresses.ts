@@ -8,6 +8,8 @@ export type Address = {
 export type AddressInput = {
   label: "Home" | "Work" | "Other"; line1: string; localityId: string; pincode: string; landmark: string; contactName: string; contactPhone: string;
   location: { lat: number; lng: number }; deliveryNotes?: string | null; makeDefault?: boolean;
+  /** Finished uploads (F24). `null` removes the saved file; leave out to keep it. */
+  voiceMediaId?: string | null; housePhotoMediaId?: string | null;
 };
 
 export const listAddresses = () => api<Address[]>("GET", "/addresses").then(r => r.data);

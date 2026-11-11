@@ -23,6 +23,9 @@ export default function CategoryProducts() {
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("relevance");
   const [inStock, setInStock] = useState(false);
+  const [food, setFood] = useState<"veg" | "non_veg" | null>(null);
+  const [brand, setBrand] = useState<string | null>(null);
+  const [under, setUnder] = useState<number | null>(null);
   const zoneId = zone?.id;
 
   useEffect(() => { if (zoneId) void getCategories(zoneId).then(setTree).catch(() => undefined); }, [zoneId]);
@@ -48,13 +51,20 @@ export default function CategoryProducts() {
 
   const shown = useMemo(() => {
     let list = inStock ? items.filter(p => p.availability === "in_stock") : items;
+    if (food === "veg") list = list.filter(p => p.foodType === "veg" || p.foodType === "vegan");
+    if (food === "non_veg") list = list.filter(p => p.foodType === "non_veg" || p.foodType === "egg");
+    if (brand) list = list.filter(p => p.brand?.id === brand);
+    if (under) list = list.filter(p => (defaultVariant(p)?.price ?? 0) <= under * 100);
     const price = (p: Product) => defaultVariant(p)?.price ?? 0;
     const off = (p: Product) => defaultVariant(p)?.discountPercent ?? 0;
     if (sort === "low") list = [...list].sort((a, b) => price(a) - price(b));
     else if (sort === "high") list = [...list].sort((a, b) => price(b) - price(a));
     else if (sort === "discount") list = [...list].sort((a, b) => off(b) - off(a));
     return list;
-  }, [items, sort, inStock]);
+  }, [items, sort, inStock, food, brand, under]);
+  const hasFood = useMemo(() => items.some(p => p.foodType === "veg" || p.foodType === "vegan" || p.foodType === "non_veg" || p.foodType === "egg"), [items]);
+  const brands = useMemo(() => { const m = new Map<string, string>(); items.forEach(p => { if (p.brand) m.set(p.brand.id, p.brand.name); }); return [...m.entries()]; }, [items]);
+  const filtered = inStock || !!food || !!brand || !!under;
 
   const children = cat?.children ?? [];
   const cycleSort = () => setSort(s => SORTS[(SORTS.findIndex(x => x.key === s) + 1) % SORTS.length]!.key);
@@ -72,10 +82,14 @@ export default function CategoryProducts() {
             {children.map(c => <Chip key={c.id} label={c.name} active={sub === c.id} onPress={() => setSub(c.id)} />)}
           </ScrollView>
         )}
-        <View style={[s.chips, { paddingTop: children.length ? 0 : space.sm }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={[s.chips, { paddingTop: children.length ? 0 : space.sm }]}>
           <Chip label={SORTS.find(x => x.key === sort)!.label} icon="sliders" active={sort !== "relevance"} onPress={cycleSort} />
           <Chip label="In stock" icon="check" active={inStock} onPress={() => setInStock(v => !v)} />
-        </View>
+          {hasFood && <Chip label="Veg" active={food === "veg"} onPress={() => setFood(f => (f === "veg" ? null : "veg"))} />}
+          {hasFood && <Chip label="Non-veg" active={food === "non_veg"} onPress={() => setFood(f => (f === "non_veg" ? null : "non_veg"))} />}
+          {[99, 199, 499].map(u => <Chip key={u} label={`Under ₹${u}`} active={under === u} onPress={() => setUnder(c => (c === u ? null : u))} />)}
+          {brands.length > 1 && brands.map(([bid, bn]) => <Chip key={bid} label={bn} icon="tag" active={brand === bid} onPress={() => setBrand(c => (c === bid ? null : bid))} />)}
+        </ScrollView>
 
         {loading && <ActivityIndicator color={colors.maroon} style={{ marginTop: 60 }} />}
         {error && !loading && (
@@ -87,7 +101,7 @@ export default function CategoryProducts() {
           <View style={{ alignItems: "center", gap: space.sm, marginTop: 70 }}>
             <Icon name="package" size={40} color={colors.faint} />
             <Text style={type.h2}>Nothing here yet</Text>
-            <Text style={type.small}>{inStock ? "Try turning off the In stock filter." : "This shelf is empty right now."}</Text>
+            <Text style={type.small}>{filtered ? "No products match these filters. Try removing one." : "This shelf is empty right now."}</Text>
           </View>
         )}
         {!loading && !error && (

@@ -3,7 +3,7 @@
 Customer app for Darjeeling Stores: browse a nearby store's catalogue, fill a cart, check out (cash or online), and follow the order to the door.
 Android and iOS, built with Expo (React Native) and Expo Router, like the rider app.
 
-**Status (2026-11-11):** about 38 of the 40 screens are built against the real backend and pass the TypeScript check. Not yet tested on a real phone, and online payment has not been tried with live or test Razorpay keys. The rest of this document is the original plan, kept as the reference for what each screen does.
+**Status (2026-11-11):** all 40 screens are built against the real backend and pass the TypeScript check. Not yet tested on a real phone, and online payment has not been tried with live or test Razorpay keys. The rest of this document is the original plan, kept as the reference for what each screen does.
 
 | Area | State |
 |---|---|
@@ -13,11 +13,11 @@ Android and iOS, built with Expo (React Native) and Expo Router, like the rider 
 | Cart, coupons, addresses, checkout, payment method, order placed (16-19, 21, 22, 25) | Built |
 | Online payment: Razorpay in a WebView, confirming, retry, expired (23, 24) | Built, untested with Razorpay |
 | Delivery time and pre-order slots (20), store closed (40) | Built |
-| Orders, order detail, live tracking, cancel, report a problem, refunds, reorder (26-32) | Built (no photo on the problem report) |
+| Orders, order detail, live tracking, cancel, report a problem with a photo, refunds, reorder (26-32) | Built |
 | Notify-me list (15), account, edit profile, notification settings, help and delete account (33-37) | Built |
-| Notifications inbox (10) | Not built: no backend endpoint |
-| Brand page (13) | Not built |
-| Not confirmed in existing screens | Home offers row and recently ordered, category filters and sort, favourites and share, address voice note and photo, recent searches, offline banner |
+| Notifications inbox (10) | Built as an order-updates list from the customer's orders (no server inbox yet); push needs a development build |
+| Brand page (13) | Built (a brand's products, found through search) |
+| Address voice note and house photo, favourites, share, category filters (veg, brand, price), recent searches, offline banner | Built |
 | Needs a development build | Push notifications, native Razorpay SDK |
 
 - Backend reference: `docs/api/` (F01 login, F04/F05 catalogue and stock, F07 notify-me, F08 discovery, F09 addresses, F10 cart and quote, F11 fees, F12 coupons and banners, F13 orders, F14 lifecycle, F15 payments, F16 refunds, F17 hours and pre-orders, F20 tracking, F23 notifications, F24 media).

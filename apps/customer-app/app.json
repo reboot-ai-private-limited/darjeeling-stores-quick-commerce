@@ -25,6 +25,8 @@
       "expo-font",
       ["expo-splash-screen", { "image": "./assets/splash-icon.png", "backgroundColor": "#401815", "imageWidth": 200 }],
       "expo-secure-store",
+      ["expo-image-picker", { "photosPermission": "Darjeeling Stores uses your photos so you can add a picture of your door or of a problem item.", "cameraPermission": "Darjeeling Stores uses the camera to take a picture of your door or of a problem item." }],
+      ["expo-audio", { "microphonePermission": "Darjeeling Stores uses the microphone to record a voice note for your delivery partner." }],
       ["expo-location", { "locationWhenInUsePermission": "Darjeeling Stores uses your location to find the nearest store and deliver to your door." }]
     ]
   }

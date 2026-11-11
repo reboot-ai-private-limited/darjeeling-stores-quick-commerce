@@ -33,6 +33,11 @@ export default function Account() {
       <Card style={{ marginTop: space.md }}>
         <Row icon="map-pin" label="Delivery location" value={place?.label ?? "Not set"} />
       </Card>
+      <Card style={{ marginTop: space.md, padding: 0, overflow: "hidden" }}>
+        <Press onPress={() => router.push("/favourites")} style={s.link}>
+          <Icon name="heart" size={19} color={colors.maroon} /><Text style={[type.body, { flex: 1, fontWeight: "600" }]}>Favourites</Text><Icon name="chevron-right" size={18} color={colors.faint} />
+        </Press>
+      </Card>
       {signedIn && (
         <Card style={{ marginTop: space.md, padding: 0, overflow: "hidden" }}>
           {LINKS.map(([icon, label, path], i) => (
