@@ -1,9 +1,11 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { appliedCoupon, removeCoupon } from "../api/account";
+import { listAddresses } from "../api/addresses";
 import { getStoreStatus, REASONS, syncCart, toServerLines, type ServerCart, type StoreStatus } from "../api/cart";
 import { Button, Header, Icon, Press, Screen, tap } from "../components/ui";
 import { useCart, type Line } from "../state/cart";
@@ -19,6 +21,8 @@ export default function CartScreen() {
   const [server, setServer] = useState<ServerCart | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [coupon, setCoupon] = useState<string | null>(null);
+  useFocusEffect(useCallback(() => { if (signedIn && lines.length > 0) void appliedCoupon().then(setCoupon).catch(() => undefined); }, [signedIn, lines.length]));
   const linesRef = useRef<Line[]>(lines);
   linesRef.current = lines;
 
@@ -53,9 +57,14 @@ export default function CartScreen() {
   const eta = status ? `${status.eta.minMinutes}-${status.eta.maxMinutes} min` : null;
   const unavailable = lines.some(l => l.available === false);
 
-  const checkout = () => {
+  /** With a saved address, go straight to checkout (it has a Change button). Only a customer with no address is sent to add one. */
+  const checkout = async () => {
     if (!signedIn) { router.push("/login"); return; }
-    router.push({ pathname: "/addresses", params: { pick: "1" } });
+    try {
+      const list = await listAddresses();
+      if (list.length > 0) { router.push("/checkout"); return; }
+    } catch { /* fall through: checkout itself asks for an address if it finds none */ }
+    router.push({ pathname: "/address/edit", params: { pick: "1" } });
   };
 
   return (
@@ -113,11 +122,20 @@ export default function CartScreen() {
             </View>
 
             {signedIn && (
-              <Press onPress={() => router.push("/coupons")} haptic style={[s.card, { flexDirection: "row", alignItems: "center", gap: space.md }]}>
-                <Icon name="tag" size={20} color={colors.maroon} />
-                <Text style={[type.body, { flex: 1, fontWeight: "700" }]}>Apply coupon</Text>
-                <Icon name="chevron-right" size={18} color={colors.faint} />
-              </Press>
+              coupon ? (
+                <View style={[s.card, { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.greenSoft }]}>
+                  <Icon name="check-circle" size={20} color={colors.green} />
+                  <View style={{ flex: 1 }}><Text style={[type.body, { fontWeight: "900", color: colors.green }]}>{coupon} applied</Text><Text style={type.small}>Discount is added at checkout</Text></View>
+                  <Press onPress={() => { void removeCoupon().then(() => setCoupon(null)).catch(() => undefined); }} haptic><Text style={{ color: colors.red, fontWeight: "800", padding: 6 }}>Remove</Text></Press>
+                </View>
+              ) : (
+                <Press onPress={() => router.push("/coupons")} haptic style={[s.card, { flexDirection: "row", alignItems: "center", gap: space.md }]}>
+                  <Icon name="tag" size={20} color={colors.maroon} />
+                  <Text style={[type.body, { flex: 1, fontWeight: "700" }]}>Apply coupon</Text>
+                  <Text style={{ color: colors.maroon, fontWeight: "800", fontSize: 12 }}>View offers</Text>
+                  <Icon name="chevron-right" size={18} color={colors.faint} />
+                </Press>
+              )
             )}
 
             <View style={s.card}>

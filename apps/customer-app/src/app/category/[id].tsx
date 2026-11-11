@@ -1,7 +1,10 @@
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
-import { findCategory, getCategories, getProducts, defaultVariant, type Category, type Product } from "../../api/catalog";
+import { cachedCategories, findCategory, getCategories, getProducts, defaultVariant, type Category, type Product } from "../../api/catalog";
+import { GridSkeleton } from "../../components/Skeleton";
+import { Dropdown } from "../../components/Dropdown";
 import { fillRow, CartBar, ProductCard } from "../../components/shop";
 import { Button, Chip, Header, Icon, Press, Screen } from "../../components/ui";
 import { useStore } from "../../state/store";
@@ -14,7 +17,7 @@ const SORTS: { key: Sort; label: string }[] = [{ key: "relevance", label: "Relev
 export default function CategoryProducts() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const { zone } = useStore();
-  const [tree, setTree] = useState<Category[]>([]);
+  const [tree, setTree] = useState<Category[]>(() => cachedCategories(zone?.id));
   const [sub, setSub] = useState<string | null>(null); // selected sub-category, null = all
   const [items, setItems] = useState<Product[]>([]);
   const [next, setNext] = useState<string | null>(null);
@@ -67,7 +70,7 @@ export default function CategoryProducts() {
   const filtered = inStock || !!food || !!brand || !!under;
 
   const children = cat?.children ?? [];
-  const cycleSort = () => setSort(s => SORTS[(SORTS.findIndex(x => x.key === s) + 1) % SORTS.length]!.key);
+  const cols = children.length > 0 ? 2 : 3; // the left rail takes room, so two cards fit beside it
 
   return (
     <View style={{ flex: 1 }}>
@@ -76,22 +79,32 @@ export default function CategoryProducts() {
           <Header title={cat?.name ?? name ?? "Products"} right={<Press onPress={() => router.push("/search")} haptic style={s.iconBtn}><Icon name="search" size={20} /></Press>} />
         </View>
 
-        {children.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.chips}>
-            <Chip label="All" active={sub === null} onPress={() => setSub(null)} />
-            {children.map(c => <Chip key={c.id} label={c.name} active={sub === c.id} onPress={() => setSub(c.id)} />)}
-          </ScrollView>
-        )}
+        <View style={{ flex: 1, flexDirection: "row" }}>
+          {children.length > 0 && (
+            <ScrollView showsVerticalScrollIndicator={false} style={s.rail} contentContainerStyle={{ paddingBottom: 140 }}>
+              {[{ id: null as string | null, name: "All", imageUrl: cat?.imageUrl ?? null }, ...children.map(c => ({ id: c.id as string | null, name: c.name, imageUrl: c.imageUrl }))].map(c => {
+                const on = sub === c.id;
+                return (
+                  <Press key={c.id ?? "all"} onPress={() => setSub(c.id)} style={[s.railItem, on && s.railOn]}>
+                    <View style={[s.railImg, on && { borderColor: colors.maroon }]}>
+                      {c.imageUrl ? <Image source={{ uri: c.imageUrl }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : <Icon name="grid" size={22} color={colors.maroon} />}
+                    </View>
+                    <Text style={[s.railText, on && { color: colors.maroon, fontWeight: "900" }]} numberOfLines={2}>{c.name}</Text>
+                  </Press>
+                );
+              })}
+            </ScrollView>
+          )}
+          <View style={{ flex: 1 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={[s.chips, { paddingTop: children.length ? 0 : space.sm }]}>
-          <Chip label={SORTS.find(x => x.key === sort)!.label} icon="sliders" active={sort !== "relevance"} onPress={cycleSort} />
+          <Dropdown title="Sort by" label="Sort" value={sort === "relevance" ? null : sort} options={SORTS.filter(x => x.key !== "relevance").map(x => ({ value: x.key, label: x.label }))} onChange={v => setSort(v ?? "relevance")} />
+          <Dropdown title="Price" label="Price" value={under} options={[99, 199, 499].map(u => ({ value: u, label: `Under ₹${u}` }))} onChange={setUnder} />
+          {hasFood && <Dropdown title="Food type" label="Type" value={food} options={[{ value: "veg", label: "Veg" }, { value: "non_veg", label: "Non-veg" }]} onChange={v => setFood(v as "veg" | "non_veg" | null)} />}
+          {brands.length > 1 && <Dropdown title="Brand" label="Brand" value={brand} options={brands.map(([bid, bn]) => ({ value: bid, label: bn }))} onChange={setBrand} />}
           <Chip label="In stock" icon="check" active={inStock} onPress={() => setInStock(v => !v)} />
-          {hasFood && <Chip label="Veg" active={food === "veg"} onPress={() => setFood(f => (f === "veg" ? null : "veg"))} />}
-          {hasFood && <Chip label="Non-veg" active={food === "non_veg"} onPress={() => setFood(f => (f === "non_veg" ? null : "non_veg"))} />}
-          {[99, 199, 499].map(u => <Chip key={u} label={`Under ₹${u}`} active={under === u} onPress={() => setUnder(c => (c === u ? null : u))} />)}
-          {brands.length > 1 && brands.map(([bid, bn]) => <Chip key={bid} label={bn} icon="tag" active={brand === bid} onPress={() => setBrand(c => (c === bid ? null : bid))} />)}
         </ScrollView>
 
-        {loading && <ActivityIndicator color={colors.maroon} style={{ marginTop: 60 }} />}
+        {loading && <GridSkeleton cols={cols} />}
         {error && !loading && (
           <View style={{ alignItems: "center", gap: space.md, marginTop: 60 }}>
             <Icon name="wifi-off" size={36} color={colors.faint} /><Text style={type.small}>{error}</Text><Button label="Try again" variant="soft" onPress={() => void load()} />
@@ -106,13 +119,15 @@ export default function CategoryProducts() {
         )}
         {!loading && !error && (
           <FlatList
-            data={fillRow(shown, 3)} numColumns={3} keyExtractor={(p, i) => p?.id ?? `fill${i}`} showsVerticalScrollIndicator={false}
-            columnWrapperStyle={{ gap: space.sm, paddingHorizontal: space.lg }} contentContainerStyle={{ gap: space.xl, paddingTop: space.md, paddingBottom: 140 }}
+            data={fillRow(shown, cols)} numColumns={cols} key={cols} keyExtractor={(p, i) => p?.id ?? `fill${i}`} showsVerticalScrollIndicator={false}
+            columnWrapperStyle={{ gap: space.sm, paddingHorizontal: children.length > 0 ? space.sm : space.lg }} contentContainerStyle={{ gap: space.xl, paddingTop: space.md, paddingBottom: 140 }}
             onEndReached={() => void loadMore()} onEndReachedThreshold={0.6}
             ListFooterComponent={more ? <ActivityIndicator color={colors.maroon} /> : undefined}
             renderItem={({ item }) => item ? <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View> : <View style={{ flex: 1 }} />}
           />
         )}
+          </View>
+        </View>
       </Screen>
       <CartBar />
     </View>
@@ -121,5 +136,10 @@ export default function CategoryProducts() {
 
 const s = StyleSheet.create({
   chips: { flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  rail: { width: 86, flexGrow: 0, backgroundColor: colors.white, borderRightWidth: 1, borderRightColor: colors.line },
+  railItem: { alignItems: "center", paddingVertical: space.md, paddingHorizontal: 4, borderLeftWidth: 4, borderLeftColor: "transparent" },
+  railOn: { backgroundColor: colors.cream, borderLeftColor: colors.maroon },
+  railImg: { width: 56, height: 56, borderRadius: 28, overflow: "hidden", backgroundColor: colors.creamDeep, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "transparent" },
+  railText: { marginTop: 6, fontSize: 11, fontWeight: "700", color: colors.ink, textAlign: "center", lineHeight: 14 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
 });

@@ -15,8 +15,10 @@ export const cancelNotifyMe = (id: string) => api("DELETE", `/notify-me/${id}`);
 export type CouponRow = { code: string; type: "flat" | "percent" | "free_delivery"; description: string; value: number; minOrder: number; applicable: boolean; reason: string | null };
 export const listCoupons = (zoneId: string, subtotal?: number) =>
   api<CouponRow[]>("GET", `/coupons/available?zoneId=${zoneId}${subtotal ? `&subtotal=${subtotal}` : ""}`).then(r => r.data);
-export const applyCoupon = (code: string) => api("POST", "/cart/coupon", { code: code.trim().toUpperCase() });
+export const applyCoupon = (code: string) => api<{ coupon: { code: string; type: string; description: string } }>("POST", "/cart/coupon", { code: code.trim().toUpperCase() }).then(r => r.data.coupon);
 export const removeCoupon = () => api("DELETE", "/cart/coupon");
+/** The coupon on the server cart, if any (null when none or the cart is empty). */
+export const appliedCoupon = () => api<{ couponCode: string | null }>("GET", "/cart").then(r => r.data.couponCode ?? null);
 export const COUPON_WHY: Record<string, string> = {
   min_order: "Add more items to use this", first_order_only: "For first orders only", limit_reached: "Offer limit reached", expired: "This offer has expired", not_applicable: "Not valid for this cart",
 };
