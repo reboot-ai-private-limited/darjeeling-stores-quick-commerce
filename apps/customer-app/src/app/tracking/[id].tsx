@@ -4,7 +4,7 @@ import { AppState, Linking, ScrollView, Share, StyleSheet, Text, View } from "re
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getOrderGroup, getTracking, isActiveStatus, pollMs, STEPS, stepTimes, trackingHeadline, type OrderGroup, type Tracking } from "../../api/orders";
 import { TrackMap } from "../../components/TrackMap";
-import { Button, Icon, Press } from "../../components/ui";
+import { Button, goBack, Icon, Press } from "../../components/ui";
 import { colors, radius, shadow, space, type } from "../../theme";
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
@@ -69,7 +69,7 @@ export default function TrackingScreen() {
 
       {/* Top: back button and the ETA pill */}
       <View style={[s.top, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <Press onPress={() => router.back()} haptic style={s.back}><Icon name="arrow-left" size={20} /></Press>
+        <Press onPress={goBack} haptic style={s.back}><Icon name="arrow-left" size={20} /></Press>
         <View style={s.eta}>
           <Text style={s.etaText}>{etaText}</Text>
           {live && stamp && <Text style={[s.etaSub, stale && { color: colors.red }]}>{riderPos ? "Location updated" : "Updated"} {ago(stamp, now)}</Text>}

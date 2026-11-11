@@ -35,12 +35,17 @@ export function Screen({ children, scroll = false, pad = true, bottomPad = 24, s
   return <View style={[base, style]}><View style={[{ flex: 1 }, inner]}>{children}</View></View>;
 }
 
+/** Goes back if there is a screen to return to, otherwise to home (e.g. after the stack was reset on delivery). */
+export function goBack() {
+  if (router.canGoBack()) router.back(); else router.replace("/home");
+}
+
 export function Header({ title, subtitle, back = true, right, light = false }: { title?: string; subtitle?: string; back?: boolean; right?: ReactNode; light?: boolean }) {
   const fg = light ? colors.white : colors.ink;
   return (
     <View style={s.header}>
       {back ? (
-        <Press onPress={() => router.back()} style={[s.iconBtn, light && { backgroundColor: "rgba(255,255,255,0.14)" }]} haptic>
+        <Press onPress={goBack} style={[s.iconBtn, light && { backgroundColor: "rgba(255,255,255,0.14)" }]} haptic>
           <Icon name="arrow-left" color={fg} />
         </Press>
       ) : <View style={{ width: 44 }} />}

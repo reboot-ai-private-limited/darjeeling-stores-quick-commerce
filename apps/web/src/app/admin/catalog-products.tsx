@@ -6,7 +6,23 @@ import { adminFetch } from "./session-client";
 // Matches docs/api/F04-master-catalog.md and apps/api/src/modules/catalog/interface/schemas.ts.
 
 export type CategoryNode = { id: string; name: string; slug: string; parentId: string | null; sortOrder: number; isActive: boolean; children?: CategoryNode[] };
-export type Brand = { id: string; name: string; sortOrder: number; isActive: boolean };
+export type Brand = { id: string; name: string; sortOrder: number; isActive: boolean; logoMediaId?: string | null; logoUrls?: Record<string, string> };
+const brandLogo = (b: Brand) => b.logoUrls?.["160"] ?? b.logoUrls?.thumb ?? b.logoUrls?.["320"] ?? Object.values(b.logoUrls ?? {})[0] ?? "";
+
+/** Uploads a brand's logo and returns its media id. */
+async function uploadBrandLogo(brandId: string, file: File): Promise<string> {
+  const ticket = await call<{ data: { mediaId: string; upload: { url: string; method: string; fields: Record<string, string> } } }>("media/upload-url", send("POST", {
+    kind: "brand_logo", contentType: file.type || "image/png", sizeBytes: file.size, ownerRef: { type: "brand", id: brandId },
+  }));
+  const { url, method, fields } = ticket.data.upload;
+  const form = new FormData();
+  Object.entries(fields ?? {}).forEach(([k, v]) => form.append(k, v));
+  form.append("file", file);
+  const put = await fetch(url, { method: method || "POST", body: form });
+  if (!put.ok) throw new Error("The logo could not be uploaded to storage.");
+  await call("media/complete", send("POST", { mediaId: ticket.data.mediaId }));
+  return ticket.data.mediaId;
+}
 
 type Attribute = { name: string; value: string };
 type Variant = { id: string; label: string; weightGrams: number; sku: string; barcode: string | null; isActive: boolean; attributes: Attribute[] };
@@ -302,8 +318,12 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
   const [returnable, setReturnable] = useState(product?.isReturnable ?? true);
   const [tags, setTags] = useState((product?.tags ?? []).join(", "));
   const [highlights, setHighlights] = useState((product?.highlights ?? []).join("\n"));
-  const [keyInfo, setKeyInfo] = useState<KeyInfoRow[]>(product?.keyInfo ?? []);
-  const [sections, setSections] = useState<InfoSection[]>(product?.infoSections ?? []);
+  // Key information and information sections look identical in the customer app, so they are edited as one list
+  // (older products that still have key-info rows get them merged in here and saved back as sections).
+  const [sections, setSections] = useState<InfoSection[]>([
+    ...(product?.keyInfo ?? []).map((k) => ({ title: k.label, body: k.value })),
+    ...(product?.infoSections ?? []),
+  ].slice(0, 15));
   const [nutrition, setNutrition] = useState<Nutrition | null>(product?.nutrition ?? null);
   const [variants, setVariants] = useState<VariantDraft[]>([emptyVariant()]);
   const [busy, setBusy] = useState(false);
@@ -346,7 +366,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
       hsnCode: hsn.trim() || null, status, sortOrder: parseInt(sortOrder, 10) || 0, isReturnable: returnable,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       highlights: highlights.split("\n").map((t) => t.trim()).filter(Boolean),
-      keyInfo: keyInfo.filter((r) => r.label.trim() && r.value.trim()),
+      keyInfo: [],
       infoSections: sections.filter((s) => s.title.trim() && s.body.trim()),
       nutrition: nutrition && nutrition.rows.length > 0 ? { ...nutrition, servingSize: nutrition.servingSize?.trim() || null, rows: nutrition.rows.filter((r) => r.name.trim()) } : null,
     };
@@ -468,11 +488,30 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
           <label style={lbl}>Sort order<input type="number" min={0} step={1} value={sortOrder} disabled={dis} onChange={(e) => setSortOrder(e.target.value)} /></label>
         </div>
 
-        <label style={{ ...lbl, marginTop: 14 }}>Also show under (up to 5 more categories — hold Ctrl/Cmd to select several)
-          <select multiple size={Math.min(6, Math.max(3, cats.length))} value={extra} disabled={dis} onChange={(e) => setExtra(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, 5))}>
-            {cats.filter((c) => c.id !== categoryId).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-        </label>
+        <div style={{ ...lbl, marginTop: 14 }}>
+          <span>Also show under (up to 5 more categories)</span>
+          <details style={{ position: "relative", marginTop: 4 }}>
+            <summary style={{ cursor: dis ? "not-allowed" : "pointer", listStyle: "none", border: "1px solid var(--admin-border)", borderRadius: 8, padding: "10px 12px", background: "#fff", display: "flex", justifyContent: "space-between", gap: 8, pointerEvents: dis ? "none" : "auto" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {extra.filter((x) => x !== categoryId).length === 0
+                  ? "Select categories…"
+                  : extra.filter((x) => x !== categoryId).map((id) => cats.find((c) => c.id === id)?.label ?? "").filter(Boolean).join(", ")}
+              </span>
+              <span aria-hidden="true">▾</span>
+            </summary>
+            <div style={{ position: "absolute", zIndex: 20, left: 0, right: 0, maxHeight: 240, overflowY: "auto", background: "#fff", border: "1px solid var(--admin-border)", borderRadius: 8, marginTop: 4, padding: 6, boxShadow: "0 6px 18px rgba(0,0,0,0.12)" }}>
+              {cats.filter((c) => c.id !== categoryId).map((c) => {
+                const checked = extra.includes(c.id);
+                return (
+                  <label key={c.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 8px", fontWeight: 400, opacity: !checked && extra.length >= 5 ? 0.5 : 1 }}>
+                    <input type="checkbox" checked={checked} disabled={dis || (!checked && extra.length >= 5)} onChange={() => setExtra(checked ? extra.filter((x) => x !== c.id) : [...extra, c.id].slice(0, 5))} />
+                    {c.label}
+                  </label>
+                );
+              })}
+            </div>
+          </details>
+        </div>
         <label style={{ ...lbl, display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}><input type="checkbox" checked={returnable} disabled={dis} onChange={(e) => setReturnable(e.target.checked)} /> Returnable once delivered (damaged or missing items are always refunded)</label>
 
         <div style={section}>
@@ -480,27 +519,17 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
           <label style={lbl}>Tags (comma separated, up to 20)<input value={tags} disabled={dis} onChange={(e) => setTags(e.target.value)} placeholder="tea, organic, gift" /></label>
           <label style={{ ...lbl, marginTop: 12 }}>Highlights (one per line, up to 6)<textarea value={highlights} disabled={dis} onChange={(e) => setHighlights(e.target.value)} placeholder={"Hand-picked leaves\nNo added colour"} /></label>
 
-          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Key information (up to 15)</h4>
-          {keyInfo.map((r, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "end" }}>
-              <label style={{ ...lbl, flex: 1 }}>Label<input maxLength={40} value={r.label} disabled={dis} onChange={(e) => setKeyInfo(keyInfo.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} placeholder="Shelf life" /></label>
-              <label style={{ ...lbl, flex: 2 }}>Value<input maxLength={200} value={r.value} disabled={dis} onChange={(e) => setKeyInfo(keyInfo.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} placeholder="12 months" /></label>
-              <button type="button" style={smallBtn} disabled={dis} onClick={() => setKeyInfo(keyInfo.filter((_, j) => j !== i))}>Remove</button>
-            </div>
-          ))}
-          {keyInfo.length < 15 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setKeyInfo([...keyInfo, { label: "", value: "" }])}>+ Key info row</button>}
-
-          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Information sections (up to 6)</h4>
+          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Information (up to 15) — e.g. Shelf life, Storage, Ingredients</h4>
           {sections.map((s, i) => (
             <div key={i} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
-                <label style={{ ...lbl, flex: 1 }}>Title<input maxLength={60} value={s.title} disabled={dis} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} placeholder="Ingredients" /></label>
+                <label style={{ ...lbl, flex: 1 }}>Title<input maxLength={60} value={s.title} disabled={dis} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} placeholder="Shelf life, Storage, Ingredients…" /></label>
                 <button type="button" style={smallBtn} disabled={dis} onClick={() => setSections(sections.filter((_, j) => j !== i))}>Remove</button>
               </div>
               <textarea maxLength={1000} value={s.body} disabled={dis} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, body: e.target.value } : x)))} placeholder="Text (up to 1000 characters)" />
             </div>
           ))}
-          {sections.length < 6 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setSections([...sections, { title: "", body: "" }])}>+ Section</button>}
+          {sections.length < 15 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setSections([...sections, { title: "", body: "" }])}>+ Add information</button>}
 
           <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Nutrition (optional)</h4>
           {nutrition ? (
@@ -668,17 +697,38 @@ export function BrandManager({ brands, canEdit, onChanged }: { brands: Brand[]; 
   const [isActive, setIsActive] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [removeLogo, setRemoveLogo] = useState(false);
+
+  function chooseLogo(file: File | null) {
+    setLogo(file); setRemoveLogo(false);
+    setLogoPreview((old) => { if (old.startsWith("blob:")) URL.revokeObjectURL(old); return file ? URL.createObjectURL(file) : ""; });
+  }
 
   function start(b: Brand | "new") {
     setEditing(b); setError("");
+    setLogo(null); setRemoveLogo(false); setLogoPreview(b === "new" ? "" : brandLogo(b));
     setName(b === "new" ? "" : b.name); setSortOrder(b === "new" ? String(brands.length) : String(b.sortOrder)); setIsActive(b === "new" ? true : b.isActive);
   }
   async function save(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError("");
     try {
       const body = { name: name.trim(), sortOrder: parseInt(sortOrder, 10) || 0 };
-      if (editing === "new") await call("admin/brands", send("POST", body));
-      else if (editing) await call(`admin/brands/${editing.id}`, send("PUT", { ...body, isActive }));
+      let id: string;
+      if (editing === "new") id = (await call<{ data: { id: string } }>("admin/brands", send("POST", body))).data.id;
+      else if (editing) { id = editing.id; await call(`admin/brands/${id}`, send("PUT", { ...body, isActive })); }
+      else return;
+      if (logo || removeLogo) {
+        try {
+          const logoMediaId = logo ? await uploadBrandLogo(id, logo) : null;
+          await call(`admin/brands/${id}`, send("PUT", { logoMediaId }));
+        } catch (err) {
+          setEditing(null); onChanged();
+          setError(`The brand was saved, but its logo was not: ${err instanceof Error ? err.message : "upload failed"}. Edit the brand to try again.`);
+          return;
+        }
+      }
       setEditing(null); onChanged();
     } catch (err) { setError(err instanceof Error ? err.message : "The brand could not be saved."); } finally { setBusy(false); }
   }
@@ -701,6 +751,20 @@ export function BrandManager({ brands, canEdit, onChanged }: { brands: Brand[]; 
             <label style={lbl}>Brand name<input required maxLength={120} value={name} disabled={busy} onChange={(e) => setName(e.target.value)} /></label>
             <label style={lbl}>Sort order<input type="number" min={0} step={1} value={sortOrder} disabled={busy} onChange={(e) => setSortOrder(e.target.value)} /></label>
           </div>
+          <div style={{ marginTop: 14 }}>
+            <span style={{ ...lbl, marginBottom: 6 }}>Logo (shown on the customer app's "Shop by brand" tiles)</span>
+            <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+              {logoPreview && !removeLogo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={logoPreview} alt="Logo preview" style={{ width: 80, height: 80, borderRadius: 40, objectFit: "cover", border: "2px solid #e0b64a" }} />
+                : <span style={{ width: 80, height: 80, borderRadius: 40, background: "#fff3cc", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#8a5a00" }}>No logo</span>}
+              <span style={{ display: "grid", gap: 6 }}>
+                <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-label="Choose a brand logo" onChange={(e) => chooseLogo(e.target.files?.[0] ?? null)} />
+                {logoPreview && !removeLogo && <button type="button" style={{ ...smallBtn, justifySelf: "start" }} disabled={busy} onClick={() => { chooseLogo(null); setRemoveLogo(true); }}>Remove logo</button>}
+                <small style={{ color: "var(--admin-muted)" }}>A square picture works best (JPG, PNG or WebP).</small>
+              </span>
+            </div>
+          </div>
           {editing !== "new" && <label style={{ ...lbl, display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active</label>}
           <div className="admin-role-actions" style={{ marginTop: 16, gap: 8 }}>
             <button className="admin-role-button" disabled={busy}>{busy ? "Saving…" : "Save brand"}</button>
@@ -712,6 +776,10 @@ export function BrandManager({ brands, canEdit, onChanged }: { brands: Brand[]; 
         <div className="admin-tree">
           {brands.map((b) => (
             <div key={b.id} className="admin-tree-row" style={{ opacity: b.isActive ? 1 : 0.6 }}>
+              {brandLogo(b)
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={brandLogo(b)} alt="" style={{ width: 40, height: 40, borderRadius: 20, objectFit: "cover", border: "1px solid var(--admin-border)", flexShrink: 0 }} />
+                : <span aria-hidden="true" title="No logo yet" style={{ width: 40, height: 40, borderRadius: 20, background: "#fff3cc", flexShrink: 0 }} />}
               <span style={{ flex: 1 }}><strong>{b.name}</strong>{!b.isActive && <small style={{ marginLeft: 8 }}>inactive</small>}</span>
               {canEdit && <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
                 <button style={smallBtn} disabled={busy} onClick={() => start(b)}>Edit</button>

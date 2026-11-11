@@ -37,7 +37,7 @@ const nutrition = z.object({
 const infoSection = z.object({ title: z.string().trim().min(1).max(60), body: z.string().trim().min(1).max(1000) }).strict();
 const productInfo = {
   highlights: z.array(z.string().trim().min(1).max(120)).max(6),
-  keyInfo: z.array(keyInfoRow).max(15), nutrition, infoSections: z.array(infoSection).max(6),
+  keyInfo: z.array(keyInfoRow).max(15), nutrition, infoSections: z.array(infoSection).max(15),
 };
 
 const productFields = {

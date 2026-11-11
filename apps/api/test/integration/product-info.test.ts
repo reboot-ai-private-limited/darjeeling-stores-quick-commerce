@@ -67,7 +67,7 @@ describe("product information", () => {
     expect(await bad({ nutrition: { ...info.nutrition, rows: Array.from({ length: 21 }, (_, i) => ({ name: `N${i}`, amount: 1, unit: "g" })) } })).toBe(400);
     expect(await bad({ nutrition: { ...info.nutrition, servingSize: "1 piece" } })).toBe(400);
     expect(await bad({ nutrition: { basis: "per_serving", rows: [] } })).toBe(400);
-    expect(await bad({ infoSections: Array(7).fill({ title: "t", body: "b" }) })).toBe(400);
+    expect(await bad({ infoSections: Array(16).fill({ title: "t", body: "b" }) })).toBe(400);
     expect(await bad({ infoSections: [{ title: "t", body: "b".repeat(1001) }] })).toBe(400);
     expect(await bad({ unknownField: 1 })).toBe(400);
     const ok = await create({ nutrition: { basis: "per_serving", servingSize: "1 piece (30 g)", rows: [] } });
