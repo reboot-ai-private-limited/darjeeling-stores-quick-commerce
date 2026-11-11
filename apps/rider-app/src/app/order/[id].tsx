@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
@@ -6,6 +7,7 @@ import { getMediaUrl, stageOf } from "../../api/rider";
 import { OrderGate } from "../../components/OrderGate";
 import { VoiceNote } from "../../components/VoiceNote";
 import { Button, Card, Header, Icon, Pill, Press, Row, Screen, SectionTitle, Stagger } from "../../components/ui";
+import { dialNumber, prettyPhone, whatsappNumber } from "../../phone";
 import { isCod, useOrderDetail } from "../../state/useOrderDetail";
 import { colors, radius, rupees, type } from "../../theme";
 
@@ -44,7 +46,7 @@ export default function OrderDetailScreen() {
   const next = NEXT[stage as keyof typeof NEXT];
   const cod = isCod(o);
   const promised = hhmm(o.promisedAt);
-  const dial = o.customer.phone.replace(/\s/g, "");
+  const dial = dialNumber(o.customer.phone);
   async function openMedia(mediaId: string) {
     setMediaError("");
     try { await Linking.openURL(await getMediaUrl(mediaId)); } catch { setMediaError("Could not open the file. Try again."); }
@@ -59,9 +61,9 @@ export default function OrderDetailScreen() {
         <Card style={{ marginTop: 18 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
             <View style={s.avatar}><Text style={s.avatarText}>{o.customer.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}</Text></View>
-            <View style={{ flex: 1 }}><Text style={type.h2}>{o.customer.name}</Text><Text style={type.small}>{o.customer.phone}</Text></View>
+            <View style={{ flex: 1, minWidth: 0 }}><Text style={type.h2}>{o.customer.name}</Text><Text style={{ fontSize: 17, fontWeight: "800", color: colors.ink, letterSpacing: 0.4, marginTop: 3 }} selectable>{prettyPhone(o.customer.phone)}</Text></View>
             <Press haptic onPress={() => void Linking.openURL(`tel:${dial}`)} style={[s.call, { backgroundColor: colors.greenSoft }]}><Icon name="phone" size={20} color={colors.green} /></Press>
-            <Press haptic onPress={() => void Linking.openURL(`https://wa.me/${dial.replace(/\D/g, "")}`)} style={[s.call, { backgroundColor: colors.blueSoft }]}><Icon name="message-circle" size={20} color={colors.blue} /></Press>
+            <Press haptic onPress={() => void Linking.openURL(`https://wa.me/${whatsappNumber(o.customer.phone)}`)} style={[s.call, { backgroundColor: "#e3f9ea" }]}><Ionicons name="logo-whatsapp" size={24} color="#25D366" /></Press>
           </View>
           <View style={s.rule} />
           <Row icon="map-pin" label={`${o.address.line1}, ${o.address.locality}`} />

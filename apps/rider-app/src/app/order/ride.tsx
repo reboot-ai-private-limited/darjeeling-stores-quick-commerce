@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
 import Animated, { SlideInDown } from "react-native-reanimated";
 import { arrived, stageOf, startRide } from "../../api/rider";
@@ -9,21 +9,27 @@ import { SwipeButton } from "../../components/SwipeButton";
 import { Icon, Press, Screen } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { currentFix, isCod, useOrderDetail } from "../../state/useOrderDetail";
+import { dialNumber } from "../../phone";
+import { useRoute } from "../../state/useRoute";
 import { colors, radius, rupees, shadow, type } from "../../theme";
 
 const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "—");
 
-/** Ride screen: an illustrated route on top (real navigation is "Open Google Maps") and a sheet with the next action. */
+/** Ride screen: the live map with the road to the customer on top (it follows the rider while riding) and a sheet with the next action. */
 export default function Ride() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { refreshOrders } = useStore();
   const { detail: o, error, loading, reload } = useOrderDetail(id);
   const [failure, setFailure] = useState("");
   const [resetKey, setResetKey] = useState(0);
+  const { position, route } = useRoute(o?.id, o?.warehouse.location ?? null);
+  const [follow, setFollow] = useState(false);
+  const riding = !!o && stageOf(o.status) === "out_for_delivery";
+  // Start following as soon as the ride begins; the rider can drag the map to stop, and tap Recenter to follow again.
+  useEffect(() => { if (riding) setFollow(true); }, [riding]);
   if (!o) return <OrderGate title="Ride" loading={loading} error={error} onRetry={() => void reload()} />;
 
   const stage = stageOf(o.status);
-  const riding = stage === "out_for_delivery";
   const fail = (e: unknown, fallback: string) => { setFailure(e instanceof Error ? e.message : fallback); setResetKey(k => k + 1); };
 
   async function begin() {
@@ -40,15 +46,16 @@ export default function Ride() {
       router.replace({ pathname: "/order/arrived", params: { id: o!.id } });
     } catch (e) { fail(e, "Could not mark you as arrived."); }
   }
-  const mapsQuery = o.address.location ? `${o.address.location.lat},${o.address.location.lng}` : encodeURIComponent(`${o.address.line1}, ${o.address.locality}`);
+  const km = route ? (route.distanceM >= 1000 ? `${(route.distanceM / 1000).toFixed(1)} km` : `${Math.round(route.distanceM / 10) * 10} m`) : null;
+  const mins = route ? Math.max(1, Math.ceil(route.durationS / 60)) : null;
 
   return (
     <Screen pad={false} bottomPad={0} style={{ backgroundColor: "#efe9da" }}>
       <View style={{ flex: 1 }}>
-        <View style={s.mapWrap}><RideMap height={520} warehouse={o.warehouse.location} destination={o.address.location} moving={riding} /></View>
+        <View style={s.mapWrap}><RideMap height={520} warehouse={o.warehouse.location} destination={o.address.location} moving={riding} route={route} position={position} follow={follow} onUserMove={() => setFollow(false)} /></View>
         <View style={s.topBar}>
           <Press haptic onPress={() => router.back()} style={s.round}><Icon name="arrow-left" /></Press>
-          <View style={s.chip}><Icon name="navigation" size={14} color={colors.maroon} /><Text style={s.chipText}>{riding ? "Heading to customer" : stage === "arrived" ? "You have arrived" : "Start the ride when ready"}</Text></View>
+          <View style={s.chip}><Icon name="navigation" size={14} color={colors.maroon} /><Text style={s.chipText}>{stage === "arrived" ? "You have arrived" : km && mins ? `${km} · ${mins} min${route?.approximate ? " (straight line)" : ""}` : riding ? "Heading to customer" : "Start the ride when ready"}</Text></View>
         </View>
       </View>
 
@@ -66,8 +73,8 @@ export default function Ride() {
           <View style={{ flex: 1 }}><Text style={[type.body, { fontWeight: "800" }]}>{o.customer.name}</Text><Text style={type.small} numberOfLines={2}>{o.address.landmark ?? `${o.address.line1}, ${o.address.locality}`}</Text></View>
         </View>
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <Press haptic style={s.action} onPress={() => void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${mapsQuery}`)}><Icon name="map" size={18} color={colors.maroon} /><Text style={s.actionText}>Open Google Maps</Text></Press>
-          <Press haptic style={[s.action, { flex: 0, width: 56, backgroundColor: colors.greenSoft }]} onPress={() => void Linking.openURL(`tel:${o.customer.phone.replace(/\s/g, "")}`)}><Icon name="phone" size={20} color={colors.green} /></Press>
+          <Press haptic style={s.action} onPress={() => setFollow(true)}><Icon name="crosshair" size={18} color={colors.maroon} /><Text style={s.actionText}>{follow ? "Following you" : "Recenter on me"}</Text></Press>
+          <Press haptic style={[s.action, { flex: 0, width: 56, backgroundColor: colors.greenSoft }]} onPress={() => void Linking.openURL(`tel:${dialNumber(o.customer.phone)}`)}><Icon name="phone" size={20} color={colors.green} /></Press>
         </View>
         {failure ? <Text style={{ color: colors.red, fontWeight: "700", fontSize: 13, textAlign: "center" }}>{failure}</Text> : null}
         {stage === "arrived"

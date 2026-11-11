@@ -17,7 +17,7 @@ import { createPaymentsModule, type PaymentProvider, type PaymentSettings } from
 import { createRefundsModule, type Eligibility, type RefundSettings } from "../modules/refunds/refunds.public.js";
 import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
 import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
-import { baselineEta, createTrackingModule, DEFAULT_TRACKING_SETTINGS, type EtaProvider, type TrackingSettings } from "../modules/tracking/tracking.public.js";
+import { baselineEta, createTrackingModule, DEFAULT_TRACKING_SETTINGS, type EtaProvider, type RoutePathProvider, type TrackingSettings } from "../modules/tracking/tracking.public.js";
 import { createDiscoveryModule, type BannerSource, type DiscoverySettings, type StoreSettings } from "../modules/discovery/discovery.public.js";
 import { createJobsModule } from "../modules/jobs/jobs.public.js";
 import {
@@ -77,7 +77,7 @@ export interface Dev2Options {
   stockThresholds?: StockThresholds | SettingsProvider<StockThresholds>; priceConflictMode?: "block" | "warn" | (() => Promise<"block" | "warn">);
   hoursSettings?: Partial<HoursSettings> | SettingsProvider<HoursSettings>; orderHistory?: OrderHistory; customerNames?: (userIds: readonly string[]) => Promise<Map<string, string>>;
   /** Live ETA settings, the routes provider that replaces the straight-line estimate, and the secret that signs public tracking links (F20). */
-  trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; trackingTokenSecret?: string;
+  trackingSettings?: Partial<TrackingSettings>; eta?: EtaProvider; routePath?: RoutePathProvider; trackingTokenSecret?: string;
   /** Offline sync: the doorstep UPI details and the offline delivery checks (F21). */
   syncSettings?: Partial<SyncSettings>;
   warehouses?: WarehouseDirectory;
@@ -355,7 +355,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
     connection, relations, orders: ordersPort, ...(riderThenIndexes && { rider: riderThenIndexes }), ...(customerThenIndexes && { customer: customerThenIndexes }),
     riders: { forUser: userId => riders.service.forUser(userId), byId: id => riders.service.byId(id), recordLocation: (id, location, at) => riders.service.recordLocation(id, location, at) },
     settings: liveSettings(DEFAULT_TRACKING_SETTINGS, { get pingOnOrderSeconds() { return riders.settings.locationPingSecondsOnOrder; }, get pingIdleSeconds() { return riders.settings.locationPingSecondsIdle; } }, options.trackingSettings),
-    eta, ...(options.trackingTokenSecret && { tokenSecret: options.trackingTokenSecret }),
+    eta, ...(options.routePath && { routePath: options.routePath }), ...(options.trackingTokenSecret && { tokenSecret: options.trackingTokenSecret }),
   });
   const sync = createSyncModule({
     connection, orders: ordersPort, ...(riderThenIndexes && { rider: riderThenIndexes }), auth: authThenIndexes,
