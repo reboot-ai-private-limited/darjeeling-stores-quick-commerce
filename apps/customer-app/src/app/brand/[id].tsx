@@ -2,7 +2,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Text, View } from "react-native";
 import { searchProducts, type Product } from "../../api/catalog";
-import { CartBar, ProductCard } from "../../components/shop";
+import { fillRow, CartBar, ProductCard } from "../../components/shop";
 import { Header, Icon, Screen } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { colors, space, type } from "../../theme";
@@ -26,9 +26,9 @@ export default function Brand() {
         {items?.length === 0 && <View style={{ alignItems: "center", gap: space.sm, marginTop: 70 }}><Icon name="package" size={40} color={colors.faint} /><Text style={type.h2}>Nothing here yet</Text></View>}
         {items && items.length > 0 && (
           <FlatList
-            data={items} numColumns={3} keyExtractor={p => p.id} showsVerticalScrollIndicator={false}
+            data={fillRow(items, 3)} numColumns={3} keyExtractor={(p, i) => p?.id ?? `fill${i}`} showsVerticalScrollIndicator={false}
             columnWrapperStyle={{ gap: space.sm, paddingHorizontal: space.lg }} contentContainerStyle={{ gap: space.xl, paddingTop: space.md, paddingBottom: 140 }}
-            renderItem={({ item }) => <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View>}
+            renderItem={({ item }) => item ? <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View> : <View style={{ flex: 1 }} />}
           />
         )}
       </Screen>

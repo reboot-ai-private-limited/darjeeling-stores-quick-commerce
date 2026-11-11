@@ -6,7 +6,7 @@ import { cardImage, getProducts, type Category, type Product } from "../api/cata
 import { liftIn } from "../motion";
 import { colors, space, type } from "../theme";
 import { SectionHead } from "./home";
-import { CategoryTile, ProductCard } from "./shop";
+import { CategoryTile, fillRow, ProductCard } from "./shop";
 import { Icon } from "./ui";
 
 type Shelf = { cat: Category; products: Product[] };
@@ -61,9 +61,9 @@ export function CategoryFeed({ category, zoneId, eta }: { category: Category; zo
         <SectionHead title={category.name} />
         {grid.length === 0 && <Text style={[type.body, { textAlign: "center", color: colors.muted, marginTop: 50 }]}>Nothing here yet.</Text>}
         <FlatList
-          data={grid} numColumns={3} scrollEnabled={false} keyExtractor={p => p.id}
+          data={fillRow(grid, 3)} numColumns={3} scrollEnabled={false} keyExtractor={(p, i) => p?.id ?? `fill${i}`}
           columnWrapperStyle={{ gap: space.sm, paddingHorizontal: space.lg }} contentContainerStyle={{ gap: space.xl, paddingTop: space.md }}
-          renderItem={({ item, index }) => <Animated.View entering={liftIn((index % 9) * 30)} style={{ flex: 1 }}><ProductCard product={item} width="100%" eta={eta} /></Animated.View>}
+          renderItem={({ item, index }) => item ? <Animated.View entering={liftIn((index % 9) * 30)} style={{ flex: 1 }}><ProductCard product={item} width="100%" eta={eta} /></Animated.View> : <View style={{ flex: 1 }} />}
         />
       </View>
     );
