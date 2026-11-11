@@ -1,6 +1,7 @@
 ﻿packages:
   - apps/*
   - "!apps/rider-app"
+  - "!apps/customer-app"
   - packages/*
 allowBuilds:
   esbuild: true
