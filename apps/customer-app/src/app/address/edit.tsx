@@ -5,6 +5,8 @@ import { createAddress, deleteAddress, listAddresses, updateAddress, type Addres
 import { getCities, getLocalities, type Locality } from "../../api/app";
 import { getMe } from "../../api/auth";
 import { ApiError } from "../../api/http";
+import { uploadMessage, uploadPhoto, uploadVoice } from "../../api/media";
+import { PhotoPicker, VoiceRecorder, type Picked, type Voice } from "../../components/Attach";
 import { MapPicker, type Point } from "../../components/MapPicker";
 import { Button, Chip, Header, Icon, Screen } from "../../components/ui";
 import { useStore } from "../../state/store";
@@ -37,6 +39,10 @@ export default function EditAddress() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tried, setTried] = useState(false);
+  const [photo, setPhoto] = useState<Picked>(null);
+  const [voice, setVoice] = useState<Voice>(null);
+  const [savedPhoto, setSavedPhoto] = useState<string | null>(null);
+  const [savedVoice, setSavedVoice] = useState<{ mediaId: string; durationSec: number } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -52,6 +58,7 @@ export default function EditAddress() {
           if (a && live) {
             setLabel(a.label); setLocalityId(a.localityId); setPin(a.location); setTarget(a.location); setLine1(a.line1); setLandmark(a.landmark);
             setPincode(a.pincode); setName(a.contactName); setPhone(a.contactPhone.replace(/^\+91/, "")); setNotes(a.deliveryNotes ?? ""); setMakeDefault(a.isDefault);
+            setA0(a); setSavedPhoto(a.housePhoto?.mediaId ?? null); setSavedVoice(a.voiceNote ?? null);
           }
         } else {
           const me = await getMe().catch(() => null);
@@ -63,6 +70,7 @@ export default function EditAddress() {
     return () => { live = false; };
   }, [editing, id]);
 
+  const [a0, setA0] = useState<Address | null>(null);
   const pickArea = (a: Locality) => { setLocalityId(a.id); setPin(a.location); setTarget(a.location); };
 
   const problems = {
@@ -79,7 +87,16 @@ export default function EditAddress() {
     setTried(true);
     if (invalid || !localityId) return;
     setBusy(true); setError(null);
+    // Upload the photo and voice note first; the address is saved with their ids.
+    let housePhotoMediaId: string | null | undefined; let voiceMediaId: string | null | undefined;
+    try {
+      if (photo) housePhotoMediaId = await uploadPhoto("address_photo", photo.uri);
+      else if (editing && !savedPhoto && a0?.housePhoto) housePhotoMediaId = null;
+      if (voice) voiceMediaId = await uploadVoice(voice.uri, voice.seconds);
+      else if (editing && !savedVoice && a0?.voiceNote) voiceMediaId = null;
+    } catch (e) { setError(uploadMessage(e)); setBusy(false); return; }
     const body = {
+      ...(housePhotoMediaId !== undefined ? { housePhotoMediaId } : {}), ...(voiceMediaId !== undefined ? { voiceMediaId } : {}),
       label, line1: line1.trim(), localityId, pincode, landmark: landmark.trim(), contactName: name.trim(), contactPhone: `+91${phone}`,
       location: pin, deliveryNotes: notes.trim() || null, makeDefault,
     };
@@ -127,6 +144,8 @@ export default function EditAddress() {
               <Field label="Contact name" value={name} onChange={setName} placeholder="Who will receive the order" bad={bad("name")} maxLength={60} />
               <Field label="Contact phone" value={phone} onChange={t => setPhone(t.replace(/\D/g, "").slice(0, 10))} placeholder="10-digit mobile number" keyboard="number-pad" prefix="+91" bad={bad("phone")} />
               <Field label="Delivery note (optional)" value={notes} onChange={setNotes} placeholder="Ring the bell twice" maxLength={300} />
+              <PhotoPicker label="House photo (optional)" hint="A picture of your door or gate helps the rider find you." value={photo} onChange={setPhoto} existingId={savedPhoto} onRemoveExisting={() => setSavedPhoto(null)} />
+              <VoiceRecorder value={voice} onChange={setVoice} existing={savedVoice} onRemoveExisting={() => setSavedVoice(null)} />
 
               <View style={s.switchRow}>
                 <Text style={[type.body, { fontWeight: "700", flex: 1 }]}>Make this my default address</Text>

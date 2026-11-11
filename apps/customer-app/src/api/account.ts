@@ -32,7 +32,7 @@ export const REFUND_REASON: Record<string, string> = {
 
 export const cancelOrder = (orderId: string, reason: string) =>
   api<{ order: { status: string }; refund: { amount: number } | null; deliveryFeeRefunded: boolean }>("POST", `/orders/${orderId}/cancel`, { reason }).then(r => r.data);
-export const requestRefund = (orderId: string, body: { reason: string; items: { orderItemIndex: number; qty: number }[]; customerNote?: string }) =>
+export const requestRefund = (orderId: string, body: { reason: string; items: { orderItemIndex: number; qty: number }[]; customerNote?: string; photoMediaIds?: string[] }) =>
   api<Refund>("POST", `/orders/${orderId}/refund-request`, body).then(r => r.data);
 
 /** Friendly text for cancel and refund-request errors; empty when the code isn't one we know. */

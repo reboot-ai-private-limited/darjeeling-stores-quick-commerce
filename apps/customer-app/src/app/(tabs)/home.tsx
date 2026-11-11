@@ -131,6 +131,7 @@ export default function Home() {
               <Icon name="chevron-down" size={16} color={colors.yellow} />
             </View>
           </Press>
+          <Press onPress={() => router.push("/notifications")} haptic style={[s.profile, { backgroundColor: "rgba(255,255,255,0.16)" }]}><Icon name="bell" size={19} color={colors.white} /></Press>
           <Press onPress={() => router.push("/account")} haptic style={s.profile}><Icon name="user" size={20} color={colors.maroon} /></Press>
         </Animated.View>
         <Press onPress={() => router.push("/search")} style={{ marginTop: space.md }}>

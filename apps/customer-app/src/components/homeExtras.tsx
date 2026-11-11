@@ -114,7 +114,7 @@ export function BrandRow({ products }: { products: Product[] }) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingVertical: space.md, gap: space.md }}>
         {brands.map(([id, b], i) => (
           <Animated.View key={id} entering={liftIn(i * 40)}>
-            <Press haptic onPress={() => router.push({ pathname: "/search", params: { q: b.name } })} style={{ alignItems: "center", width: 76, gap: 6 }}>
+            <Press haptic onPress={() => router.push({ pathname: "/brand/[id]", params: { id, name: b.name } })} style={{ alignItems: "center", width: 76, gap: 6 }}>
               <View style={s.brand}><Text style={s.brandLetter}>{b.name.slice(0, 1).toUpperCase()}</Text></View>
               <Text style={s.brandName} numberOfLines={1}>{b.name}</Text>
             </Press>
