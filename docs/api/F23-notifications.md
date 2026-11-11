@@ -10,12 +10,9 @@ Customers and riders get push (FCM) and WhatsApp messages sent by the server whe
 |---|---|---|---|
 | `GET` | `/me/notification-prefs` | Customer | My promo preferences |
 | `PUT` | `/me/notification-prefs` | Customer | Change promo preferences |
-| `GET` | `/admin/notification-templates` | Admin `notifications:manage` | List templates |
-| `POST` | `/admin/notification-templates` | Admin `notifications:manage` | Create a template 🔒 |
-| `PUT` | `/admin/notification-templates/:id` | Admin `notifications:manage` | Edit a template 🔒 |
 | `GET` | `/admin/notifications` | Admin `notifications:manage` | Delivery log |
 | `POST` | `/admin/notifications/:id/retry` | Admin `notifications:manage` | Retry a failed message |
-| `POST` | `/admin/broadcast` | Admin `notifications:manage` | Send a promo broadcast 🔒 |
+| `POST` | `/admin/broadcast` | Admin `notifications:manage` | Send a promo broadcast |
 | `GET` | `/webhooks/whatsapp` | Webhook | Provider verification challenge |
 | `POST` | `/webhooks/whatsapp` | Webhook | Delivery status and incoming replies |
 
@@ -55,25 +52,10 @@ Push arrives as an FCM **data** message (so the app can wake and react) with an 
 
 Deep links: customer `ds://order/<id>`, `ds://product/<id>`, `ds://category/<id>`, `ds://cart`; rider `dsr://assignment/<id>`, `dsr://order/<id>`. Do not rely on push alone: apps also poll (F13, F19) and refresh on open.
 
-## GET /admin/notification-templates
-200:
-```json
-{
-  "data": [
-    { "id": "tpl_1", "key": "order_confirmed", "channel": "whatsapp", "title": null, "body": "Hi {{name}}, order {{orderNo}} is confirmed. Total ₹{{total}}. Delivery OTP: {{otp}}. Track: {{trackingUrl}}", "whatsappTemplateName": "order_confirmed_v1", "category": "utility", "language": "en", "isActive": true },
-    { "id": "tpl_2", "key": "order_confirmed", "channel": "push", "title": "Order confirmed", "body": "Your order {{orderNo}} is confirmed.", "whatsappTemplateName": null, "category": "utility", "language": "en", "isActive": true }
-  ],
-  "meta": { "count": 2 }
-}
-```
-`channel`: `push`, `whatsapp`, `sms`. `category`: `utility`, `marketing`, `authentication`. `{{vars}}` are filled by the server. `(key, channel)` is unique.
+## Message wording (built in)
+There is no template screen or API. Every message the server sends on its own is written in code, in `apps/api/src/modules/notifications/domain/templates.ts`: customer order and refund updates, item-unavailable and cancellation notices, rider assignment, hand-over, cancellation and already-paid alerts, back-in-stock, login codes (WhatsApp, then SMS) and the promo broadcast. Each entry is one message key on one channel (`push`, `whatsapp` or `sms`) with its title, body and category; `{{variables}}` are filled in by the server (`name`, `orderNo`, `total`, `otp`, `trackingUrl`, `riderName`, `riderPhone`, `productName`, `variantLabel`, `itemName`, `amount`, `refundStatus`, `status`, `code`, `minVersion`, `link`, `reason`, `eta`, `title`, `body`). A unit test checks every built-in message uses only those variables and that every WhatsApp message names its provider-approved template.
 
-The server can fill: `name`, `orderNo`, `total`, `otp`, `trackingUrl`, `riderName`, `riderPhone`, `productName`, `variantLabel`, `itemName`, `amount`, `refundStatus`, `status`, `code`, `minVersion`, `link`, `reason`, `eta`, `title`, `body`. A message is never sent with a variable left blank: a missing value is an error for whoever queued it.
-
-A new install already has these templates (added only when missing, so edits are never overwritten): `back_in_stock` (push, and WhatsApp `back_in_stock_v1`) and `otp_login` (WhatsApp `login_otp`, and SMS). Submit the WhatsApp ones for approval under exactly those names, or change `whatsappTemplateName` to match what is approved.
-
-## POST /admin/notification-templates · PUT /admin/notification-templates/:id
-Body: the object without `id` (`PUT` may send just the fields to change). 201/200: the template. `key` is `lower_snake_case`; `language` defaults to `en`; `isActive` to `true`. Both calls are audited. Errors: `409 CONFLICT` (`key` + `channel` exists, including by renaming) · `400 VALIDATION_ERROR` (unknown `{{var}}` with `details.field` and `details.variable`; a WhatsApp template without `whatsappTemplateName`; `whatsappTemplateName` on another channel; a `title` on anything but push; marketing on SMS) · `404 NOT_FOUND`. A WhatsApp template must match one approved by the provider; changing `body` does not change the approved text.
+To change wording, edit that file and deploy. A WhatsApp message must keep matching the template approved by the provider, so a new WhatsApp wording needs the provider's approval first. Push wording can change freely.
 
 ## GET /admin/notifications
 Query: `status=queued|sent|delivered|failed`, `channel`, `userId`, `orderId`, `from`, `to`, `limit` (default 50, at most 100), `cursor`. Newest first; `nextCursor` is the last id of the page. `failedCount` counts failed messages matching the other filters. Login codes appear with `userId: null`, a masked number in place of the recipient and no text: the code itself is never stored. 200:
@@ -85,7 +67,7 @@ Query: `status=queued|sent|delivered|failed`, `channel`, `userId`, `orderId`, `f
 ```
 
 ## POST /admin/notifications/:id/retry
-200: `{ "data": { "id": "ntf_1", "status": "queued" } }`. The message is sent again with its tries counted from zero, and the retry is audited. Errors: `409 CONFLICT` with `details.reason = "not_failed"` · `404 NOT_FOUND`.
+200: `{ "data": { "id": "ntf_1", "status": "queued" } }`. The message is sent again with its tries counted from zero. Errors: `409 CONFLICT` with `details.reason = "not_failed"` · `404 NOT_FOUND`.
 
 ## POST /admin/broadcast
 Promo push to opted-in customers. Body:
@@ -103,7 +85,7 @@ Login OTP (WhatsApp first, SMS fallback), the 8 PM owner digest, unacknowledged-
 
 ## Implementation notes (backend, D2-2)
 
-- **Two modules.** `jobs` is a durable work queue in MongoDB (`jobs`, `job_schedules`); `notifications` holds templates, the delivery log, preferences, the channel adapters and the webhook. Other modules do not send messages themselves: they call `notifications.notify({ userId, templateKey, vars, data, channels, purpose, dedupeKey })` and the message is queued, sent by a worker, and logged.
+- **Two modules.** `jobs` is a durable work queue in MongoDB (`jobs`, `job_schedules`); `notifications` holds the built-in message wording, the delivery log, preferences, the channel adapters and the webhook. Other modules do not send messages themselves: they call `notifications.notify({ userId, templateKey, vars, data, channels, purpose, dedupeKey })` and the message is queued, sent by a worker, and logged.
 - **Queue behavior.** A worker takes a job with one atomic update and holds it for 5 minutes, so two workers never run the same job. If a worker dies, another takes the job over once the hold ends, so a job can run twice and handlers must be safe to repeat (messages are sent only if still `queued` and not held). A failing job is retried after 30 s, 1 min, 2 min... up to an hour, then marked `failed`. A job a worker keeps dying on stops after its tries are used up. Finished jobs are removed after 14 days. `dedupeKey` makes enqueuing the same work twice a no-op.
 - **Sending.** One message per channel is saved and a `notification.send` job is queued (5 tries). Push goes to every registered device; devices the provider says are gone are removed; the message counts as sent if any device got it. A failure that waiting cannot fix (no device, no phone, unapproved WhatsApp template, provider not configured) is recorded at once and not retried; anything else (provider busy or down) keeps the message `queued` and retries, then fails with "Gave up after 5 tries". An admin can retry a failed message.
 - **Recurring work** (`startBackground()`, once per server start): every minute, give back stock held by an order that never finished (F05 `releaseExpiredHolds`); every minute, hand "item is back" messages from Notify Me to delivery (F07); every hour, delete expired and stuck media (F24 `sweep`). Several servers can run this: each interval runs once.

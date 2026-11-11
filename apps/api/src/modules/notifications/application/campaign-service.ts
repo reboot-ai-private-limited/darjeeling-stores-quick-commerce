@@ -1,8 +1,8 @@
-import { validation } from "../../catalog/catalog.public.js";
+import { templatesFor } from "../domain/templates.js";
 import type { JobQueue } from "../../jobs/jobs.public.js";
 import { DEFAULT_PREFS, allowedByPrefs, whatsappParams, type Channel } from "../domain/notification.js";
 import type { DeliveryService } from "./delivery-service.js";
-import type { AudienceDirectory, AuditEntry, BackInStockOutbox, MediaUrls, NotificationStore } from "./ports.js";
+import type { AudienceDirectory, BackInStockOutbox, MediaUrls, NotificationStore } from "./ports.js";
 
 export const BROADCAST_JOB = "notification.broadcast";
 export const BROADCAST_TEMPLATE = "promo_broadcast";
@@ -37,25 +37,18 @@ export function createCampaignService(deps: {
 
   return {
     /** Queues a promo to opted-in customers of the zones. Returns at once with how many will get it. */
-    async broadcast(input: BroadcastInput, audit: Omit<AuditEntry, "action" | "entityId" | "entityType">) {
-      if (input.channels.includes("whatsapp")) {
-        const template = (await store.templatesFor(BROADCAST_TEMPLATE)).find(t => t.channel === "whatsapp" && t.isActive && t.category === "marketing");
-        if (!template) throw validation("WhatsApp broadcasts need an active marketing template with the key promo_broadcast", { field: "channels" });
-      }
+    async broadcast(input: BroadcastInput) {
       let recipients = 0;
       for await (const _customer of optedIn(input.zoneIds, input.channels)) { if (++recipients >= COUNT_LIMIT) break; }
       const broadcastId = newId();
       const { id: jobId } = await queue.enqueue({ type: BROADCAST_JOB, payload: { broadcastId, ...input } satisfies BroadcastPayload, dedupeKey: `broadcast:${broadcastId}`, maxAttempts: 3 });
-      await store.recordAudit({ ...audit, action: "notification.broadcast", entityType: "broadcast", entityId: broadcastId });
       return { jobId, recipients };
     },
 
     /** The job that does the broadcast. Repeating it queues nobody twice. */
     async runBroadcast(payload: BroadcastPayload): Promise<{ queued: number }> {
       let queued = 0;
-      const wa = payload.channels.includes("whatsapp")
-        ? (await store.templatesFor(BROADCAST_TEMPLATE)).find(t => t.channel === "whatsapp" && t.isActive && t.whatsappTemplateName)
-        : undefined;
+      const wa = payload.channels.includes("whatsapp") ? templatesFor(BROADCAST_TEMPLATE).find(t => t.channel === "whatsapp") : undefined;
       for await (const customer of optedIn(payload.zoneIds, payload.channels)) {
         for (const channel of customer.channels) {
           const message = delivery.blank({

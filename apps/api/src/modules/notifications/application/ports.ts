@@ -1,4 +1,4 @@
-import type { Channel, Notification, NotificationStatus, Prefs, Template } from "../domain/notification.js";
+import type { Channel, Notification, NotificationStatus, Prefs } from "../domain/notification.js";
 
 /** A failure from a provider. `permanent` means trying again cannot help (a bad number, an unapproved template). */
 export class ProviderError extends Error {
@@ -30,10 +30,8 @@ export interface BackInStockOutbox {
 }
 export interface MediaUrls { urls(mediaIds: readonly string[]): Promise<Record<string, Record<string, string>>> }
 
-export class DuplicateTemplateError extends Error { constructor() { super("A template with this key and channel exists"); this.name = "DuplicateTemplateError"; } }
 export class DuplicateNotificationError extends Error { constructor() { super("This notification was already queued"); this.name = "DuplicateNotificationError"; } }
 
-export interface AuditEntry { actorId: string; actorRole: string; action: string; entityType: string; entityId: string; requestId: string }
 
 export interface LogFilters {
   status?: NotificationStatus | undefined; channel?: Channel | undefined; userId?: string | undefined; orderId?: string | undefined;
@@ -42,14 +40,6 @@ export interface LogFilters {
 
 export interface NotificationStore {
   ensureIndexes(): Promise<void>;
-  /** Adds the built-in templates that are missing. Never changes one an admin has edited. */
-  seedTemplates(templates: readonly Omit<Template, "id" | "createdAt" | "updatedAt">[], newId: () => string, at: Date): Promise<void>;
-
-  listTemplates(): Promise<Template[]>;
-  getTemplate(id: string): Promise<Template | null>;
-  templatesFor(key: string): Promise<Template[]>;
-  insertTemplate(template: Template, audit: AuditEntry): Promise<void>;
-  saveTemplate(template: Template, audit: AuditEntry): Promise<void>;
 
   getPrefs(userId: string): Promise<Prefs | null>;
   getPrefsMany(userIds: readonly string[]): Promise<Map<string, Prefs>>;
@@ -64,9 +54,8 @@ export interface NotificationStore {
   markFailed(id: string, error: string, at: Date): Promise<void>;
   /** After a try that can be repeated: keeps it queued with the reason. */
   release(id: string, error: string, at: Date): Promise<void>;
-  requeue(id: string, at: Date, audit: AuditEntry): Promise<boolean>;
+  requeue(id: string, at: Date): Promise<boolean>;
   list(filters: LogFilters, beforeId: string | undefined, limit: number): Promise<Notification[]>;
   failedCount(filters: LogFilters): Promise<number>;
   applyProviderStatus(providerMessageId: string, next: NotificationStatus, error: string | null, at: Date): Promise<boolean>;
-  recordAudit(entry: AuditEntry): Promise<void>;
 }
