@@ -13,8 +13,31 @@ type Category = {
   parentId: string | null;
   sortOrder: number;
   isActive: boolean;
+  imageMediaId?: string | null;
+  imageUrls?: Record<string, string>;
   children?: Category[];
 };
+
+const categoryPhoto = (c: Category) => c.imageUrls?.thumb ?? c.imageUrls?.["320"] ?? c.imageUrls?.small ?? Object.values(c.imageUrls ?? {})[0] ?? "";
+
+/** Uploads a picture for a category and returns its media id. */
+async function uploadCategoryImage(categoryId: string, file: File): Promise<string> {
+  const post = async (path: string, body: unknown) => {
+    const res = await adminFetch(`/api/v1/${path}`, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" }, body: JSON.stringify(body) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((json as { error?: { message?: string } }).error?.message ?? "The picture could not be uploaded.");
+    return json;
+  };
+  const ticket = (await post("media/upload-url", { kind: "category_image", contentType: file.type || "image/jpeg", sizeBytes: file.size, ownerRef: { type: "category", id: categoryId } })) as { data: { mediaId: string; upload: { url: string; method: string; fields: Record<string, string> } } };
+  const { url, method, fields } = ticket.data.upload;
+  const form = new FormData();
+  Object.entries(fields ?? {}).forEach(([k, v]) => form.append(k, v));
+  form.append("file", file);
+  const put = await fetch(url, { method: method || "POST", body: form });
+  if (!put.ok) throw new Error("The picture could not be uploaded to storage.");
+  await post("media/complete", { mediaId: ticket.data.mediaId });
+  return ticket.data.mediaId;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +85,9 @@ function CategoryRow({
     <>
       <div className="admin-tree-row" style={{ "--depth": depth } as React.CSSProperties}>
         <span className="admin-tree-indent" />
+        {categoryPhoto(cat)
+          ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={categoryPhoto(cat)} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+          : <span aria-hidden="true" title="No photo yet" style={{ width: 40, height: 40, borderRadius: 8, background: "#fff3cc", flexShrink: 0 }} />}
         <span style={{ flex: 1 }}>
           <strong>{cat.name}</strong>
           <small style={{ marginLeft: 8, color: "var(--admin-muted)", fontSize: 11 }}>/{cat.slug}</small>
@@ -108,6 +134,14 @@ function CategoryManager({ canEdit }: { canEdit: boolean }) {
   const [parentId, setParentId] = useState<string>("");
   const [autoSlug, setAutoSlug] = useState(true);
   const [isActive, setIsActive] = useState(true);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [removePhoto, setRemovePhoto] = useState(false);
+
+  function choosePhoto(file: File | null) {
+    setPhoto(file); setRemovePhoto(false);
+    setPhotoPreview((old) => { if (old.startsWith("blob:")) URL.revokeObjectURL(old); return file ? URL.createObjectURL(file) : ""; });
+  }
 
   const [deleting, setDeleting] = useState<Category | null>(null);
 
@@ -136,6 +170,8 @@ function CategoryManager({ canEdit }: { canEdit: boolean }) {
     setEditing(cat);
     setFormError("");
     setDeleting(null);
+    setPhoto(null); setRemovePhoto(false);
+    setPhotoPreview(cat === "new" ? "" : categoryPhoto(cat));
     if (cat === "new") {
       setName(""); setSlug(""); setParentId(""); setAutoSlug(true); setIsActive(true); setIsActive(true);
     } else {
@@ -151,11 +187,22 @@ function CategoryManager({ canEdit }: { canEdit: boolean }) {
       const siblings = flat.filter((c) => c.parentId === (parentId || null) && (isNew || c.id !== (editing as Category).id));
       const sortOrder = isNew ? (siblings.length > 0 ? Math.max(...siblings.map((s) => s.sortOrder)) + 1 : 0) : (editing as Category).sortOrder;
       const payload = isNew ? { name: name.trim(), parentId: parentId || null, sortOrder } : { name: name.trim(), parentId: parentId || null, sortOrder, isActive };
-      await api(isNew ? "categories" : `categories/${(editing as Category).id}`, {
+      const saved = await api<{ data: { id: string } }>(isNew ? "categories" : `categories/${(editing as Category).id}`, {
         method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
         body: JSON.stringify(payload),
       });
+      const id = isNew ? saved.data.id : (editing as Category).id;
+      if (photo || removePhoto) {
+        try {
+          const imageMediaId = photo ? await uploadCategoryImage(id, photo) : null;
+          await api(`categories/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" }, body: JSON.stringify({ imageMediaId }) });
+        } catch (err) {
+          setEditing(null); setAttempt((v) => v + 1);
+          setFormError(`The category was saved, but its photo was not: ${err instanceof Error ? err.message : "upload failed"}. Edit the category to try again.`);
+          return;
+        }
+      }
       setEditing(null);
       setNotice(isNew ? "Category created." : "Category updated.");
       setAttempt((v) => v + 1);
@@ -241,6 +288,18 @@ function CategoryManager({ canEdit }: { canEdit: boolean }) {
               />
             </label>
             <small style={{ color: "var(--admin-muted)" }}>URL slug is generated automatically: /{slugify(name) || "…"}</small>
+            <div>
+              <span style={{ display: "block", marginBottom: 6 }}>Photo (shown to customers on the category tile)</span>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                {photoPreview && !removePhoto
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={photoPreview} alt="Category photo preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 12, border: "1px solid #cbc5ba" }} />
+                  : <span style={{ width: 88, height: 88, borderRadius: 12, background: "#fff3cc", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#8a5a00" }}>No photo</span>}
+                <span style={{ display: "grid", gap: 6 }}>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-label="Choose category photo" onChange={(e) => choosePhoto(e.target.files?.[0] ?? null)} />
+                  {(photoPreview && !removePhoto) && <button type="button" disabled={busy} onClick={() => { choosePhoto(null); setRemovePhoto(true); }} style={{ justifySelf: "start", minHeight: 30, padding: "4px 10px" }}>Remove photo</button>}
+                </span>
+              </div>
+            </div>
             {editing !== "new" && <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={isActive} disabled={busy} onChange={(e) => setIsActive(e.target.checked)} /> Active (visible to customers)</label>}
             <label htmlFor="cat-parent">Parent category (optional)
               <select id="cat-parent" value={parentId} disabled={busy}

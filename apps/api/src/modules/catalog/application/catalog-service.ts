@@ -8,6 +8,9 @@ import type {
   BrandInput, BrandPatch, BrandView, CategoryInput, CategoryPatch, ProductInput, ProductListQuery, ProductPatch, ProductView, VariantInput, VariantPatch,
 } from "./types.js";
 
+/** A category with the picture's addresses for each size, ready for the admin screen. */
+export type CategoryView = Omit<CategoryNode, "children"> & { imageUrls: Record<string, string>; children: CategoryView[] };
+
 const encodeCursor = (id: string) => Buffer.from(id).toString("base64url");
 function decodeCursor(cursor: string | undefined): string | undefined {
   if (cursor === undefined) return undefined;
@@ -59,7 +62,12 @@ export function createCatalogService(deps: CatalogDeps) {
 
   return {
     // ---------- categories ----------
-    async categoryTree(): Promise<CategoryNode[]> { return buildTree(await store.listCategories()); },
+    async categoryTree(): Promise<CategoryView[]> {
+      const categories = await store.listCategories();
+      const urls = await media.urls(categories.flatMap(c => (c.imageMediaId ? [c.imageMediaId] : [])));
+      const withUrls = (node: CategoryNode): CategoryView => ({ ...node, imageUrls: node.imageMediaId ? urls[node.imageMediaId] ?? {} : {}, children: node.children.map(withUrls) });
+      return buildTree(categories).map(withUrls);
+    },
 
     async createCategory(input: CategoryInput): Promise<Category> {
       const at = now();
