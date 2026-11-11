@@ -1,7 +1,8 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
+import { setOrigin } from "./heroTransition";
 import { FlatList, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { SlideInDown } from "react-native-reanimated";
 import { liftIn } from "../motion";
@@ -36,12 +37,19 @@ export function AddButton({ product }: { product: Product }) {
 export function ProductCard({ product, width = 132, eta, onPress }: { product: Product; width?: number | `${number}%`; eta?: string; onPress?: () => void }) {
   const v = defaultVariant(product);
   const img = cardImage(product);
+  const imgRef = useRef<ComponentRef<typeof View>>(null);
+  /** Remember where this card is, so the product page can open out of it. */
+  const open = () => {
+    if (onPress) { onPress(); return; }
+    const go = (r?: { x: number; y: number; w: number; h: number }) => { setOrigin(r ? { id: product.id, uri: img, ...r } : null); router.push(`/product/${product.id}`); };
+    if (imgRef.current) imgRef.current.measureInWindow((x, y, w, h) => go(w > 0 && h > 0 ? { x, y, w, h } : undefined)); else go();
+  };
   const out = product.availability !== "in_stock";
   return (
-    <Press onPress={onPress ?? (() => router.push(`/product/${product.id}`))} style={{ width }}>
+    <Press onPress={open} style={{ width }}>
       <View style={out && { opacity: 0.6 }}>
         <View>
-          <View style={s.imgWrap}>
+          <View ref={imgRef} collapsable={false} style={s.imgWrap}>
             {img ? <Image source={{ uri: img }} style={s.img} contentFit="cover" transition={150} /> : <Icon name="package" size={32} color={colors.faint} />}
             {v && v.discountPercent > 0 && <View style={s.off}><Text style={s.offText}>{v.discountPercent}% OFF</Text></View>}
           </View>
