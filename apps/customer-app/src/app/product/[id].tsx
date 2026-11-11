@@ -1,9 +1,7 @@
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, BackHandler, FlatList, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { setOrigin, takeOrigin } from "../../components/heroTransition";
+import { ActivityIndicator, FlatList, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { rememberViewed } from "../../components/homeExtras";
 import { getProduct, getProducts, notifyMe, type Product, type ProductDetail } from "../../api/catalog";
@@ -25,7 +23,7 @@ export default function ProductScreen() {
   const { qtyOf, add, remove } = useCart();
   const fav = useFavourites();
   const insets = useSafeAreaInsets();
-  const { width, height: H } = useWindowDimensions();
+  const { width } = useWindowDimensions();
 
   const [p, setP] = useState<ProductDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,38 +46,6 @@ export default function ProductScreen() {
     void getProducts(zone.id, p.categoryId).then(r => setSimilar(r.items.filter(x => x.id !== p.id).slice(0, 12))).catch(() => setSimilar([]));
   }, [zone, p]);
 
-  // Opening and closing: the page grows out of the tapped card and shrinks back into it.
-  const origin = useRef(takeOrigin(id)).current;
-  useEffect(() => { setOrigin(null); }, []); // used once; a later open from a link must not fly from a stale spot
-  const from = origin ?? { id, uri: null, x: width * 0.08, y: H * 0.62, w: width * 0.84, h: H * 0.18 };
-  const target = { x: width * 0.14, y: insets.top + 56 + width * 0.62 * 0.04, w: width * 0.72, h: width * 0.62 * 0.92 };
-  const progress = useSharedValue(0);
-  const overlay = useSharedValue(origin?.uri ? 1 : 0);
-  const [opened, setOpened] = useState(false);
-  const closing = useRef(false);
-  const finish = () => router.back();
-  useEffect(() => { progress.value = withTiming(1, { duration: 360, easing: Easing.out(Easing.cubic) }, f => { if (f) runOnJS(setOpened)(true); }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const close = useCallback(() => {
-    if (closing.current) return;
-    closing.current = true;
-    overlay.value = origin?.uri ? 1 : 0;
-    progress.value = withTiming(0, { duration: 300, easing: Easing.in(Easing.cubic) }, f => { if (f) runOnJS(finish)(); });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { const sub = BackHandler.addEventListener("hardwareBackPress", () => { close(); return true; }); return () => sub.remove(); }, [close]);
-  useEffect(() => { if (opened && (p || error) && !closing.current) overlay.value = withTiming(0, { duration: 180 }); }, [opened, p, error]); // eslint-disable-line react-hooks/exhaustive-deps
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * 0.35 }));
-  const sheetStyle = useAnimatedStyle(() => ({
-    left: interpolate(progress.value, [0, 1], [from.x, 0]), top: interpolate(progress.value, [0, 1], [from.y, 0]),
-    width: interpolate(progress.value, [0, 1], [from.w, width]), height: interpolate(progress.value, [0, 1], [from.h, H]),
-    borderRadius: interpolate(progress.value, [0, 1], [16, 0]),
-  }));
-  const contentStyle = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [0.4, 0.9], [0, 1], Extrapolation.CLAMP) }));
-  const flyStyle = useAnimatedStyle(() => ({
-    left: interpolate(progress.value, [0, 1], [from.x, target.x]), top: interpolate(progress.value, [0, 1], [from.y, target.y]),
-    width: interpolate(progress.value, [0, 1], [from.w, target.w]), height: interpolate(progress.value, [0, 1], [from.h, target.h]),
-    borderRadius: interpolate(progress.value, [0, 1], [12, 0]), opacity: overlay.value,
-  }));
-
   const v = p ? p.variants[vi] ?? p.variants[0] : undefined;
   const qty = v ? qtyOf(v.variantId) : 0;
   const images = p ? p.images.map(i => i.urls["640"] ?? Object.values(i.urls)[0]).filter((u): u is string => !!u) : [];
@@ -95,13 +61,10 @@ export default function ProductScreen() {
   };
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }, backdropStyle]} />
-      <Animated.View style={[{ position: "absolute", overflow: "hidden", backgroundColor: colors.white }, sheetStyle]}>
-      <Animated.View style={[{ position: "absolute", left: 0, top: 0, width, height: H, backgroundColor: colors.white }, contentStyle]}>
+    <View style={{ flex: 1, backgroundColor: colors.white }}>
       {/* Back and share sit on top of the page */}
       <View style={[s.topBtns, { top: insets.top + 8 }]}>
-        <Press onPress={close} haptic style={s.iconBtn}><Icon name="arrow-left" size={20} /></Press>
+        <Press onPress={() => router.back()} haptic style={s.iconBtn}><Icon name="arrow-left" size={20} /></Press>
         {p && (
           <View style={{ flexDirection: "row", gap: space.sm }}>
             <Press onPress={() => void fav.toggle(p)} haptic style={s.iconBtn}><Icon name="heart" size={18} color={fav.has(p.id) ? colors.red : colors.ink} /></Press>
@@ -217,7 +180,7 @@ export default function ProductScreen() {
                     <FlatList
                       horizontal data={similar} keyExtractor={x => x.id} showsHorizontalScrollIndicator={false}
                       contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.md, gap: space.md }}
-                      renderItem={({ item }) => <ProductCard product={item} eta={etaLabel} />}
+                      renderItem={({ item }) => <ProductCard product={item} eta={etaLabel} onPress={() => router.push(`/product/${item.id}`)} />}
                     />
                   </View>
                 )}
@@ -248,13 +211,6 @@ export default function ProductScreen() {
           )}
         </View>
       )}
-      </Animated.View>
-      </Animated.View>
-      {origin?.uri ? (
-        <Animated.View pointerEvents="none" style={[{ position: "absolute", overflow: "hidden", backgroundColor: colors.white }, flyStyle]}>
-          <Image source={{ uri: origin.uri }} style={{ width: "100%", height: "100%" }} contentFit="contain" />
-        </Animated.View>
-      ) : null}
     </View>
   );
 }
