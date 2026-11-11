@@ -83,3 +83,30 @@ export function GridSkeleton({ cols = 2 }: { cols?: number }) {
     </View>
   );
 }
+
+/** Stand-in for the Categories tab: a grid of round-cornered tiles with a name line under each, four to a row. */
+export function CategoryGridSkeleton({ count = 16 }: { count?: number }) {
+  const { width } = useWindowDimensions();
+  const tile = (width - space.sm * 2) / 4 - 10;
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading categories" style={{ flexDirection: "row", flexWrap: "wrap", padding: space.sm }}>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={{ width: "25%", padding: 5, alignItems: "center" }}>
+          <Bone h={tile} r={radius.lg} />
+          <Bone w="70%" h={11} style={{ marginTop: 8 }} />
+          <Bone w="45%" h={11} style={{ marginTop: 5 }} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Stand-in for a category's shelves on Home: two product rows. */
+export function RailsSkeleton() {
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading products">
+      <RailBone title={150} />
+      <RailBone title={120} />
+    </View>
+  );
+}
