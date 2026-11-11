@@ -12,10 +12,14 @@ export type IconName = React.ComponentProps<typeof Feather>["name"];
 export const Icon = ({ name, size = 20, color = colors.ink }: { name: IconName; size?: number; color?: string }) => <Feather name={name} size={size} color={color} />;
 
 export const tap = (style: "light" | "medium" | "success" = "light") => {
+  // Haptics are a nicety. The native part can be missing (web, some emulators, an Expo Go that does not match the SDK), and then the
+  // call fails inside a promise, which try/catch alone does not catch, so the promise's own failure is swallowed too.
   try {
-    if (style === "success") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    else void Haptics.impactAsync(style === "medium" ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
-  } catch { /* haptics are optional (web, simulators) */ }
+    const done = style === "success"
+      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      : Haptics.impactAsync(style === "medium" ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+    done.catch(() => undefined);
+  } catch { /* haptics are optional */ }
 };
 
 /** Fades and lifts its children in, one after another. `i` is the position in the sequence. */

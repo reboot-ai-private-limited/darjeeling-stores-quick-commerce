@@ -100,7 +100,7 @@ export default function Home() {
               <RecentlyViewed eta={etaText} />
               <BadgeRails products={all} eta={etaText} />
               <BudgetRail products={all} eta={etaText} />
-              <BrandRow products={all} />
+              <BrandRow products={all} zoneId={zoneId} />
 
               {data.sections.map(sec => (
                 <View key={sec.categoryId} style={{ marginTop: space.xl }}>
