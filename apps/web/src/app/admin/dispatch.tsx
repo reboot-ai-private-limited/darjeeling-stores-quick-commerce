@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { adminFetch, type AdminSession } from "./session-client";
+import { AssignRider, ChangeRider } from "./assign-rider";
+import { ReadyOrdersTab } from "./dispatch-ready";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,27 +18,6 @@ type Alert = {
   minutes?: number;
   hasActiveOrder?: boolean;
   reason?: string;
-};
-
-type SuggestionItem = {
-  riderId: string;
-  name: string;
-  activeOrders: number;
-  distanceMeters: number | null;
-  lastAssignedAt: string | null;
-  score: number;
-};
-
-type IneligibleItem = {
-  riderId: string;
-  name: string;
-  reasons: string[];
-};
-
-type SuggestionsResponse = {
-  orderId: string;
-  suggested: SuggestionItem[];
-  ineligible: IneligibleItem[];
 };
 
 type AssignmentItem = {
@@ -82,7 +63,7 @@ function fmtDate(iso: string | null | undefined): string {
 
 // ─── Alerts Tab ──────────────────────────────────────────────────────────────
 
-function AlertsTab({ onJumpToOrder }: { onJumpToOrder: (orderId: string) => void }) {
+function AlertsTab() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -132,7 +113,7 @@ function AlertsTab({ onJumpToOrder }: { onJumpToOrder: (orderId: string) => void
       <div className="admin-panel-toolbar">
         <h2 id="alerts-title">Escalations &amp; Real-time Alerts</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)" }}>Auto-refreshes every 30s</span>
+          <span style={{ fontSize: 13, color: "var(--admin-muted)" }}>Auto-refreshes every 30s</span>
           <button className="admin-text-button" disabled={loading} onClick={() => setAttempt((v) => v + 1)}>
             Refresh
           </button>
@@ -145,7 +126,7 @@ function AlertsTab({ onJumpToOrder }: { onJumpToOrder: (orderId: string) => void
         <p className="admin-roles-message" role="status">Checking live alerts…</p>
       ) : alerts.length === 0 ? (
         <div className="admin-empty" style={{ minHeight: 220 }}>
-          <span className="admin-badge admin-badge-active" style={{ marginBottom: 12, fontSize: 12 }}>All Clear</span>
+          <span className="admin-badge admin-badge-active" style={{ marginBottom: 12, fontSize: 14 }}>All Clear</span>
           <h2>No Active Alerts</h2>
           <p>No SLA breaches, delayed assignments, or unattended rider problems at this moment.</p>
         </div>
@@ -162,22 +143,17 @@ function AlertsTab({ onJumpToOrder }: { onJumpToOrder: (orderId: string) => void
                     </span>
                     <strong>{getTitle(alert)}</strong>
                   </div>
-                  {alert.message && <p style={{ margin: "2px 0 6px", fontSize: 12 }}>{alert.message}</p>}
-                  {alert.note && <p style={{ margin: "2px 0 6px", fontSize: 12, color: "var(--admin-muted)" }}>Note: {alert.note}</p>}
-                  <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--admin-muted)" }}>
-                    {alert.orderId && <span>Order: <code>{alert.orderId}</code></span>}
-                    {alert.riderId && <span>Rider: <code>{alert.riderId}</code></span>}
+                  {alert.message && <p style={{ margin: "2px 0 6px", fontSize: 14 }}>{alert.message}</p>}
+                  {alert.note && <p style={{ margin: "2px 0 6px", fontSize: 14, color: "var(--admin-muted)" }}>Note: {alert.note}</p>}
+                  <div style={{ display: "flex", gap: 12, fontSize: 13, color: "var(--admin-muted)" }}>
                     {alert.since && <span>Since: {fmtDate(alert.since)}</span>}
                   </div>
                 </div>
-                {alert.orderId && (
-                  <button
-                    className="admin-role-button"
-                    style={{ minHeight: 32, padding: "4px 10px", fontSize: 12 }}
-                    onClick={() => onJumpToOrder(alert.orderId!)}
-                  >
-                    View order
-                  </button>
+                {alert.orderId && alert.type === "ack_overdue" && (
+                  <ChangeRider orderId={alert.orderId} status="ASSIGNED" compact onChanged={() => setAttempt((v) => v + 1)} />
+                )}
+                {alert.orderId && alert.type === "order_delayed" && (
+                  <AssignRider orderId={alert.orderId} compact onAssigned={() => setAttempt((v) => v + 1)} />
                 )}
               </div>
             );
@@ -188,155 +164,9 @@ function AlertsTab({ onJumpToOrder }: { onJumpToOrder: (orderId: string) => void
   );
 }
 
-// ─── Suggestions & Assign Tab ────────────────────────────────────────────────
-
-function SuggestionsTab({ initialOrderId = "" }: { initialOrderId?: string }) {
-  const [orderId, setOrderId] = useState(initialOrderId);
-  const [data, setData] = useState<SuggestionsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (initialOrderId) {
-      setOrderId(initialOrderId);
-      void fetchSuggestions(initialOrderId);
-    }
-  }, [initialOrderId]);
-
-  async function fetchSuggestions(idToLookup: string) {
-    if (!idToLookup.trim()) return;
-    setLoading(true);
-    setError("");
-    setData(null);
-    setNotice("");
-    try {
-      const res = await api<{ data: SuggestionsResponse }>(`dispatch/suggestions?orderId=${encodeURIComponent(idToLookup.trim())}`);
-      setData(res.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load suggestions.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function assignRider(riderId: string) {
-    if (!data?.orderId) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      await api(`orders/${data.orderId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
-        body: JSON.stringify({ riderId }),
-      });
-      setNotice(`Order ${data.orderId} successfully assigned to rider.`);
-      setData(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Assignment failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <section className="admin-panel" style={{ marginBottom: 20 }}>
-        <div className="admin-panel-toolbar">
-          <h2>Rider Recommendations &amp; Manual Assignment</h2>
-        </div>
-        <form
-          className="admin-staff-filters"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void fetchSuggestions(orderId);
-          }}
-          style={{ border: 0 }}
-        >
-          <label style={{ flex: 2 }}>
-            Ready Order ID (24-char hex)
-            <input
-              type="text"
-              required
-              pattern="[a-f0-9]{24}"
-              value={orderId}
-              placeholder="e.g. 64b8a2e1d0f9a2b3c4d5e6f7"
-              onChange={(e) => setOrderId(e.target.value)}
-              disabled={loading || busy}
-            />
-          </label>
-          <button className="admin-role-button" disabled={loading || busy}>
-            {loading ? "Calculating…" : "Find Candidates"}
-          </button>
-        </form>
-      </section>
-
-      {notice && <p role="status" style={{ color: "#137333", marginBottom: 12, fontSize: 13 }}>{notice}</p>}
-      {error && <p role="alert" className="admin-role-error" style={{ marginBottom: 12 }}>{error}</p>}
-
-      {data && (
-        <div style={{ display: "grid", gap: 16 }}>
-          <section className="admin-panel">
-            <div className="admin-panel-toolbar">
-              <h2>Suggested Riders for Order <code>{data.orderId}</code></h2>
-              <span>{data.suggested.length} ranked candidate(s)</span>
-            </div>
-            {data.suggested.length === 0 ? (
-              <p className="admin-roles-message">No active riders match eligibility for this order right now.</p>
-            ) : (
-              <div style={{ padding: "8px 20px" }}>
-                {data.suggested.map((c) => (
-                  <div key={c.riderId} className="admin-suggestion-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span className="admin-badge admin-badge-active">Rank #{c.score}</span>
-                        <strong style={{ fontSize: 14 }}>{c.name}</strong>
-                      </div>
-                      <div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--admin-muted)", marginTop: 4 }}>
-                        <span>Active loads: <strong>{c.activeOrders}</strong></span>
-                        {c.distanceMeters !== null && <span>Distance: {(c.distanceMeters / 1000).toFixed(1)} km</span>}
-                        {c.lastAssignedAt && <span>Last assigned: {fmtDate(c.lastAssignedAt)}</span>}
-                      </div>
-                    </div>
-                    <button
-                      className="admin-role-button"
-                      disabled={busy}
-                      onClick={() => assignRider(c.riderId)}
-                    >
-                      {busy ? "Assigning…" : "Assign Order"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {data.ineligible.length > 0 && (
-            <details className="admin-panel" style={{ padding: "16px 20px" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-                Ineligible Riders ({data.ineligible.length})
-              </summary>
-              <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-                {data.ineligible.map((i) => (
-                  <div key={i.riderId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, borderBottom: "1px solid var(--admin-border)", padding: "6px 0" }}>
-                    <span>{i.name}</span>
-                    <span style={{ color: "#a73535" }}>{i.reasons.join(", ").replace(/_/g, " ")}</span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
-
 // ─── Assignments Live Board Tab ──────────────────────────────────────────────
 
-function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) => void }) {
+function AssignmentsTab() {
   const [assignments, setAssignments] = useState<AssignmentItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -467,11 +297,11 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
       {handoverTarget && (
         <form className="admin-panel admin-role-form" onSubmit={submitHandover} style={{ marginBottom: 20 }}>
           <h2>Handover Order #{handoverTarget.orderNo || handoverTarget.orderId}</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
             Current Rider: <strong>{handoverTarget.riderName}</strong>. Handing over transfers the live assignment to another active rider.
           </p>
           <div style={{ display: "grid", gap: 12, maxWidth: 500 }}>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Select Destination Rider *
               <select
                 required
@@ -486,7 +316,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                 ))}
               </select>
             </label>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Reason for Handover *
               <input
                 required
@@ -515,7 +345,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
         <form className="admin-panel admin-role-form" onSubmit={submitResolve} style={{ marginBottom: 20 }}>
           <h2>Resolve Failed Delivery: #{resolveTarget.orderNo || resolveTarget.orderId}</h2>
           <div style={{ display: "grid", gap: 12, maxWidth: 500 }}>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Resolution Action *
               <select
                 value={resolveAction}
@@ -528,7 +358,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
               </select>
             </label>
             {resolveAction === "cancel_return" && (
-              <label style={{ fontSize: 12 }}>
+              <label style={{ fontSize: 14 }}>
                 Goods Condition *
                 <select
                   value={goodsCondition}
@@ -541,7 +371,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                 </select>
               </label>
             )}
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Resolution Notes
               <textarea
                 value={resolveNote}
@@ -605,29 +435,23 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                 {assignments.map((a) => (
                   <tr key={a.id} style={{ background: a.overdue ? "#fff8f7" : undefined }}>
                     <td>
-                      <button
-                        className="admin-text-button"
-                        style={{ padding: 0, fontWeight: 600, textAlign: "left" }}
-                        onClick={() => onInspectOrder(a.orderId)}
-                      >
-                        #{a.orderNo || a.orderId.slice(-6)}
-                      </button>
+                      <strong>#{a.orderNo || a.orderId.slice(-6)}</strong>
                     </td>
                     <td>{a.riderName || <span style={{ color: "var(--admin-muted)" }}>{a.riderId}</span>}</td>
                     <td>
                       <span className={`admin-badge ${a.status === "acknowledged" ? "admin-badge-active" : a.status === "assigned" ? (a.overdue ? "admin-badge-inactive" : "admin-badge-paused") : ""}`}>
                         {a.status}
                       </span>
-                      {a.overdue && <small style={{ display: "block", color: "#a73535", fontWeight: 600, fontSize: 10 }}>ACK OVERDUE</small>}
+                      {a.overdue && <small style={{ display: "block", color: "#a73535", fontWeight: 600, fontSize: 12 }}>ACK OVERDUE</small>}
                     </td>
-                    <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{fmtDate(a.ackDeadlineAt)}</td>
+                    <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{fmtDate(a.ackDeadlineAt)}</td>
                     <td>
                       <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
                         {a.status === "assigned" && (
                           <button
                             disabled={busy}
                             onClick={() => unassignOrder(a.orderId)}
-                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "#a73535" }}
+                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13, color: "#a73535" }}
                           >
                             Unassign
                           </button>
@@ -636,7 +460,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                           <button
                             disabled={busy}
                             onClick={() => setHandoverTarget(a)}
-                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13 }}
                           >
                             Handover
                           </button>
@@ -644,7 +468,7 @@ function AssignmentsTab({ onInspectOrder }: { onInspectOrder: (orderId: string) 
                         <button
                           disabled={busy}
                           onClick={() => setResolveTarget(a)}
-                          style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                          style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13 }}
                         >
                           Resolve
                         </button>
@@ -749,7 +573,7 @@ function BatchesTab() {
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, alignItems: "center" }}>
         <div>
           <h2 style={{ fontSize: 18, margin: 0 }}>Route Batches</h2>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--admin-muted)" }}>Group multiple ready orders for single-rider multi-drop routes.</p>
+          <p style={{ margin: "2px 0 0", fontSize: 14, color: "var(--admin-muted)" }}>Group multiple ready orders for single-rider multi-drop routes.</p>
         </div>
         <button className="admin-role-button" onClick={() => setCreating(!creating)}>
           {creating ? "Cancel" : "Create Batch"}
@@ -763,7 +587,7 @@ function BatchesTab() {
         <form className="admin-panel admin-role-form" onSubmit={createBatch} style={{ marginBottom: 20 }}>
           <h2>Create Multi-Order Batch</h2>
           <div style={{ display: "grid", gap: 12, maxWidth: 520 }}>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Select Delivery Rider *
               <select
                 required
@@ -778,7 +602,7 @@ function BatchesTab() {
                 ))}
               </select>
             </label>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Ready Order IDs (1–10 IDs, comma or newline separated) *
               <textarea
                 required
@@ -822,8 +646,8 @@ function BatchesTab() {
                     </span>
                     <strong>Batch <code>{b.id.slice(-6)}</code></strong>
                   </div>
-                  <p style={{ margin: 0, fontSize: 13 }}>Rider ID: <code>{b.riderId}</code></p>
-                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--admin-muted)" }}>
+                  <p style={{ margin: 0, fontSize: 15 }}>Rider ID: <code>{b.riderId}</code></p>
+                  <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--admin-muted)" }}>
                     {b.orderIds.length} orders: {b.orderIds.map((id) => id.slice(-6)).join(", ")}
                   </p>
                 </div>
@@ -831,7 +655,7 @@ function BatchesTab() {
                   <button
                     disabled={busy}
                     onClick={() => cancelBatch(b.id)}
-                    style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "6px 12px", background: "#fff", cursor: "pointer", fontSize: 12, color: "#a73535" }}
+                    style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "6px 12px", background: "#fff", cursor: "pointer", fontSize: 14, color: "#a73535" }}
                   >
                     Cancel Batch
                   </button>
@@ -847,11 +671,10 @@ function BatchesTab() {
 
 // ─── Root Dispatch Desk Component ─────────────────────────────────────────────
 
-type DispatchTab = "alerts" | "assignments" | "suggestions" | "batches";
+type DispatchTab = "ready" | "alerts" | "assignments" | "batches";
 
 export default function Dispatch({ session }: { session: AdminSession }) {
-  const [tab, setTab] = useState<DispatchTab>("alerts");
-  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+  const [tab, setTab] = useState<DispatchTab>("ready");
 
   const canManage =
     session.user.permissions.includes("*") ||
@@ -868,11 +691,6 @@ export default function Dispatch({ session }: { session: AdminSession }) {
     );
   }
 
-  function handleJumpToOrder(orderId: string) {
-    setSelectedOrderId(orderId);
-    setTab("suggestions");
-  }
-
   return (
     <>
       <div className="admin-heading" style={{ marginBottom: 12 }}>
@@ -884,9 +702,9 @@ export default function Dispatch({ session }: { session: AdminSession }) {
 
       <div className="admin-tab-nav" role="tablist" aria-label="Dispatch Desk Sections">
         {([
+          { key: "ready", label: "Ready orders" },
           { key: "alerts", label: "Alerts & Escalations" },
           { key: "assignments", label: "Live Assignments" },
-          { key: "suggestions", label: "Suggestions & Assign" },
           { key: "batches", label: "Route Batches" },
         ] as { key: DispatchTab; label: string }[]).map((t) => (
           <button
@@ -901,9 +719,9 @@ export default function Dispatch({ session }: { session: AdminSession }) {
         ))}
       </div>
 
-      {tab === "alerts" && <AlertsTab onJumpToOrder={handleJumpToOrder} />}
-      {tab === "assignments" && <AssignmentsTab onInspectOrder={handleJumpToOrder} />}
-      {tab === "suggestions" && <SuggestionsTab initialOrderId={selectedOrderId} />}
+      {tab === "ready" && <ReadyOrdersTab />}
+      {tab === "alerts" && <AlertsTab />}
+      {tab === "assignments" && <AssignmentsTab />}
       {tab === "batches" && <BatchesTab />}
     </>
   );

@@ -71,7 +71,7 @@ function Thumb({ mediaId, size = 64 }: { mediaId: string | null; size?: number }
   }, [mediaId]);
   const box = { width: size * 2, height: size, borderRadius: 6, background: "#f3f1ee", border: "1px solid var(--admin-border)", objectFit: "cover" as const, display: "block" };
   // eslint-disable-next-line @next/next/no-img-element
-  return src ? <img src={src} alt="" style={box} /> : <div style={{ ...box, display: "grid", placeItems: "center", fontSize: 10, color: "var(--admin-muted)" }}>{mediaId ? "…" : "No image"}</div>;
+  return src ? <img src={src} alt="" style={box} /> : <div style={{ ...box, display: "grid", placeItems: "center", fontSize: 12, color: "var(--admin-muted)" }}>{mediaId ? "…" : "No image"}</div>;
 }
 
 export default function Banners({ session }: { session: AdminSession }) {
@@ -187,11 +187,11 @@ export default function Banners({ session }: { session: AdminSession }) {
           <div style={{ marginTop: 16, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
             <Thumb mediaId={draft.imageMediaId} size={70} />
             <div>
-              <label style={{ display: "inline-block", cursor: "pointer", border: "1px solid #cbc5ba", borderRadius: 6, padding: "8px 14px", background: "#fff", fontSize: 12 }}>
+              <label style={{ display: "inline-block", cursor: "pointer", border: "1px solid #cbc5ba", borderRadius: 6, padding: "8px 14px", background: "#fff", fontSize: 14 }}>
                 {draft.imageMediaId ? "Replace image" : "Upload image"}
                 <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} style={{ display: "none" }} onChange={e => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
               </label>
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--admin-muted)" }}>JPEG, PNG or WebP. A wide image (about 2:1) works best.</p>
+              <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--admin-muted)" }}>JPEG, PNG or WebP. A wide image (about 2:1) works best.</p>
             </div>
           </div>
           <label style={{ marginTop: 14 }}><input type="checkbox" checked={draft.isActive} onChange={e => set({ isActive: e.target.checked })} disabled={busy} /> Visible to customers</label>
@@ -218,10 +218,10 @@ export default function Banners({ session }: { session: AdminSession }) {
                       <tr key={b.id}>
                         <td><Thumb mediaId={b.imageMediaId} size={40} /></td>
                         <td style={{ fontWeight: 500 }}>{b.title}</td>
-                        <td style={{ fontSize: 12, maxWidth: 220, overflowWrap: "anywhere" }}>{linkText(b.link)}</td>
-                        <td style={{ fontSize: 12 }}>{zoneName(b.zoneId)}</td>
+                        <td style={{ fontSize: 14, maxWidth: 220, overflowWrap: "anywhere" }}>{linkText(b.link)}</td>
+                        <td style={{ fontSize: 14 }}>{zoneName(b.zoneId)}</td>
                         <td>{b.sortOrder}</td>
-                        <td style={{ fontSize: 12 }}>{b.startsAt ? dateTime(b.startsAt) : "Now"} → {b.endsAt ? dateTime(b.endsAt) : "No end"}</td>
+                        <td style={{ fontSize: 14 }}>{b.startsAt ? dateTime(b.startsAt) : "Now"} → {b.endsAt ? dateTime(b.endsAt) : "No end"}</td>
                         <td><Badge tone={s.tone}>{s.label}</Badge></td>
                         {canManage && (
                           <td>

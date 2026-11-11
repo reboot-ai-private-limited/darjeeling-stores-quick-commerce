@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { FleetMap, type FleetPin } from "./fleet-map";
 import { adminFetch, type AdminSession } from "./session-client";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -252,7 +253,7 @@ function RiderDirectory({
         <form className="admin-panel admin-role-form" onSubmit={saveRider} style={{ marginBottom: 20 }}>
           <h2>{editing === "new" ? "Onboard Delivery Partner" : `Edit Rider — ${(editing as Rider).name}`}</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16, maxWidth: 860, alignItems: "start" }}>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Full Name *
               <input
                 required
@@ -266,7 +267,7 @@ function RiderDirectory({
             </label>
 
             {editing === "new" && (
-              <label style={{ fontSize: 12 }}>
+              <label style={{ fontSize: 14 }}>
                 Phone Number (E.164 or 10 digits) *
                 <input
                   required
@@ -279,7 +280,7 @@ function RiderDirectory({
               </label>
             )}
 
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Home Zone *
               <select
                 required
@@ -295,7 +296,7 @@ function RiderDirectory({
               </select>
             </label>
 
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Vehicle Details (optional)
               <input
                 maxLength={40}
@@ -308,12 +309,12 @@ function RiderDirectory({
             </label>
 
             <fieldset style={{ gridColumn: "1 / -1", border: "1px solid var(--admin-border)", borderRadius: 6, padding: "10px 14px", margin: 0 }}>
-              <legend style={{ fontSize: 12, fontWeight: 600 }}>Permitted Fulfillment Warehouses *</legend>
+              <legend style={{ fontSize: 14, fontWeight: 600 }}>Permitted Fulfillment Warehouses *</legend>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8, marginTop: 6 }}>
                 {warehouses.map((w) => {
                   const checked = formWarehouseIds.includes(w.id);
                   return (
-                    <label key={w.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                    <label key={w.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
                       <input
                         type="checkbox"
                         checked={checked}
@@ -407,7 +408,7 @@ function RiderDirectory({
                         <strong>{r.name}</strong>
                         {!r.isActive && <small style={{ display: "block", color: "#a73535" }}>Deactivated</small>}
                       </td>
-                      <td style={{ fontSize: 12 }}>{r.phone}</td>
+                      <td style={{ fontSize: 14 }}>{r.phone}</td>
                       <td>
                         <span className={`admin-badge ${isOnline ? "admin-badge-active" : isBreak ? "admin-badge-paused" : "admin-badge-disabled"}`}>
                           {r.status.replace("_", " ")}
@@ -416,12 +417,12 @@ function RiderDirectory({
                       <td>
                         <strong>{r.activeOrderCount}</strong> active
                       </td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{r.vehicle || "—"}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{r.vehicle || "—"}</td>
                       <td>
                         <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
                           <button
                             onClick={() => onViewShifts(r.id, r.name)}
-                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                            style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13 }}
                           >
                             Shifts
                           </button>
@@ -429,7 +430,7 @@ function RiderDirectory({
                             <>
                               <button
                                 onClick={() => startEdit(r)}
-                                style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                                style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13 }}
                               >
                                 Edit
                               </button>
@@ -437,7 +438,7 @@ function RiderDirectory({
                                 <button
                                   disabled={busy}
                                   onClick={() => forceOffline(r)}
-                                  style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "#b06000" }}
+                                  style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13, color: "#b06000" }}
                                 >
                                   Force offline
                                 </button>
@@ -445,7 +446,7 @@ function RiderDirectory({
                               <button
                                 disabled={busy}
                                 onClick={() => toggleActive(r)}
-                                style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: r.isActive ? "#a73535" : "#137333" }}
+                                style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13, color: r.isActive ? "#a73535" : "#137333" }}
                               >
                                 {r.isActive ? "Deactivate" : "Reactivate"}
                               </button>
@@ -472,6 +473,7 @@ function LiveFleetTab({ warehouses }: { warehouses: Warehouse[] }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [focusId, setFocusId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -489,7 +491,7 @@ function LiveFleetTab({ warehouses }: { warehouses: Warehouse[] }) {
       }
     }
     void load();
-    const interval = setInterval(load, 15_000);
+    const interval = setInterval(load, 10_000);
     return () => {
       active = false;
       clearInterval(interval);
@@ -501,7 +503,7 @@ function LiveFleetTab({ warehouses }: { warehouses: Warehouse[] }) {
       <div className="admin-panel-toolbar">
         <h2 id="fleet-title">Live Field Monitoring</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)" }}>Polls every 15s</span>
+          <span style={{ fontSize: 13, color: "var(--admin-muted)" }}>Updates every 10 seconds</span>
           <button className="admin-text-button" disabled={loading} onClick={() => setAttempt((v) => v + 1)}>
             Refresh
           </button>
@@ -515,6 +517,17 @@ function LiveFleetTab({ warehouses }: { warehouses: Warehouse[] }) {
       ) : fleet.length === 0 ? (
         <p className="admin-roles-message">No riders currently on active shift.</p>
       ) : (
+        <>
+        <div style={{ padding: "0 16px 16px" }}>
+          {fleet.some((r) => r.location) ? (
+            <FleetMap
+              riders={fleet.flatMap((r): FleetPin[] => (r.location ? [{ id: r.riderId, name: r.name, status: r.status, location: r.location, lastLocationAt: r.lastLocationAt, orders: r.activeOrders.map((o) => "#" + (o.orderNo || o.orderId.slice(-6))) }] : []))}
+              focusId={focusId} onSelect={setFocusId} height={440}
+            />
+          ) : (
+            <p className="admin-roles-message">No rider has sent a location yet. They appear on the map as soon as the rider app sends its first position.</p>
+          )}
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table className="admin-product-table">
             <thead>
@@ -531,9 +544,9 @@ function LiveFleetTab({ warehouses }: { warehouses: Warehouse[] }) {
               {fleet.map((r) => {
                 const whName = warehouses.find((w) => w.id === r.currentWarehouseId)?.name ?? "—";
                 return (
-                  <tr key={r.riderId}>
+                  <tr key={r.riderId} onClick={() => r.location && setFocusId(r.riderId)} style={{ cursor: r.location ? "pointer" : undefined, background: focusId === r.riderId ? "#fff8e5" : undefined }} title={r.location ? "Click to show on the map" : undefined}>
                     <td><strong>{r.name}</strong></td>
-                    <td style={{ fontSize: 12 }}>{whName}</td>
+                    <td style={{ fontSize: 14 }}>{whName}</td>
                     <td>
                       <span className={`admin-badge ${r.status === "online" ? "admin-badge-active" : "admin-badge-paused"}`}>
                         {r.status}
@@ -541,11 +554,11 @@ function LiveFleetTab({ warehouses }: { warehouses: Warehouse[] }) {
                     </td>
                     <td>
                       {r.activeOrders.length === 0 ? (
-                        <span style={{ color: "var(--admin-muted)", fontSize: 12 }}>Idle (0 orders)</span>
+                        <span style={{ color: "var(--admin-muted)", fontSize: 14 }}>Idle (0 orders)</span>
                       ) : (
                         <div>
                           <strong>{r.activeOrders.length} in flight</strong>
-                          <div style={{ fontSize: 11, color: "var(--admin-muted)" }}>
+                          <div style={{ fontSize: 13, color: "var(--admin-muted)" }}>
                             {r.activeOrders.map((o) => `#${o.orderNo || o.orderId.slice(-6)} (${o.status})`).join(", ")}
                           </div>
                         </div>
@@ -557,21 +570,23 @@ function LiveFleetTab({ warehouses }: { warehouses: Warehouse[] }) {
                           href={`https://maps.google.com/?q=${r.location.lat},${r.location.lng}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: "var(--admin-accent)", textDecoration: "underline", fontSize: 12 }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ color: "var(--admin-accent)", textDecoration: "underline", fontSize: 14 }}
                         >
                           {r.location.lat.toFixed(4)}, {r.location.lng.toFixed(4)} ↗
                         </a>
                       ) : (
-                        <span style={{ color: "var(--admin-muted)", fontSize: 12 }}>GPS Pending</span>
+                        <span style={{ color: "var(--admin-muted)", fontSize: 14 }}>GPS Pending</span>
                       )}
                     </td>
-                    <td style={{ fontSize: 11, color: "var(--admin-muted)" }}>{fmtDate(r.lastLocationAt)}</td>
+                    <td style={{ fontSize: 13, color: "var(--admin-muted)" }}>{fmtDate(r.lastLocationAt)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
   );
@@ -632,10 +647,10 @@ function ShiftsTab({
     <section className="admin-panel" aria-labelledby="shifts-title">
       {targetRiderId && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: "#f7f6f3", borderBottom: "1px solid var(--admin-border)" }}>
-          <span style={{ fontSize: 13 }}>
+          <span style={{ fontSize: 15 }}>
             Showing shift history for <strong>{targetRiderName || targetRiderId}</strong>
           </span>
-          <button className="admin-text-button" onClick={onClearTarget} style={{ fontSize: 12 }}>
+          <button className="admin-text-button" onClick={onClearTarget} style={{ fontSize: 14 }}>
             Clear filter (View all shifts)
           </button>
         </div>
@@ -692,15 +707,15 @@ function ShiftsTab({
                   <tr key={s.id}>
                     <td><code>{s.riderId.slice(-6)}</code></td>
                     <td>{wh}</td>
-                    <td style={{ fontSize: 12 }}>{fmtDate(s.startedAt)}</td>
-                    <td style={{ fontSize: 12 }}>
+                    <td style={{ fontSize: 14 }}>{fmtDate(s.startedAt)}</td>
+                    <td style={{ fontSize: 14 }}>
                       {isActive ? (
                         <span className="admin-badge admin-badge-active">On Shift</span>
                       ) : (
                         fmtDate(s.endedAt)
                       )}
                     </td>
-                    <td style={{ fontWeight: 600, fontSize: 12 }}>
+                    <td style={{ fontWeight: 600, fontSize: 14 }}>
                       {calcDuration(s.startedAt, s.endedAt)}
                     </td>
                     <td>
@@ -708,7 +723,7 @@ function ShiftsTab({
                         {s.punchIn.distanceFromWarehouseM}m ({s.punchIn.verified ? "Verified" : "Unverified"})
                       </span>
                     </td>
-                    <td style={{ fontSize: 12 }}>
+                    <td style={{ fontSize: 14 }}>
                       {s.breaks.length} break{s.breaks.length !== 1 ? "s" : ""}
                     </td>
                   </tr>

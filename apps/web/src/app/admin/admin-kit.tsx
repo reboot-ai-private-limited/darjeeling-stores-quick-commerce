@@ -107,7 +107,7 @@ export function Heading({ title, subtitle, children }: { title: string; subtitle
 
 export function Notice({ kind = "error", children }: { kind?: "error" | "ok" | "info"; children: ReactNode }) {
   const colours = { error: ["#fdf0ee", "#b3261e"], ok: ["#f6f3ee", "#1b6b3a"], info: ["#f5f4f2", "#5a554c"] }[kind];
-  return <p role={kind === "error" ? "alert" : "status"} style={{ margin: "10px 0", padding: "9px 12px", borderRadius: 8, background: colours[0], color: colours[1], fontSize: 12 }}>{children}</p>;
+  return <p role={kind === "error" ? "alert" : "status"} style={{ margin: "10px 0", padding: "9px 12px", borderRadius: 8, background: colours[0], color: colours[1], fontSize: 14 }}>{children}</p>;
 }
 
 export function Badge({ tone = "paused", children }: { tone?: "active" | "paused" | "inactive" | "disabled" | "enabled"; children: ReactNode }) {
@@ -128,7 +128,7 @@ export function Tabs<K extends string>({ tabs, value, onChange, label }: { tabs:
 
 export function Field({ label, hint, children, wide }: { label: string; hint?: string; children: ReactNode; wide?: boolean }) {
   return (
-    <label className="admin-field" style={{ display: "grid", gap: 4, alignContent: "start", fontSize: 12, ...(wide ? { gridColumn: "1 / -1", marginTop: 14 } : {}) }}>
+    <label className="admin-field" style={{ display: "grid", gap: 4, alignContent: "start", fontSize: 14, ...(wide ? { gridColumn: "1 / -1", marginTop: 14 } : {}) }}>
       <span style={{ fontWeight: 600 }}>{label}</span>
       {children}
       {hint && <small style={{ color: "var(--admin-muted)" }}>{hint}</small>}

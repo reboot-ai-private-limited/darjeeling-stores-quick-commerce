@@ -423,6 +423,39 @@ describe("batches", () => {
   });
 });
 
+describe("reassigning an order before pickup", () => {
+  it("gives an assigned order to another rider in one step and offers the others as suggestions", async () => {
+    const old = await onShift({ name: "Old" });
+    const next = await onShift({ name: "Next" });
+    const order = ready();
+    const first = (await assign(order.id, old.id)).body.data.assignment;
+
+    const options = await f.get(`/admin/dispatch/suggestions?orderId=${order.id}`);
+    expect(options.status, JSON.stringify(options.body)).toBe(200);
+    expect(options.body.data.currentRiderId).toBe(old.id);
+    expect(options.body.data.suggested.map((r: { riderId: string }) => r.riderId)).toEqual([next.id]);
+
+    const res = await f.send("post", `/admin/orders/${order.id}/reassign`, { toRiderId: next.id, reason: "Closer to the customer" });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.data.assignment).toMatchObject({ orderId: order.id, riderId: next.id, status: "assigned" });
+    expect(res.body.data.order).toEqual({ id: order.id, status: "ASSIGNED" });
+    expect(await assignmentDoc({ _id: first.id as never })).toMatchObject({ live: false });
+    expect(await assignmentDoc({ _id: res.body.data.assignment.id as never })).toMatchObject({ live: true, riderId: next.id });
+
+    // handing it to the rider who already has it is refused
+    expect((await f.send("post", `/admin/orders/${order.id}/reassign`, { toRiderId: next.id })).status).toBe(400);
+  });
+
+  it("is refused once the order has been picked up (use a hand-over instead)", async () => {
+    const old = await onShift({ name: "Old" });
+    const next = await onShift({ name: "Next" });
+    const order = ready();
+    await assign(order.id, old.id);
+    f.orders.setStatus(order.id, "OUT_FOR_DELIVERY");
+    expect((await f.send("post", `/admin/orders/${order.id}/reassign`, { toRiderId: next.id })).status).toBe(409);
+  });
+});
+
 describe("handing an order to another rider", () => {
   it("moves a picked-up order to a new rider who must acknowledge, without changing its status", async () => {
     const old = await onShift({ name: "Old" });

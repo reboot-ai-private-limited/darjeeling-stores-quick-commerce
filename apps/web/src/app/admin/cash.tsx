@@ -127,11 +127,11 @@ function CashInHandTab({
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 20 }}>
         <div className="admin-panel" style={{ padding: "16px 20px" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Total Cash with Fleet</span>
+          <span style={{ fontSize: 13, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Total Cash with Fleet</span>
           <h2 style={{ fontSize: 26, margin: "6px 0 0", color: "var(--admin-accent)" }}>{fmtCurrency(totalInHand)}</h2>
         </div>
         <div className="admin-panel" style={{ padding: "16px 20px" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Riders Holding Cash</span>
+          <span style={{ fontSize: 13, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Riders Holding Cash</span>
           <h2 style={{ fontSize: 26, margin: "6px 0 0" }}>{data.filter((r) => r.cashInHand > 0).length}</h2>
         </div>
       </div>
@@ -190,23 +190,23 @@ function CashInHandTab({
                       <td>
                         <strong>{r.name || `Rider ${r.riderId.slice(-6)}`}</strong>
                         {isHigh && (
-                          <span className="admin-badge admin-badge-paused" style={{ marginLeft: 8, fontSize: 10 }}>
+                          <span className="admin-badge admin-badge-paused" style={{ marginLeft: 8, fontSize: 12 }}>
                             HIGH BALANCE
                           </span>
                         )}
                       </td>
-                      <td style={{ fontSize: 14, fontWeight: 600 }}>{fmtCurrency(r.cashInHand)}</td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+                      <td style={{ fontSize: 16, fontWeight: 600 }}>{fmtCurrency(r.cashInHand)}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>
                         {r.byWarehouse.map((w) => {
                           const whCode = warehouses.find((item) => item.id === w.warehouseId)?.code ?? w.warehouseId.slice(-4);
                           return `${whCode}: ${fmtCurrency(w.amount)}`;
                         }).join(" | ") || "—"}
                       </td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{fmtDate(r.lastDepositAt)}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{fmtDate(r.lastDepositAt)}</td>
                       <td>
                         <button
                           className="admin-role-button"
-                          style={{ padding: "4px 10px", fontSize: 11 }}
+                          style={{ padding: "4px 10px", fontSize: 13 }}
                           onClick={() => onOpenDeposit(r.riderId, primaryWh)}
                         >
                           Collect Deposit
@@ -333,7 +333,7 @@ function LedgerTab({
                 const isCollected = e.type === "collected";
                 return (
                   <tr key={e.id}>
-                    <td style={{ fontSize: 12 }}>{fmtDate(e.at)}</td>
+                    <td style={{ fontSize: 14 }}>{fmtDate(e.at)}</td>
                     <td><strong>{rName}</strong></td>
                     <td>
                       <span className={`admin-badge ${isDeposit ? "admin-badge-active" : isCollected ? "admin-badge-paused" : ""}`}>
@@ -343,9 +343,9 @@ function LedgerTab({
                     <td style={{ fontWeight: 600, color: isDeposit ? "#137333" : isCollected ? "#b06000" : undefined }}>
                       {isDeposit ? "-" : "+"}{fmtCurrency(Math.abs(e.amount))}
                     </td>
-                    <td style={{ fontSize: 12, fontFamily: "monospace" }}>{e.orderNo || (e.orderId ? `#${e.orderId.slice(-6)}` : "—")}</td>
-                    <td style={{ fontSize: 12 }}>{whCode}</td>
-                    <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{e.note || "—"}</td>
+                    <td style={{ fontSize: 14, fontFamily: "monospace" }}>{e.orderNo || (e.orderId ? `#${e.orderId.slice(-6)}` : "—")}</td>
+                    <td style={{ fontSize: 14 }}>{whCode}</td>
+                    <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{e.note || "—"}</td>
                   </tr>
                 );
               })}
@@ -483,7 +483,7 @@ function DepositFormTab({
       </div>
 
       <h2>{mode === "deposit" ? "Record Cash Hand-in" : "Record Ledger Adjustment"}</h2>
-      <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+      <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
         {mode === "deposit"
           ? "Confirm cashier receipt of physical cash deposited by a delivery partner."
           : "Debit or credit a rider's cash liability to settle discrepancies or manual cash corrections."}
@@ -493,7 +493,7 @@ function DepositFormTab({
       {error && <p role="alert" className="admin-role-error" style={{ margin: "8px 0" }}>{error}</p>}
 
       <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-        <label style={{ fontSize: 12 }}>
+        <label style={{ fontSize: 14 }}>
           Delivery Partner *
           <select
             required
@@ -509,7 +509,7 @@ function DepositFormTab({
           </select>
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label style={{ fontSize: 14 }}>
           Fulfillment Store / Warehouse *
           <select
             required
@@ -525,7 +525,7 @@ function DepositFormTab({
           </select>
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label style={{ fontSize: 14 }}>
           Amount in Rupees (₹) *
           <input
             type="number"
@@ -542,7 +542,7 @@ function DepositFormTab({
           )}
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label style={{ fontSize: 14 }}>
           {mode === "deposit" ? "Receipt Note / Reference" : "Adjustment Reason *"}
           <textarea
             required={mode === "adjust"}
@@ -698,7 +698,7 @@ function ReconciliationTab() {
             color: reconSubTab === "upi" ? "var(--admin-accent)" : "inherit",
             fontWeight: reconSubTab === "upi" ? 600 : 400,
             cursor: "pointer",
-            fontSize: 12,
+            fontSize: 14,
           }}
         >
           Doorstep UPI &amp; Discrepancies ({openReconCount} open)
@@ -714,7 +714,7 @@ function ReconciliationTab() {
             color: reconSubTab === "offline" ? "var(--admin-accent)" : "inherit",
             fontWeight: reconSubTab === "offline" ? 600 : 400,
             cursor: "pointer",
-            fontSize: 12,
+            fontSize: 14,
           }}
         >
           Offline Delivery Reviews ({openReviewCount} open)
@@ -728,11 +728,11 @@ function ReconciliationTab() {
       {resolvingRecon && (
         <form className="admin-panel admin-role-form" onSubmit={submitResolveRecon} style={{ marginBottom: 20 }}>
           <h2>Resolve #{resolvingRecon.orderNo} ({resolvingRecon.type})</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
             Rider: <strong>{resolvingRecon.riderName}</strong> · Discrepancy Amount: <strong>{fmtCurrency(resolvingRecon.amount)}</strong>
           </p>
           <div style={{ display: "grid", gap: 12, maxWidth: 500 }}>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Outcome Decision *
               <select
                 value={reconOutcome}
@@ -748,7 +748,7 @@ function ReconciliationTab() {
               </select>
             </label>
             {reconOutcome === "verified" && (
-              <label style={{ fontSize: 12 }}>
+              <label style={{ fontSize: 14 }}>
                 Bank Reference / UTR Number
                 <input
                   value={bankRef}
@@ -759,7 +759,7 @@ function ReconciliationTab() {
                 />
               </label>
             )}
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Audit Note
               <input
                 value={reconNote}
@@ -785,11 +785,11 @@ function ReconciliationTab() {
       {resolvingReview && (
         <form className="admin-panel admin-role-form" onSubmit={submitResolveReview} style={{ marginBottom: 20 }}>
           <h2>Audit Offline Delivery #{resolvingReview.orderNo}</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
             Delivered while rider was offline: {fmtDate(resolvingReview.deliveredAt)}. Distance: {resolvingReview.distanceFromAddressM ?? "—"}m.
           </p>
           <div style={{ display: "grid", gap: 12, maxWidth: 500 }}>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Audit Outcome *
               <select
                 value={reviewOutcome}
@@ -801,7 +801,7 @@ function ReconciliationTab() {
                 <option value="rejected">Reject Delivery (Send Order to Failed)</option>
               </select>
             </label>
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Reason / Review Note
               <textarea
                 value={reviewNote}
@@ -861,18 +861,18 @@ function ReconciliationTab() {
                             {r.status}
                           </span>
                         </td>
-                        <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{fmtDate(r.at)}</td>
+                        <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{fmtDate(r.at)}</td>
                         <td>
                           {isOpen ? (
                             <button
                               className="admin-role-button"
-                              style={{ padding: "4px 8px", fontSize: 11 }}
+                              style={{ padding: "4px 8px", fontSize: 13 }}
                               onClick={() => setResolvingRecon(r)}
                             >
                               Resolve
                             </button>
                           ) : (
-                            <span style={{ fontSize: 11, color: "var(--admin-muted)" }}>
+                            <span style={{ fontSize: 13, color: "var(--admin-muted)" }}>
                               {r.resolution?.outcome ?? "Resolved"}
                             </span>
                           )}
@@ -916,7 +916,7 @@ function ReconciliationTab() {
                       <tr key={rev.orderId}>
                         <td><strong>#{rev.orderNo}</strong></td>
                         <td>{rev.riderName}</td>
-                        <td style={{ fontSize: 12 }}>{fmtDate(rev.deliveredAt)}</td>
+                        <td style={{ fontSize: 14 }}>{fmtDate(rev.deliveredAt)}</td>
                         <td>
                           {rev.flags.map((f) => (
                             <span key={f} className="admin-badge admin-badge-paused" style={{ marginRight: 4 }}>
@@ -924,15 +924,15 @@ function ReconciliationTab() {
                             </span>
                           ))}
                         </td>
-                        <td style={{ fontSize: 12 }}>{rev.distanceFromAddressM !== null ? `${rev.distanceFromAddressM}m` : "—"}</td>
-                        <td style={{ fontSize: 12 }}>
+                        <td style={{ fontSize: 14 }}>{rev.distanceFromAddressM !== null ? `${rev.distanceFromAddressM}m` : "—"}</td>
+                        <td style={{ fontSize: 14 }}>
                           {rev.collection ? `${rev.collection.method}: ${fmtCurrency(rev.collection.amount)}` : "—"}
                         </td>
                         <td>
                           {isOpen ? (
                             <button
                               className="admin-role-button"
-                              style={{ padding: "4px 8px", fontSize: 11 }}
+                              style={{ padding: "4px 8px", fontSize: 13 }}
                               onClick={() => setResolvingReview(rev)}
                             >
                               Audit Proof

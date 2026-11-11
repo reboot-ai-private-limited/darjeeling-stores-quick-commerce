@@ -90,7 +90,7 @@ function CategoryRow({
           : <span aria-hidden="true" title="No photo yet" style={{ width: 40, height: 40, borderRadius: 8, background: "#fff3cc", flexShrink: 0 }} />}
         <span style={{ flex: 1 }}>
           <strong>{cat.name}</strong>
-          <small style={{ marginLeft: 8, color: "var(--admin-muted)", fontSize: 11 }}>/{cat.slug}</small>
+          <small style={{ marginLeft: 8, color: "var(--admin-muted)", fontSize: 13 }}>/{cat.slug}</small>
         </span>
         {canEdit && (
           <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
@@ -293,7 +293,7 @@ function CategoryManager({ canEdit }: { canEdit: boolean }) {
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 {photoPreview && !removePhoto
                   ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={photoPreview} alt="Category photo preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 12, border: "1px solid #cbc5ba" }} />
-                  : <span style={{ width: 88, height: 88, borderRadius: 12, background: "#fff3cc", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#8a5a00" }}>No photo</span>}
+                  : <span style={{ width: 88, height: 88, borderRadius: 12, background: "#fff3cc", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#8a5a00" }}>No photo</span>}
                 <span style={{ display: "grid", gap: 6 }}>
                   <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-label="Choose category photo" onChange={(e) => choosePhoto(e.target.files?.[0] ?? null)} />
                   {(photoPreview && !removePhoto) && <button type="button" disabled={busy} onClick={() => { choosePhoto(null); setRemovePhoto(true); }} style={{ justifySelf: "start", minHeight: 30, padding: "4px 10px" }}>Remove photo</button>}

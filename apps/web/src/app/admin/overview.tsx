@@ -23,9 +23,9 @@ function Tile({ label, value, note, tone = "plain", onClick }: { label: string; 
   const colours = TONES[tone];
   const body = (
     <>
-      <span style={{ fontSize: 11, color: "var(--admin-muted)", letterSpacing: 0.2 }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--admin-muted)", letterSpacing: 0.2 }}>{label}</span>
       <strong style={{ fontSize: 24, lineHeight: 1.1, color: colours.fg }}>{value}</strong>
-      {note && <span style={{ fontSize: 11, color: "var(--admin-muted)" }}>{note}</span>}
+      {note && <span style={{ fontSize: 13, color: "var(--admin-muted)" }}>{note}</span>}
     </>
   );
   const style = { display: "grid", gap: 4, padding: "14px 16px", border: "1px solid var(--admin-border)", borderRadius: 12, background: colours.bg, textAlign: "left" as const, font: "inherit" };
@@ -66,7 +66,7 @@ export default function Overview({ session, onNavigate }: { session: AdminSessio
       </Heading>
       {error && <Notice>{error}</Notice>}
 
-      {!data && loading && <p role="status" style={{ color: "var(--admin-muted)", fontSize: 12 }}>Loading today&apos;s numbers…</p>}
+      {!data && loading && <p role="status" style={{ color: "var(--admin-muted)", fontSize: 14 }}>Loading today&apos;s numbers…</p>}
       {data && (
         <>
           <section aria-label="Today" style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", marginBottom: 16 }}>
@@ -76,7 +76,7 @@ export default function Overview({ session, onNavigate }: { session: AdminSessio
             <Tile label="Delayed orders" value={data.delayedOrders} note="Past their promised time" tone={data.delayedOrders > 0 ? "bad" : "good"} onClick={go("Orders", "orders:view")} />
           </section>
 
-          <h2 style={{ fontSize: 13, margin: "4px 0 8px" }}>Needs attention</h2>
+          <h2 style={{ fontSize: 15, margin: "4px 0 8px" }}>Needs attention</h2>
           <section aria-label="Needs attention" style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", marginBottom: 16 }}>
             <Tile label="Unacknowledged assignments" value={data.unacknowledgedAssignments} note="Riders yet to confirm" tone={data.unacknowledgedAssignments > 0 ? "bad" : "good"} onClick={go("Dispatch board", "dispatch:manage")} />
             <Tile label="Pending refunds" value={data.pendingRefunds} note="Waiting for a decision" tone={data.pendingRefunds > 0 ? "warn" : "good"} />
@@ -90,7 +90,7 @@ export default function Overview({ session, onNavigate }: { session: AdminSessio
             <section className="admin-panel" aria-labelledby="ov-wh">
               <div className="admin-panel-toolbar"><h2 id="ov-wh">By warehouse</h2><span>Today</span></div>
               {data.byWarehouse.length === 0
-                ? <p style={{ padding: "18px 20px", margin: 0, fontSize: 12, color: "var(--admin-muted)" }}>No orders yet today.</p>
+                ? <p style={{ padding: "18px 20px", margin: 0, fontSize: 14, color: "var(--admin-muted)" }}>No orders yet today.</p>
                 : (
                   <table className="admin-product-table">
                     <thead><tr><th>Warehouse</th><th style={{ textAlign: "right" }}>Orders</th><th style={{ textAlign: "right" }}>Revenue</th></tr></thead>
@@ -103,7 +103,7 @@ export default function Overview({ session, onNavigate }: { session: AdminSessio
 
             <section className="admin-panel" aria-labelledby="ov-riders">
               <div className="admin-panel-toolbar"><h2 id="ov-riders">Riders</h2><span>Right now</span></div>
-              <div style={{ display: "grid", gap: 10, padding: "14px 20px 18px", fontSize: 13 }}>
+              <div style={{ display: "grid", gap: 10, padding: "14px 20px 18px", fontSize: 15 }}>
                 {([["Online", data.riders.online, "#1b6b3a"], ["On a break", data.riders.onBreak, "#8a5a00"], ["Offline", data.riders.offline, "#716e68"]] as const).map(([label, value, colour]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ display: "flex", gap: 8, alignItems: "center" }}><span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: "50%", background: colour }} />{label}</span>
@@ -114,7 +114,7 @@ export default function Overview({ session, onNavigate }: { session: AdminSessio
               </div>
             </section>
           </div>
-          <p style={{ fontSize: 11, color: "var(--admin-muted)", marginTop: 12 }}>Numbers refresh every 30 seconds. Revenue leaves out rider tips and orders that are cancelled or still waiting for payment.</p>
+          <p style={{ fontSize: 13, color: "var(--admin-muted)", marginTop: 12 }}>Numbers refresh every 30 seconds. Revenue leaves out rider tips and orders that are cancelled or still waiting for payment.</p>
         </>
       )}
     </>

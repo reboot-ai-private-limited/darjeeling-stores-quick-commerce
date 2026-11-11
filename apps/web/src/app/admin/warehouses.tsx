@@ -459,7 +459,7 @@ export default function Warehouses({ session }: Props) {
           />
 
           <fieldset style={{ marginTop: 18, border: "1px solid var(--admin-border)", borderRadius: 6, padding: 14 }}>
-            <legend style={{ fontSize: 12, fontWeight: 600 }}>Dispatch &amp; Operations Parameters</legend>
+            <legend style={{ fontSize: 14, fontWeight: 600 }}>Dispatch &amp; Operations Parameters</legend>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
               <label>
                 Priority (1 = highest)
@@ -533,7 +533,7 @@ export default function Warehouses({ session }: Props) {
 
           {canManageOps && editing !== "new" && (
             <fieldset style={{ marginTop: 18, border: "1px solid var(--admin-border)", borderRadius: 6, padding: 14 }}>
-              <legend style={{ fontSize: 12, fontWeight: 600 }}>Warehouse Operations Pause (F17)</legend>
+              <legend style={{ fontSize: 14, fontWeight: 600 }}>Warehouse Operations Pause (F17)</legend>
               <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <input
                   type="checkbox"

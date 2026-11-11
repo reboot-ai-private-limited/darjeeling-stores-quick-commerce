@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ago, api, Badge, can, dateTime, errorText, Field, Heading, inputStyle, json, money, Notice, Tabs, timeOnly, usePolling, useWarehouses } from "./admin-kit";
+import { AssignRider, ChangeRider } from "./assign-rider";
 import type { AdminSession } from "./session-client";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ function OrderDetail({ id, canManage, onClose, onChanged }: { id: string; canMan
   }
   const post = (path: string, body?: unknown) => api(`orders/${id}/${path}`, json("POST", body ?? {}));
 
-  if (!order) return <section className="admin-panel" style={{ padding: 20 }}>{error ? <Notice>{error}</Notice> : <p role="status" style={{ fontSize: 12 }}>Loading order…</p>}</section>;
+  if (!order) return <section className="admin-panel" style={{ padding: 20 }}>{error ? <Notice>{error}</Notice> : <p role="status" style={{ fontSize: 14 }}>Loading order…</p>}</section>;
 
   const total = orderTotal(order);
   const step: { label: string; path: string } | null = order.status === "PLACED" ? { label: "Confirm order", path: "confirm" }
@@ -85,13 +86,26 @@ function OrderDetail({ id, canManage, onClose, onChanged }: { id: string; canMan
           <button className="admin-text-button" onClick={onClose} aria-label="Close order">Close</button>
         </div>
       </div>
-      <div style={{ padding: "4px 20px 20px", display: "grid", gap: 14, fontSize: 12 }}>
+      <div style={{ padding: "4px 20px 20px", display: "grid", gap: 14, fontSize: 14 }}>
         {message && <Notice kind={message.kind}>{message.text}</Notice>}
         {late && <Notice>Promised for {timeOnly(order.promisedAt)} · {ago(order.promisedAt).replace(" ago", "")} late.</Notice>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, color: "var(--admin-muted)" }}>
           <span>{order.warehouse.name}</span><span>·</span><span>Placed {dateTime(order.createdAt)}</span><span>·</span>
           <span>{order.isPreOrder && order.scheduledWindow ? `Slot ${timeOnly(order.scheduledWindow.start)}–${timeOnly(order.scheduledWindow.end)}` : `Promised ${timeOnly(order.promisedAt)}`}</span>
         </div>
+
+        {order.status === "READY" && (
+          <div style={{ border: "1px solid #e0b64a", background: "#fffaf0", borderRadius: 10, padding: 12, display: "grid", gap: 8 }}>
+            <strong style={{ fontSize: 15 }}>Ready: choose a rider</strong>
+            <AssignRider orderId={order.id} onAssigned={() => { reload(); onChanged(); }} />
+          </div>
+        )}
+
+        {["ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "ARRIVED"].includes(order.status) && (
+          <div style={{ border: "1px solid var(--admin-border)", background: "#fff", borderRadius: 10, padding: 12 }}>
+            <ChangeRider orderId={order.id} status={order.status} riderName={order.rider?.name} onChanged={() => { reload(); onChanged(); }} />
+          </div>
+        )}
 
         {canManage && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -192,7 +206,7 @@ function OrderDetail({ id, canManage, onClose, onChanged }: { id: string; canMan
           <span>Items {money(order.itemsSubtotal)}</span>
           {order.allocatedDiscount > 0 && <span>Discount −{money(order.allocatedDiscount)}</span>}
           {order.allocatedCharges.map((c, i) => <span key={i}>{CHARGE_LABEL[c.type] ?? c.type} {money(c.amount)}{c.type === "tip" ? " (goes to the rider)" : ""}</span>)}
-          <strong style={{ fontSize: 14 }}>Total {money(total)}</strong>
+          <strong style={{ fontSize: 16 }}>Total {money(total)}</strong>
           <span style={{ color: "var(--admin-muted)" }}>
             {order.paymentMethod === "cod" ? `Cash on delivery · ${order.amountDue > 0 ? `${money(order.amountDue)} to collect` : "nothing to collect"}` : "Paid online"} · {order.paymentStatus.replace(/_/g, " ")}
             {order.refundStatus !== "none" ? ` · refund ${order.refundStatus}` : ""}
@@ -307,7 +321,7 @@ export default function Orders({ session }: { session: AdminSession }) {
         {warehouses.length > 1 && <Field label="Warehouse"><select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} style={inputStyle}><option value="">All</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>}
         <Field label="From"><input type="date" value={from} onChange={e => setFrom(e.target.value)} style={inputStyle} /></Field>
         <Field label="To"><input type="date" value={to} onChange={e => setTo(e.target.value)} style={inputStyle} /></Field>
-        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, paddingBottom: 8 }}><input type="checkbox" checked={flagged} onChange={e => setFlagged(e.target.checked)} /> Offline-delivery flags only</label>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14, paddingBottom: 8 }}><input type="checkbox" checked={flagged} onChange={e => setFlagged(e.target.checked)} /> Offline-delivery flags only</label>
         <button className="admin-role-button">Search</button>
         {(search || warehouseId || from || to || flagged) && <button type="button" className="admin-text-button" onClick={() => { setQ(""); setSearch(""); setWarehouseId(""); setFrom(""); setTo(""); setFlagged(false); }}>Clear</button>}
       </form>
@@ -318,7 +332,7 @@ export default function Orders({ session }: { session: AdminSession }) {
         <section className="admin-panel" aria-label="Orders" style={{ flex: "1 1 520px", minWidth: 0 }}>
           <div className="admin-panel-toolbar"><h2>{def.label}</h2><span>{list.loading && !list.data ? "Loading…" : `${rows.length} shown${next ? "+" : ""}`}</span></div>
           {rows.length === 0 && !list.loading
-            ? <p style={{ padding: "20px", margin: 0, fontSize: 12, color: "var(--admin-muted)" }}>No orders here{search ? " match your search" : " right now"}.</p>
+            ? <p style={{ padding: "20px", margin: 0, fontSize: 14, color: "var(--admin-muted)" }}>No orders here{search ? " match your search" : " right now"}.</p>
             : (
               <div style={{ overflowX: "auto" }}>
                 <table className="admin-product-table" style={{ width: "100%" }}>
@@ -334,7 +348,7 @@ export default function Orders({ session }: { session: AdminSession }) {
                           <td><Badge tone={tone(o.status)}>{LABEL[o.status]}</Badge><br /><small style={{ color: "var(--admin-muted)" }}>{o.paymentMethod === "cod" ? "Cash" : "Online"}{o.rider ? ` · ${o.rider.name}` : ""}</small></td>
                           <td style={{ textAlign: "right" }}>{money(orderTotal(o))}</td>
                           <td style={late ? { color: "#b3261e" } : undefined}>{o.isPreOrder && o.scheduledWindow ? timeOnly(o.scheduledWindow.start) : TERMINAL.includes(o.status) ? ago(o.createdAt) : timeOnly(o.promisedAt)}{late ? <><br /><small>late</small></> : null}</td>
-                          {canManage && <td onClick={e => e.stopPropagation()}>{act && <button className="admin-role-button" onClick={() => void quick(o, act[1])}>{act[0]}</button>}</td>}
+                          {canManage && <td onClick={e => e.stopPropagation()}>{act && <button className="admin-role-button" onClick={() => void quick(o, act[1])}>{act[0]}</button>}{o.status === "READY" && <AssignRider orderId={o.id} compact onAssigned={() => list.reload()} />}{o.status === "ASSIGNED" && <ChangeRider orderId={o.id} status={o.status} riderName={o.rider?.name} compact onChanged={() => list.reload()} />}</td>}
                         </tr>
                       );
                     })}
@@ -351,7 +365,7 @@ export default function Orders({ session }: { session: AdminSession }) {
           </div>
         )}
       </div>
-      <p style={{ fontSize: 11, color: "var(--admin-muted)", marginTop: 10 }}>The list refreshes every few seconds{more.length > 0 ? " (paused while older orders are shown)" : ""}. All times are Indian time.</p>
+      <p style={{ fontSize: 13, color: "var(--admin-muted)", marginTop: 10 }}>The list refreshes every few seconds{more.length > 0 ? " (paused while older orders are shown)" : ""}. All times are Indian time.</p>
     </>
   );
 }

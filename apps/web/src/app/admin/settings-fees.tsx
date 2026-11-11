@@ -68,7 +68,7 @@ function FeeEditor({ zoneId, rule, canEdit, onSaved }: { zoneId: string; rule: R
       <div className="admin-panel-toolbar"><h2 id="fee-title">Delivery fee</h2><span>{rule ? "Saved for this zone" : "Not set up yet"}</span></div>
       <div style={{ padding: "0 20px 18px", display: "grid", gap: 12 }}>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
-        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}><input type="checkbox" disabled={!canEdit} checked={alwaysFree} onChange={e => setAlwaysFree(e.target.checked)} /> Always free in this zone (for example the area next to the warehouse)</label>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 15 }}><input type="checkbox" disabled={!canEdit} checked={alwaysFree} onChange={e => setAlwaysFree(e.target.checked)} /> Always free in this zone (for example the area next to the warehouse)</label>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <Field label="Smallest order accepted (₹)" hint="Leave empty for no minimum."><input type="number" min={0} step="0.01" disabled={!canEdit} value={minOrder} onChange={e => setMinOrder(e.target.value)} style={{ ...inputStyle, width: 140 }} /></Field>
           <Field label="Fee is worked out on"><select disabled={!canEdit} value={basis} onChange={e => setBasis(e.target.value as typeof basis)} style={inputStyle}><option value="afterDiscount">Order value after discount</option><option value="beforeDiscount">Order value before discount</option></select></Field>
@@ -78,7 +78,7 @@ function FeeEditor({ zoneId, rule, canEdit, onSaved }: { zoneId: string; rule: R
           <tbody>{tiers.map((t, i) => (
             <tr key={i}>
               <td><input aria-label={`Row ${i + 1} order value from`} type="number" min={0} step="0.01" disabled={!canEdit || i === 0} value={t.from} onChange={e => setTiers(rows => rows.map((r, j) => (j === i ? { ...r, from: e.target.value } : r)))} style={{ ...inputStyle, width: 120 }} /></td>
-              <td style={{ color: "var(--admin-muted)", fontSize: 12 }}>{tierEnd(i)}</td>
+              <td style={{ color: "var(--admin-muted)", fontSize: 14 }}>{tierEnd(i)}</td>
               <td><input aria-label={`Row ${i + 1} fee`} type="number" min={0} step="0.01" disabled={!canEdit} value={t.fee} onChange={e => setTiers(rows => rows.map((r, j) => (j === i ? { ...r, fee: e.target.value } : r)))} style={{ ...inputStyle, width: 110 }} /></td>
               <td>{canEdit && i > 0 && <button type="button" className="admin-text-button" onClick={() => setTiers(rows => rows.filter((_, j) => j !== i))}>Remove</button>}</td>
             </tr>
@@ -88,7 +88,7 @@ function FeeEditor({ zoneId, rule, canEdit, onSaved }: { zoneId: string; rule: R
           <button type="button" className="admin-text-button" onClick={() => setTiers(rows => [...rows, { from: String((Number(rows.at(-1)?.from) || 0) + 300), fee: "0" }])}>Add a row</button>
           <button className="admin-role-button" disabled={busy}>{busy ? "Saving…" : rule ? "Save delivery fee" : "Create delivery fee"}</button>
         </div>}
-        <p style={{ margin: 0, fontSize: 11, color: "var(--admin-muted)" }}>Example: from ₹0 pay ₹40, from ₹300 pay ₹20, from ₹600 pay ₹0 (free). The last row covers every larger order.</p>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--admin-muted)" }}>Example: from ₹0 pay ₹40, from ₹300 pay ₹20, from ₹600 pay ₹0 (free). The last row covers every larger order.</p>
       </div>
     </form>
   );
@@ -123,7 +123,7 @@ function SurchargeCard({ rule, canEdit, onSaved }: { rule: Rule; canEdit: boolea
   return (
     <div style={{ padding: "12px 0", borderTop: "1px solid var(--admin-border)", display: "grid", gap: 8 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <strong style={{ fontSize: 13 }}>{KIND_LABEL[rule.kind ?? "other"]}</strong>
+        <strong style={{ fontSize: 15 }}>{KIND_LABEL[rule.kind ?? "other"]}</strong>
         <Badge tone={active ? "active" : "inactive"}>{active ? "On" : "Off"}</Badge>
         {rule.kind === "rain" && rule.activeUntil && <small style={{ color: "var(--admin-muted)" }}>until {dateTime(rule.activeUntil)}</small>}
       </div>
@@ -137,12 +137,12 @@ function SurchargeCard({ rule, canEdit, onSaved }: { rule: Rule; canEdit: boolea
             <Field label="Until (next morning)"><input type="time" disabled={!canEdit} value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} /></Field>
           </>
         )}
-        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, paddingBottom: 8 }}><input type="checkbox" disabled={!canEdit} checked={waived} onChange={e => setWaived(e.target.checked)} /> Free when delivery is free</label>
-        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, paddingBottom: 8 }}><input type="checkbox" disabled={!canEdit} checked={active} onChange={e => setActive(e.target.checked)} /> Switched on</label>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14, paddingBottom: 8 }}><input type="checkbox" disabled={!canEdit} checked={waived} onChange={e => setWaived(e.target.checked)} /> Free when delivery is free</label>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14, paddingBottom: 8 }}><input type="checkbox" disabled={!canEdit} checked={active} onChange={e => setActive(e.target.checked)} /> Switched on</label>
       </div>
       {rule.kind === "late_night" && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }} role="group" aria-label="Days it applies">
-          {DAYS.map((d, i) => <label key={d} style={{ fontSize: 12, display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" disabled={!canEdit} checked={days.includes(i)} onChange={() => setDays(cur => (cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i].sort()))} />{d}</label>)}
+          {DAYS.map((d, i) => <label key={d} style={{ fontSize: 14, display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" disabled={!canEdit} checked={days.includes(i)} onChange={() => setDays(cur => (cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i].sort()))} />{d}</label>)}
         </div>
       )}
       {canEdit && <div><button className="admin-role-button" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button></div>}
@@ -193,7 +193,7 @@ function RainMode({ zoneId, rain, canEdit, onSaved }: { zoneId: string; rain: Ru
   return (
     <section className="admin-panel" aria-labelledby="rain-title">
       <div className="admin-panel-toolbar"><h2 id="rain-title">Rain mode</h2><Badge tone={on ? "active" : "inactive"}>{on ? "On" : "Off"}</Badge></div>
-      <div style={{ padding: "0 20px 16px", display: "grid", gap: 10, fontSize: 12 }}>
+      <div style={{ padding: "0 20px 16px", display: "grid", gap: 10, fontSize: 14 }}>
         <p style={{ margin: 0, color: "var(--admin-muted)" }}>Adds a small charge and extra minutes to every order in this zone while it rains. {rain?.amount !== undefined ? <>Currently {money(rain.amount)} and {rain.extraMinutes ?? 0} extra minutes (change it below under Surcharges).</> : "The amount comes from the Surcharges settings."}</p>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
         {on && rain?.activeUntil && <span>Switches off by itself at <strong>{dateTime(rain.activeUntil)}</strong>.</span>}
@@ -228,7 +228,7 @@ function BillPreview({ zoneId }: { zoneId: string }) {
         </div>
         {error && <Notice>{error}</Notice>}
         {result && (
-          <div style={{ fontSize: 13, display: "grid", gap: 4 }}>
+          <div style={{ fontSize: 15, display: "grid", gap: 4 }}>
             {result.charges.length === 0 ? <span>No delivery charges: free delivery.</span> : result.charges.map((c, i) => <span key={i}>{c.label}: <strong>{money(c.amount)}</strong></span>)}
             {result.surchargeCapApplied && <small style={{ color: "#8a5a00" }}>Surcharges were limited by the surcharge cap.</small>}
             {result.extraMinutes > 0 && <small>Adds {result.extraMinutes} minutes to the delivery time.</small>}
@@ -274,22 +274,22 @@ export default function Fees({ session }: { session: AdminSession }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <label style={{ fontSize: 13, fontWeight: 600 }}>Zone{" "}
+        <label style={{ fontSize: 15, fontWeight: 600 }}>Zone{" "}
           <select value={zoneId} onChange={e => setZoneId(e.target.value)} style={inputStyle}>{zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}</select>
         </label>
-        <span style={{ fontSize: 12, color: "var(--admin-muted)" }}>Fees and surcharges are set per delivery zone.</span>
+        <span style={{ fontSize: 14, color: "var(--admin-muted)" }}>Fees and surcharges are set per delivery zone.</span>
       </div>
       {error && <Notice>{error}</Notice>}
-      {loading && !rules.length ? <p role="status" style={{ fontSize: 12 }}>Loading…</p> : (
+      {loading && !rules.length ? <p role="status" style={{ fontSize: 14 }}>Loading…</p> : (
         <>
           <FeeEditor zoneId={zoneId} rule={fee} canEdit={canEdit} onSaved={refresh} />
           <section className="admin-panel" aria-labelledby="sur-title">
             <div className="admin-panel-toolbar"><h2 id="sur-title">Surcharges</h2><span>Late-night, rain and others</span></div>
             <div style={{ padding: "0 20px 14px" }}>
-              {surcharges.length === 0 && <p style={{ fontSize: 12, color: "var(--admin-muted)", margin: "0 0 8px" }}>No surcharges yet for this zone.</p>}
+              {surcharges.length === 0 && <p style={{ fontSize: 14, color: "var(--admin-muted)", margin: "0 0 8px" }}>No surcharges yet for this zone.</p>}
               {surcharges.map(r => <SurchargeCard key={`${r.id}-${r.amount}-${r.isActive}`} rule={r} canEdit={canEdit} onSaved={refresh} />)}
               <div style={{ borderTop: surcharges.length ? "1px solid var(--admin-border)" : undefined, paddingTop: 8 }}><NewLateNight zoneId={zoneId} onSaved={refresh} /></div>
-              <p style={{ fontSize: 11, color: "var(--admin-muted)", margin: "6px 0 0" }}>All surcharges together are limited by the &ldquo;surcharge cap&rdquo; in Store settings → Surcharges.</p>
+              <p style={{ fontSize: 13, color: "var(--admin-muted)", margin: "6px 0 0" }}>All surcharges together are limited by the &ldquo;surcharge cap&rdquo; in Store settings → Surcharges.</p>
             </div>
           </section>
           <RainMode zoneId={zoneId} rain={rain} canEdit={can(permissions, "ops_mode:manage")} onSaved={refresh} />

@@ -70,7 +70,7 @@ function WarehousePicker({
 }) {
   return (
     <div className="admin-wh-picker">
-      <label htmlFor="wh-picker" style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>Warehouse</label>
+      <label htmlFor="wh-picker" style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>Warehouse</label>
       <select
         id="wh-picker"
         value={value}
@@ -204,30 +204,30 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
   return (
     <>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
-        {notice && <p role="status" style={{ color: "#137333", margin: 0, fontSize: 12 }}>{notice}</p>}
+        {notice && <p role="status" style={{ color: "#137333", margin: 0, fontSize: 14 }}>{notice}</p>}
         {error && <p role="alert" className="admin-role-error" style={{ margin: 0 }}>{error}</p>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button className="admin-text-button" disabled={loading || busy} onClick={() => setAttempt((v) => v + 1)}>Reload</button>
           {canManage && (
-            <button className="admin-role-button" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setAdding(!adding)}>{adding ? "Close" : "+ Add products"}</button>
+            <button className="admin-role-button" style={{ padding: "8px 14px", fontSize: 14 }} onClick={() => setAdding(!adding)}>{adding ? "Close" : "+ Add products"}</button>
           )}
         </div>
       </div>
 
       {adding && (
         <form className="admin-panel" onSubmit={saveAdd} style={{ marginBottom: 16, padding: 20 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 16 }}>Add products to this warehouse</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)", margin: "0 0 14px" }}>Tick the products, set price and starting stock, then save once. Use “Fill selected” to set the same values for every ticked product.</p>
+          <h2 style={{ margin: "0 0 4px", fontSize: 18 }}>Add products to this warehouse</h2>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)", margin: "0 0 14px" }}>Tick the products, set price and starting stock, then save once. Use “Fill selected” to set the same values for every ticked product.</p>
           {available.length === 0 ? (
             <p className="admin-roles-message">{catalog.length === 0 ? "Loading products…" : "Every active product is already in this warehouse."}</p>
           ) : (
             <>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12, fontSize: 12 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12, fontSize: 14 }}>
                 <strong>Fill selected:</strong>
-                <input type="number" min="0" step="0.01" placeholder="MRP ₹" value={fill.mrp} onChange={(e) => setFill({ ...fill, mrp: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
-                <input type="number" min="0" step="0.01" placeholder="Price ₹" value={fill.price} onChange={(e) => setFill({ ...fill, price: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
-                <input type="number" min="0" step="1" placeholder="Stock" value={fill.stock} onChange={(e) => setFill({ ...fill, stock: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />
-                <button type="button" onClick={applyFill} disabled={chosen.length === 0} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "6px 12px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Apply</button>
+                <input type="number" min="0" step="0.01" placeholder="MRP ₹" value={fill.mrp} onChange={(e) => setFill({ ...fill, mrp: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 14 }} />
+                <input type="number" min="0" step="0.01" placeholder="Price ₹" value={fill.price} onChange={(e) => setFill({ ...fill, price: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 14 }} />
+                <input type="number" min="0" step="1" placeholder="Stock" value={fill.stock} onChange={(e) => setFill({ ...fill, stock: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 14 }} />
+                <button type="button" onClick={applyFill} disabled={chosen.length === 0} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "6px 12px", background: "#fff", cursor: "pointer", fontSize: 14 }}>Apply</button>
               </div>
               <div style={{ overflowX: "auto", maxHeight: 380, overflowY: "auto", border: "1px solid var(--admin-border)", borderRadius: 8 }}>
                 <table className="admin-stock-table">
@@ -242,7 +242,7 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
                           <td><input type="checkbox" aria-label={`Select ${p.name}`} checked={!!sel[p.id]} onChange={(e) => toggleProduct(p, e.target.checked)} /></td>
                           <td colSpan={p.stockMode === "pooled_weight" && sel[p.id] ? 3 : 4} style={{ fontWeight: 600 }}>{p.name}{p.stockMode === "pooled_weight" && <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}> — sold by weight</small>}</td>
                           {p.stockMode === "pooled_weight" && sel[p.id] && (
-                            <td><input type="number" min="0" step="1" placeholder="Stock (g)" value={valOf(`g:${p.id}`).stock} onChange={(e) => setVals((m) => ({ ...m, [`g:${p.id}`]: { ...valOf(`g:${p.id}`), stock: e.target.value } }))} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} /></td>
+                            <td><input type="number" min="0" step="1" placeholder="Stock (g)" value={valOf(`g:${p.id}`).stock} onChange={(e) => setVals((m) => ({ ...m, [`g:${p.id}`]: { ...valOf(`g:${p.id}`), stock: e.target.value } }))} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 14 }} /></td>
                           )}
                         </tr>
                         {sel[p.id] && p.variants.map((v) => {
@@ -251,10 +251,10 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
                           return (
                             <tr key={v.id}>
                               <td></td>
-                              <td style={{ fontSize: 12, color: "var(--admin-muted)", paddingLeft: 28 }}>{v.label}</td>
-                              <td><input type="number" min="0" step="0.01" value={x.mrp} onChange={(e) => set({ mrp: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} /></td>
-                              <td><input type="number" min="0" step="0.01" value={x.price} onChange={(e) => set({ price: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} /></td>
-                              <td>{p.stockMode === "pooled_weight" ? <span style={{ fontSize: 11, color: "var(--admin-muted)" }}>shared</span> : <input type="number" min="0" step="1" value={x.stock} onChange={(e) => set({ stock: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 12 }} />}</td>
+                              <td style={{ fontSize: 14, color: "var(--admin-muted)", paddingLeft: 28 }}>{v.label}</td>
+                              <td><input type="number" min="0" step="0.01" value={x.mrp} onChange={(e) => set({ mrp: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 14 }} /></td>
+                              <td><input type="number" min="0" step="0.01" value={x.price} onChange={(e) => set({ price: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 14 }} /></td>
+                              <td>{p.stockMode === "pooled_weight" ? <span style={{ fontSize: 13, color: "var(--admin-muted)" }}>shared</span> : <input type="number" min="0" step="1" value={x.stock} onChange={(e) => set({ stock: e.target.value })} style={{ width: 96, padding: "6px 8px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", fontSize: 14 }} />}</td>
                             </tr>
                           );
                         })}
@@ -302,18 +302,18 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
                 {offerings.flatMap((o) => o.variants.map((v) => {
                   const key = `${o.id}:${v.variantId}`;
                   const editing = editingId === key;
-                  const small = { width: 90, padding: "5px 8px", border: "1px solid #cbc5ba", borderRadius: 4, font: "inherit", fontSize: 12 } as const;
+                  const small = { width: 90, padding: "5px 8px", border: "1px solid #cbc5ba", borderRadius: 4, font: "inherit", fontSize: 14 } as const;
                   const live = v.isActive && o.status === "active";
                   return (
                     <tr key={key}>
                       <td style={{ fontWeight: 500 }}>{o.product.name}</td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{v.label}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{v.label}</td>
                       <td>{editing ? <input type="number" min="0" step="0.01" value={editMrp} onChange={(e) => setEditMrp(e.target.value)} style={small} /> : fmt(v.mrp)}</td>
                       <td>{editing ? <input type="number" min="0" step="0.01" value={editSelling} onChange={(e) => setEditSelling(e.target.value)} style={small} /> : fmt(v.price)}</td>
                       <td>{v.stock ?? "—"}</td>
                       <td>
                         {editing ? (
-                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
                             <input type="checkbox" checked={editActive} onChange={(e) => setEditActive(e.target.checked)} /> Active
                           </label>
                         ) : (
@@ -325,12 +325,12 @@ function OfferingsTab({ warehouseId, canManage }: { warehouseId: string; canMana
                           <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
                             {editing ? (
                               <>
-                                {editError && <span style={{ color: "#a73535", fontSize: 11 }}>{editError}</span>}
-                                <button disabled={busy} onClick={() => saveEdit(o, v.variantId)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12, color: "var(--admin-accent)" }}>{busy ? "Saving…" : "Save"}</button>
-                                <button disabled={busy} onClick={() => setEditingId(null)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Cancel</button>
+                                {editError && <span style={{ color: "#a73535", fontSize: 13 }}>{editError}</span>}
+                                <button disabled={busy} onClick={() => saveEdit(o, v.variantId)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 14, color: "var(--admin-accent)" }}>{busy ? "Saving…" : "Save"}</button>
+                                <button disabled={busy} onClick={() => setEditingId(null)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 14 }}>Cancel</button>
                               </>
                             ) : (
-                              <button onClick={() => startEdit(o, v)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 12 }}>Edit</button>
+                              <button onClick={() => startEdit(o, v)} style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "4px 10px", background: "#fff", cursor: "pointer", fontSize: 14 }}>Edit</button>
                             )}
                           </div>
                         </td>
@@ -406,13 +406,13 @@ function PriceHistoryTab({ warehouseId }: { warehouseId: string }) {
             <tbody>
               {entries.map((e) => (
                 <tr key={e.id}>
-                  <td style={{ fontFamily: "monospace", fontSize: 12 }}>{e.sku}</td>
+                  <td style={{ fontFamily: "monospace", fontSize: 14 }}>{e.sku}</td>
                   <td>{e.oldMrp != null ? fmt(e.oldMrp) : "—"}</td>
                   <td>{e.newMrp != null ? fmt(e.newMrp) : "—"}</td>
                   <td>{e.oldSellingPrice != null ? fmt(e.oldSellingPrice) : "—"}</td>
                   <td>{e.newSellingPrice != null ? fmt(e.newSellingPrice) : "—"}</td>
                   <td style={{ color: "var(--admin-muted)" }}>{e.changedBy}</td>
-                  <td style={{ color: "var(--admin-muted)", fontSize: 12 }}>{fmtDate(e.changedAt)}</td>
+                  <td style={{ color: "var(--admin-muted)", fontSize: 14 }}>{fmtDate(e.changedAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -528,7 +528,7 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         {subTabs.map((t) => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
-            style={{ padding: "7px 14px", border: "1px solid #cbc5ba", borderRadius: 6, background: subTab === t.key ? "#f3f1ee" : "#fff", color: subTab === t.key ? "var(--admin-accent)" : "var(--admin-text)", cursor: "pointer", fontSize: 12 }}>
+            style={{ padding: "7px 14px", border: "1px solid #cbc5ba", borderRadius: 6, background: subTab === t.key ? "#f3f1ee" : "#fff", color: subTab === t.key ? "var(--admin-accent)" : "var(--admin-text)", cursor: "pointer", fontSize: 14 }}>
             {t.label}
           </button>
         ))}
@@ -537,7 +537,7 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
         )}
       </div>
 
-      {notice && <p role="status" style={{ color: "#137333", marginBottom: 12, fontSize: 12 }}>{notice}</p>}
+      {notice && <p role="status" style={{ color: "#137333", marginBottom: 12, fontSize: 14 }}>{notice}</p>}
 
       {subTab === "levels" && (
         <section className="admin-panel" aria-labelledby="stock-levels-title">
@@ -554,7 +554,7 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
                     {levels.map((l) => (
                       <tr key={itemKey(l)}>
                         <td style={{ fontWeight: 500 }}>{l.name}</td>
-                        <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{l.variantLabel ?? "Pooled weight"}</td>
+                        <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{l.variantLabel ?? "Pooled weight"}</td>
                         <td style={{ fontWeight: 600 }}>{l.stock} {l.unit}</td>
                         <td>{l.stock <= 0 ? <span className="admin-badge admin-badge-disabled">Out of stock</span> : l.isLow ? <span className="admin-badge admin-badge-paused">Low</span> : <span className="admin-badge admin-badge-active">OK</span>}</td>
                       </tr>
@@ -584,8 +584,8 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
                         <td><span className="admin-badge" style={{ background: "#f3f1ee", color: "#c62828" }}>{m.reason}</span></td>
                         <td style={{ fontWeight: 600, color: m.delta < 0 ? "#c5221f" : "#137333" }}>{m.delta > 0 ? `+${m.delta}` : m.delta}</td>
                         <td>{m.balanceAfter}</td>
-                        <td style={{ color: "var(--admin-muted)", fontSize: 12 }}>{m.note || "—"}</td>
-                        <td style={{ color: "var(--admin-muted)", fontSize: 12 }}>{fmtDate(m.createdAt)}</td>
+                        <td style={{ color: "var(--admin-muted)", fontSize: 14 }}>{m.note || "—"}</td>
+                        <td style={{ color: "var(--admin-muted)", fontSize: 14 }}>{fmtDate(m.createdAt)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -599,23 +599,23 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
         <form className="admin-panel admin-role-form" onSubmit={submitAdjust} style={{ maxWidth: 480 }}>
           <h2>Manual stock adjustment</h2>
           <div style={{ display: "grid", gap: 12 }}>
-            <label htmlFor="adj-item" style={{ fontSize: 12 }}>Product *
+            <label htmlFor="adj-item" style={{ fontSize: 14 }}>Product *
               <select id="adj-item" required value={adjItem} disabled={busy} onChange={(e) => setAdjItem(e.target.value)} style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}>
                 <option value="">Select a product / variant</option>
                 {itemOptions}
               </select>
             </label>
-            <label htmlFor="adj-reason" style={{ fontSize: 12 }}>Reason *
+            <label htmlFor="adj-reason" style={{ fontSize: 14 }}>Reason *
               <select id="adj-reason" value={adjReason} disabled={busy} onChange={(e) => setAdjReason(e.target.value)} style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}>
                 <option value="purchase">Purchase / new stock received</option>
                 <option value="wastage">Wastage / damaged / expired</option>
                 <option value="correction">Correction</option>
               </select>
             </label>
-            <label htmlFor="adj-qty" style={{ fontSize: 12 }}>Quantity change{selected ? ` (${selected.unit})` : ""} — use a minus for a reduction *
+            <label htmlFor="adj-qty" style={{ fontSize: 14 }}>Quantity change{selected ? ` (${selected.unit})` : ""} — use a minus for a reduction *
               <input id="adj-qty" type="number" step="1" required value={adjQty} disabled={busy} onChange={(e) => setAdjQty(e.target.value)} style={{ display: "block", marginTop: 5, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }} />
             </label>
-            <label htmlFor="adj-note" style={{ fontSize: 12 }}>Note
+            <label htmlFor="adj-note" style={{ fontSize: 14 }}>Note
               <textarea id="adj-note" value={adjNote} disabled={busy} onChange={(e) => setAdjNote(e.target.value)} maxLength={200}
                 style={{ display: "block", marginTop: 5, width: "100%", minHeight: 70, padding: 10, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit", resize: "vertical" }} />
             </label>
@@ -630,7 +630,7 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
       {subTab === "count" && (
         <form className="admin-panel admin-role-form" onSubmit={submitCount}>
           <h2>Cycle count / physical audit</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>Pick each product and enter the quantity you physically counted. The system sets stock to that number.</p>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>Pick each product and enter the quantity you physically counted. The system sets stock to that number.</p>
           <div style={{ display: "grid", gap: 8, maxWidth: 560 }}>
             {countRows.map((row, i) => (
               <div key={i} style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -643,12 +643,12 @@ function StockTab({ warehouseId, canManage }: { warehouseId: string; canManage: 
                   onChange={(e) => { const r = [...countRows]; r[i] = { ...r[i]!, counted: e.target.value }; setCountRows(r); }} />
                 {countRows.length > 1 && (
                   <button type="button" onClick={() => setCountRows((r) => r.filter((_, j) => j !== i))}
-                    style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "7px 10px", background: "#fff", cursor: "pointer", fontSize: 12, color: "#a73535" }}>✕</button>
+                    style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "7px 10px", background: "#fff", cursor: "pointer", fontSize: 14, color: "#a73535" }}>✕</button>
                 )}
               </div>
             ))}
             <button type="button" onClick={() => setCountRows((r) => [...r, { item: "", counted: "" }])}
-              style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "7px 14px", background: "#fff", cursor: "pointer", fontSize: 12, alignSelf: "flex-start", color: "var(--admin-accent)" }}>
+              style={{ border: "1px solid #cbc5ba", borderRadius: 6, padding: "7px 14px", background: "#fff", cursor: "pointer", fontSize: 14, alignSelf: "flex-start", color: "var(--admin-accent)" }}>
               + Add row
             </button>
           </div>
@@ -720,7 +720,7 @@ function ImportTab({ warehouseId }: { warehouseId: string }) {
       <div className="admin-heading" style={{ marginBottom: 16 }}>
         <div>
           <h2 style={{ fontSize: 20, margin: 0 }}>Bulk Import</h2>
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--admin-muted)" }}>Upload a CSV to preview and commit bulk stock / price changes.</p>
+          <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--admin-muted)" }}>Upload a CSV to preview and commit bulk stock / price changes.</p>
         </div>
       </div>
 
@@ -731,14 +731,14 @@ function ImportTab({ warehouseId }: { warehouseId: string }) {
         <section className="admin-panel" aria-labelledby="import-upload-title" style={{ maxWidth: 480 }}>
           <div className="admin-panel-toolbar"><h2 id="import-upload-title">Upload CSV</h2></div>
           <div style={{ padding: 24 }}>
-            {!warehouseId && <p style={{ fontSize: 12, color: "#b06000", marginBottom: 12 }}>Select a warehouse before uploading.</p>}
+            {!warehouseId && <p style={{ fontSize: 14, color: "#b06000", marginBottom: 12 }}>Select a warehouse before uploading.</p>}
             <label style={{ display: "block", cursor: "pointer" }}>
               <span className="admin-role-button" style={{ display: "inline-block", padding: "10px 18px", opacity: (loading || !warehouseId) ? 0.6 : 1 }}>
                 {loading ? "Parsing CSV…" : "Choose CSV file"}
               </span>
               <input ref={fileRef} type="file" accept=".csv,text/csv" disabled={loading || !warehouseId} onChange={handleFile} style={{ display: "none" }} />
             </label>
-            <p style={{ fontSize: 11, color: "var(--admin-muted)", marginTop: 10 }}>The file will be validated first. No changes are made until you confirm.</p>
+            <p style={{ fontSize: 13, color: "var(--admin-muted)", marginTop: 10 }}>The file will be validated first. No changes are made until you confirm.</p>
           </div>
         </section>
       ) : (
@@ -748,23 +748,23 @@ function ImportTab({ warehouseId }: { warehouseId: string }) {
             <div style={{ display: "flex", gap: 8 }}>
               <button className="admin-text-button" onClick={() => { setPreview(null); setImportId(null); }}>Upload different file</button>
               {importId && validCount > 0 && (
-                <button className="admin-role-button" style={{ padding: "6px 14px", fontSize: 12 }} disabled={committing || invalidCount > 0}
+                <button className="admin-role-button" style={{ padding: "6px 14px", fontSize: 14 }} disabled={committing || invalidCount > 0}
                   onClick={commit}>{committing ? "Committing…" : "Commit import"}</button>
               )}
             </div>
           </div>
           {invalidCount > 0 && (
-            <p style={{ padding: "10px 20px", fontSize: 12, color: "#a73535", borderBottom: "1px solid var(--admin-border)" }}>
+            <p style={{ padding: "10px 20px", fontSize: 14, color: "#a73535", borderBottom: "1px solid var(--admin-border)" }}>
               Fix {invalidCount} invalid row{invalidCount !== 1 ? "s" : ""} before committing.
             </p>
           )}
           <div className="admin-import-preview">
-            <div className="admin-import-row" style={{ fontWeight: 600, fontSize: 11, color: "var(--admin-muted)", background: "#fbfaf9", borderBottom: "1px solid var(--admin-border)" }}>
+            <div className="admin-import-row" style={{ fontWeight: 600, fontSize: 13, color: "var(--admin-muted)", background: "#fbfaf9", borderBottom: "1px solid var(--admin-border)" }}>
               <span>SKU</span><span>Field</span><span>Value</span><span>Status</span>
             </div>
             {preview.map((row, i) => (
               <div key={i} className={`admin-import-row ${row.valid ? "is-valid" : "is-invalid"}`}>
-                <span style={{ fontFamily: "monospace", fontSize: 12 }}>{row.sku}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 14 }}>{row.sku}</span>
                 <span>{row.field}</span>
                 <span>{row.value}</span>
                 <span>{row.valid ? "✓ Valid" : `✗ ${row.error ?? "Invalid"}`}</span>

@@ -161,13 +161,13 @@ export default function Coupons({ session }: { session: AdminSession }) {
           </Field>
           <fieldset style={{ margin: "14px 0 0" }}>
             <legend>Where it works</legend>
-            <p style={{ fontSize: 12, color: "var(--admin-muted)", margin: "0 0 8px" }}>Tick zones to limit it. Tick none to allow every zone.</p>
+            <p style={{ fontSize: 14, color: "var(--admin-muted)", margin: "0 0 8px" }}>Tick zones to limit it. Tick none to allow every zone.</p>
             <div className="admin-role-choices">
               {zones.map(z => (
                 <label key={z.id}><input type="checkbox" checked={draft.zoneIds.includes(z.id)} disabled={busy}
                   onChange={e => set({ zoneIds: e.target.checked ? [...draft.zoneIds, z.id] : draft.zoneIds.filter(x => x !== z.id) })} /> {z.name}</label>
               ))}
-              {zones.length === 0 && <span style={{ fontSize: 12 }}>No zones found.</span>}
+              {zones.length === 0 && <span style={{ fontSize: 14 }}>No zones found.</span>}
             </div>
           </fieldset>
           <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 14 }}>
@@ -195,7 +195,7 @@ export default function Coupons({ session }: { session: AdminSession }) {
                   <tr key={i}><td>{u.customerName ?? u.userId}</td><td>{u.groupNo ?? u.orderGroupId}</td><td>{money(u.discountAmount)}</td><td>{dateTime(u.at)}</td></tr>
                 ))}</tbody>
               </table>
-              <p style={{ padding: "10px 24px", fontSize: 12, color: "var(--admin-muted)" }}>Total discount given: <strong>{money(usage.total)}</strong></p>
+              <p style={{ padding: "10px 24px", fontSize: 14, color: "var(--admin-muted)" }}>Total discount given: <strong>{money(usage.total)}</strong></p>
             </div>
           )}
         </section>
@@ -224,8 +224,8 @@ export default function Coupons({ session }: { session: AdminSession }) {
                         <td>{offer(c)}</td>
                         <td>{c.minOrder ? money(c.minOrder) : "—"}</td>
                         <td>{c.usedCount}{c.totalLimit !== null ? ` / ${c.totalLimit}` : ""}{c.perUserLimit !== null && <small style={{ display: "block", color: "var(--admin-muted)" }}>{c.perUserLimit} per customer</small>}</td>
-                        <td style={{ fontSize: 12 }}>{c.startsAt ? dateTime(c.startsAt) : "Now"} → {c.endsAt ? dateTime(c.endsAt) : "No end"}</td>
-                        <td style={{ fontSize: 12 }}>{c.zoneIds.length === 0 ? "All zones" : c.zoneIds.map(zoneName).join(", ")}</td>
+                        <td style={{ fontSize: 14 }}>{c.startsAt ? dateTime(c.startsAt) : "Now"} → {c.endsAt ? dateTime(c.endsAt) : "No end"}</td>
+                        <td style={{ fontSize: 14 }}>{c.zoneIds.length === 0 ? "All zones" : c.zoneIds.map(zoneName).join(", ")}</td>
                         <td><Badge tone={s.tone}>{s.label}</Badge></td>
                         {canManage && (
                           <td>

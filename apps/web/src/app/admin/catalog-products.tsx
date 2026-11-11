@@ -46,7 +46,7 @@ export function flattenTree(nodes: CategoryNode[], depth = 0): { id: string; lab
 }
 const firstUrl = (img: Img) => img.urls.thumb ?? img.urls.small ?? img.urls.medium ?? Object.values(img.urls)[0] ?? "";
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 12, fontWeight: 600 };
+const lbl: React.CSSProperties = { display: "block", fontSize: 14, fontWeight: 600 };
 const section: React.CSSProperties = { border: "1px solid var(--admin-border)", borderRadius: 8, padding: 16, margin: "18px 0 0", background: "#fffdf7" };
 const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 };
 const smallBtn: React.CSSProperties = { minHeight: 30, padding: "4px 10px", border: "1px solid #cbc5ba", borderRadius: 6, background: "#fff", cursor: "pointer" };
@@ -79,7 +79,7 @@ function VariantFields({ d, onChange, disabled, canRemove, onRemove, productName
           {d.autoSku
             ? <input readOnly value={genSku(productName, d.label, d.rand ?? "")} disabled style={{ background: "#fff7e7", color: "#8a5a00", fontFamily: "monospace" }} aria-label="Automatic SKU" />
             : <input required maxLength={40} pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,39}" title="2-40 letters, digits, dots, dashes or underscores" value={d.sku} disabled={disabled} onChange={(e) => onChange({ ...d, sku: e.target.value })} style={{ textTransform: "uppercase" }} />}
-          {(!d.id || d.autoSku) && <span style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 400, fontSize: 11, marginTop: 4 }}><input type="checkbox" checked={!!d.autoSku} disabled={disabled} onChange={(e) => onChange({ ...d, autoSku: e.target.checked, sku: e.target.checked ? d.sku : genSku(productName, d.label, d.rand ?? "") })} /> Auto-generate SKU</span>}
+          {(!d.id || d.autoSku) && <span style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 400, fontSize: 13, marginTop: 4 }}><input type="checkbox" checked={!!d.autoSku} disabled={disabled} onChange={(e) => onChange({ ...d, autoSku: e.target.checked, sku: e.target.checked ? d.sku : genSku(productName, d.label, d.rand ?? "") })} /> Auto-generate SKU</span>}
         </label>
         {adv && <label style={lbl}>Barcode (optional)<input maxLength={40} value={d.barcode} disabled={disabled} onChange={(e) => onChange({ ...d, barcode: e.target.value })} /></label>}
       </div>
@@ -116,7 +116,7 @@ function VariantsPanel({ product, canEdit, onChanged }: { product: Product; canE
 
   return (
     <div style={section}>
-      <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Variants ({product.variants.length})</h3>
+      <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Variants ({product.variants.length})</h3>
       {error && <p role="alert" className="admin-role-error">{error}</p>}
       <div style={{ display: "grid", gap: 10 }}>
         {product.variants.map((v) => {
@@ -134,7 +134,7 @@ function VariantsPanel({ product, canEdit, onChanged }: { product: Product; canE
           return (
             <div key={v.id} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", background: "#fff", border: "1px solid var(--admin-border)", borderRadius: 8, opacity: v.isActive ? 1 : 0.6 }}>
               <strong>{v.label}</strong>
-              <span style={{ color: "var(--admin-muted)", fontSize: 12 }}>{v.weightGrams} g · SKU {v.sku}{v.barcode ? ` · ${v.barcode}` : ""}{v.attributes.length ? ` · ${v.attributes.map((a) => `${a.name}: ${a.value}`).join(", ")}` : ""}</span>
+              <span style={{ color: "var(--admin-muted)", fontSize: 14 }}>{v.weightGrams} g · SKU {v.sku}{v.barcode ? ` · ${v.barcode}` : ""}{v.attributes.length ? ` · ${v.attributes.map((a) => `${a.name}: ${a.value}`).join(", ")}` : ""}</span>
               {!v.isActive && <span className="admin-badge admin-badge-paused">Inactive</span>}
               {canEdit && (
                 <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
@@ -178,7 +178,7 @@ async function uploadProductImage(productId: string, alt: string, file: File): P
   return ticket.data.mediaId;
 }
 
-const dropzone: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 150, width: "100%", padding: 20, boxSizing: "border-box", border: "2px dashed #e0b64a", borderRadius: 12, background: "#fffaf0", cursor: "pointer", textAlign: "center", color: "#8a5a00", fontSize: 13, fontWeight: 600 };
+const dropzone: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 150, width: "100%", padding: 20, boxSizing: "border-box", border: "2px dashed #e0b64a", borderRadius: 12, background: "#fffaf0", cursor: "pointer", textAlign: "center", color: "#8a5a00", fontSize: 15, fontWeight: 600 };
 const hiddenInput: React.CSSProperties = { position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" };
 const thumbCard: React.CSSProperties = { margin: 0, width: 170, border: "1px solid var(--admin-border)", borderRadius: 10, padding: 8, background: "#fff", textAlign: "center" };
 const thumbImg: React.CSSProperties = { width: "100%", height: 130, objectFit: "cover", borderRadius: 8, background: "#f7f6f3", display: "block" };
@@ -192,7 +192,7 @@ function Dropzone({ disabled, multiple, label, onFiles }: { disabled: boolean; m
       onDrop={(e) => { e.preventDefault(); setOver(false); if (!disabled) onFiles(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"))); }}>
       <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 16l4-4 4 4 3-3 5 5 M4 4h16v16H4z M9 9h.01" /></svg>
       <span>{label}</span>
-      <span style={{ fontWeight: 400, fontSize: 11, color: "var(--admin-muted)" }}>Click to choose or drag &amp; drop · JPEG, PNG or WebP · up to 5 MB each</span>
+      <span style={{ fontWeight: 400, fontSize: 13, color: "var(--admin-muted)" }}>Click to choose or drag &amp; drop · JPEG, PNG or WebP · up to 5 MB each</span>
       <input type="file" accept="image/jpeg,image/png,image/webp" multiple={multiple} disabled={disabled} style={hiddenInput} onChange={(e) => { onFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
     </label>
   );
@@ -250,7 +250,7 @@ function ImagesPanel({ product, canEdit, onChanged }: { product: Product; canEdi
 
   return (
     <div style={{ ...section, margin: 0 }}>
-      <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Product photos ({product.images.length}/20) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
+      <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Product photos ({product.images.length}/20) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
       {error && <p role="alert" className="admin-role-error">{error}</p>}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
         {product.images.map((img, i) => (
@@ -274,7 +274,7 @@ function ImagesPanel({ product, canEdit, onChanged }: { product: Product; canEdi
         ))}
       </div>
       {canEdit && product.images.length < 20 && <Dropzone disabled={busy} multiple label={busy ? "Uploading…" : product.images.length === 0 ? "Add product photos" : "Add more photos"} onFiles={(f) => void add(f)} />}
-      {product.images.length === 0 && !canEdit && <p style={{ color: "var(--admin-muted)", fontSize: 12 }}>No photos.</p>}
+      {product.images.length === 0 && !canEdit && <p style={{ color: "var(--admin-muted)", fontSize: 14 }}>No photos.</p>}
     </div>
   );
 }
@@ -388,7 +388,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
         <h2>{isNew ? "New product" : `Edit — ${product.name}`}</h2>
         {error && <p role="alert" className="admin-role-error" style={{ marginBottom: 14 }}>{error}</p>}
         {similar && (
-          <div role="alert" style={{ background: "#fff7e7", border: "1px solid #f5d57a", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13 }}>
+          <div role="alert" style={{ background: "#fff7e7", border: "1px solid #f5d57a", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 15 }}>
             <strong>Possible duplicate{similar.length > 1 ? "s" : ""}:</strong>
             <ul style={{ margin: "6px 0 10px 18px" }}>{similar.map((s) => <li key={s.id}>{s.name} — {s.reason === "sku_exists" ? "a SKU is already used" : "similar name"}</li>)}</ul>
             <button type="button" className="admin-role-button" disabled={busy} onClick={(e) => void submit(e, true)}>Create anyway</button>
@@ -397,14 +397,14 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
 
         {isNew && (
           <div style={{ ...section, margin: "0 0 18px" }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Product photos ({photos.length}/10) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Product photos ({photos.length}/10) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
             {photos.length > 0 && (
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
                 {photos.map((f, i) => <QueuedPhoto key={`${f.name}-${f.size}-${i}`} file={f} main={i === 0} disabled={dis} onReplace={(nf) => setPhotos(photos.map((x, j) => (j === i ? nf : x)))} onRemove={() => setPhotos(photos.filter((_, j) => j !== i))} />)}
               </div>
             )}
             {photos.length < 10 && <Dropzone disabled={dis} multiple label={photos.length === 0 ? "Add product photos" : "Add more photos"} onFiles={(f) => setPhotos([...photos, ...f].slice(0, 10))} />}
-            <p style={{ fontSize: 12, color: "var(--admin-muted)", margin: "10px 0 0" }}>Photos upload when you click “Create product”.</p>
+            <p style={{ fontSize: 14, color: "var(--admin-muted)", margin: "10px 0 0" }}>Photos upload when you click “Create product”.</p>
           </div>
         )}
 
@@ -417,7 +417,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
 
         {isNew && (
           <div style={{ ...section, margin: "18px 0 0" }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Variants (at least 1, up to 20)</h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Variants (at least 1, up to 20)</h3>
             <div style={{ display: "grid", gap: 10 }}>
               {variants.map((v, i) => <VariantFields key={i} d={v} productName={name} disabled={dis} onChange={(x) => setVariants(variants.map((y, j) => (j === i ? x : y)))} canRemove={variants.length > 1} onRemove={() => setVariants(variants.filter((_, j) => j !== i))} />)}
             </div>
@@ -427,7 +427,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
 
         {isNew && whs.length > 0 && (
           <div style={{ ...section, margin: "18px 0 0" }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>Sell in a warehouse <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— optional, saves a trip to Offerings &amp; stock</small></h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>Sell in a warehouse <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— optional, saves a trip to Offerings &amp; stock</small></h3>
             <label style={lbl}>Warehouse
               <select value={whId} disabled={dis} onChange={(e) => setWhId(e.target.value)}>
                 <option value="">Not now — add it later</option>
@@ -438,14 +438,14 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
               <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                 {variants.map((v, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                    <span style={{ width: 130, fontSize: 12, fontWeight: 600 }}>{v.label || `Variant ${i + 1}`}</span>
+                    <span style={{ width: 130, fontSize: 14, fontWeight: 600 }}>{v.label || `Variant ${i + 1}`}</span>
                     <label style={{ ...lbl, width: 110 }}>MRP ₹<input type="number" min="0" step="0.01" value={offerOf(i).mrp} disabled={dis} onChange={(e) => setOfferAt(i, { mrp: e.target.value })} /></label>
                     <label style={{ ...lbl, width: 110 }}>Price ₹<input type="number" min="0" step="0.01" value={offerOf(i).price} disabled={dis} onChange={(e) => setOfferAt(i, { price: e.target.value })} /></label>
                     {stockMode !== "pooled_weight" && <label style={{ ...lbl, width: 110 }}>Stock<input type="number" min="0" step="1" value={offerOf(i).stock} disabled={dis} onChange={(e) => setOfferAt(i, { stock: e.target.value })} /></label>}
                   </div>
                 ))}
                 {stockMode === "pooled_weight" && <label style={{ ...lbl, width: 180 }}>Stock (grams, shared by all variants)<input type="number" min="0" step="1" value={grams} disabled={dis} onChange={(e) => setGrams(e.target.value)} /></label>}
-                <p style={{ margin: 0, fontSize: 11, color: "var(--admin-muted)" }}>Customers only see it once the product Status is “Active”.</p>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--admin-muted)" }}>Customers only see it once the product Status is “Active”.</p>
               </div>
             )}
           </div>
@@ -476,11 +476,11 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
         <label style={{ ...lbl, display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}><input type="checkbox" checked={returnable} disabled={dis} onChange={(e) => setReturnable(e.target.checked)} /> Returnable once delivered (damaged or missing items are always refunded)</label>
 
         <div style={section}>
-          <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Product information</h3>
+          <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Product information</h3>
           <label style={lbl}>Tags (comma separated, up to 20)<input value={tags} disabled={dis} onChange={(e) => setTags(e.target.value)} placeholder="tea, organic, gift" /></label>
           <label style={{ ...lbl, marginTop: 12 }}>Highlights (one per line, up to 6)<textarea value={highlights} disabled={dis} onChange={(e) => setHighlights(e.target.value)} placeholder={"Hand-picked leaves\nNo added colour"} /></label>
 
-          <h4 style={{ margin: "16px 0 8px", fontSize: 13 }}>Key information (up to 15)</h4>
+          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Key information (up to 15)</h4>
           {keyInfo.map((r, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "end" }}>
               <label style={{ ...lbl, flex: 1 }}>Label<input maxLength={40} value={r.label} disabled={dis} onChange={(e) => setKeyInfo(keyInfo.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} placeholder="Shelf life" /></label>
@@ -490,7 +490,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
           ))}
           {keyInfo.length < 15 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setKeyInfo([...keyInfo, { label: "", value: "" }])}>+ Key info row</button>}
 
-          <h4 style={{ margin: "16px 0 8px", fontSize: 13 }}>Information sections (up to 6)</h4>
+          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Information sections (up to 6)</h4>
           {sections.map((s, i) => (
             <div key={i} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
@@ -502,7 +502,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
           ))}
           {sections.length < 6 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setSections([...sections, { title: "", body: "" }])}>+ Section</button>}
 
-          <h4 style={{ margin: "16px 0 8px", fontSize: 13 }}>Nutrition (optional)</h4>
+          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Nutrition (optional)</h4>
           {nutrition ? (
             <>
               <div style={grid}>
@@ -623,7 +623,7 @@ export function ProductManager({ categories, brands, canEdit }: { categories: Ca
         <label style={lbl}>Category<select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">All categories</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
         <label style={lbl}>Status<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Active &amp; inactive</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select></label>
       </div>
-      {notice && <p role="status" style={{ margin: "0 24px 12px", color: "#137333", fontSize: 13 }}>{notice}</p>}
+      {notice && <p role="status" style={{ margin: "0 24px 12px", color: "#137333", fontSize: 15 }}>{notice}</p>}
       {error && <p role="alert" className="admin-role-error" style={{ margin: "0 24px 12px" }}>{error} <button onClick={() => setAttempt((n) => n + 1)}>Retry</button></p>}
       {rows === null && !error ? <p className="admin-roles-message">Loading products…</p> : rows && rows.length === 0 ? (
         <p className="admin-roles-message">No products found{search || categoryId || status ? " for these filters" : " yet"}.{canEdit && !search && !categoryId && !status ? " Create the first one with “New product”." : ""}</p>

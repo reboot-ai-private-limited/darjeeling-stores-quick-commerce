@@ -98,11 +98,11 @@ function DemandTab({ zones, warehouses }: { zones: Zone[]; warehouses: Warehouse
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 20 }}>
         <div className="admin-panel" style={{ padding: "16px 20px" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Total Customer Requests</span>
+          <span style={{ fontSize: 13, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Total Customer Requests</span>
           <h2 style={{ fontSize: 26, margin: "6px 0 0", color: "var(--admin-accent)" }}>{totalWaiting}</h2>
         </div>
         <div className="admin-panel" style={{ padding: "16px 20px" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Out of Stock Products Wanted</span>
+          <span style={{ fontSize: 13, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Out of Stock Products Wanted</span>
           <h2 style={{ fontSize: 26, margin: "6px 0 0" }}>{demand.length}</h2>
         </div>
       </div>
@@ -167,14 +167,14 @@ function DemandTab({ zones, warehouses }: { zones: Zone[]; warehouses: Warehouse
                   return (
                     <tr key={`${d.productId}-${d.variantId ?? "default"}-${i}`}>
                       <td><strong>{d.name || d.productId}</strong></td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{d.variantLabel ?? "All variants"}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{d.variantLabel ?? "All variants"}</td>
                       <td>{zName}</td>
                       <td>
-                        <span className="admin-badge admin-badge-active" style={{ fontSize: 13, fontWeight: 700 }}>
+                        <span className="admin-badge admin-badge-active" style={{ fontSize: 15, fontWeight: 700 }}>
                           {d.waiting} request{d.waiting !== 1 ? "s" : ""}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{fmtDate(d.oldestRequestAt)}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{fmtDate(d.oldestRequestAt)}</td>
                     </tr>
                   );
                 })}
@@ -303,7 +303,7 @@ function TemplatesTab() {
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, alignItems: "center" }}>
         <div>
           <h2 style={{ fontSize: 18, margin: 0 }}>Message Templates</h2>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--admin-muted)" }}>Templates for Push notifications, SMS alerts, and Meta WhatsApp Cloud.</p>
+          <p style={{ margin: "2px 0 0", fontSize: 14, color: "var(--admin-muted)" }}>Templates for Push notifications, SMS alerts, and Meta WhatsApp Cloud.</p>
         </div>
         <button className="admin-role-button" onClick={startCreate}>
           New Template
@@ -318,7 +318,7 @@ function TemplatesTab() {
           <h2>{editing === "new" ? "Create Notification Template" : `Edit Template: ${key}`}</h2>
           <div style={{ display: "grid", gap: 12, maxWidth: 560 }}>
             <div style={{ display: "flex", gap: 12 }}>
-              <label style={{ flex: 2, fontSize: 12 }}>
+              <label style={{ flex: 2, fontSize: 14 }}>
                 Template Key (lower_snake_case) *
                 <input
                   required
@@ -330,7 +330,7 @@ function TemplatesTab() {
                   style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
-              <label style={{ flex: 1, fontSize: 12 }}>
+              <label style={{ flex: 1, fontSize: 14 }}>
                 Channel *
                 <select
                   value={channel}
@@ -346,7 +346,7 @@ function TemplatesTab() {
             </div>
 
             <div style={{ display: "flex", gap: 12 }}>
-              <label style={{ flex: 1, fontSize: 12 }}>
+              <label style={{ flex: 1, fontSize: 14 }}>
                 Category *
                 <select
                   value={category}
@@ -359,7 +359,7 @@ function TemplatesTab() {
                   <option value="authentication">Authentication</option>
                 </select>
               </label>
-              <label style={{ width: 120, fontSize: 12 }}>
+              <label style={{ width: 120, fontSize: 14 }}>
                 Language Code *
                 <input
                   required
@@ -373,7 +373,7 @@ function TemplatesTab() {
             </div>
 
             {channel !== "sms" && (
-              <label style={{ fontSize: 12 }}>
+              <label style={{ fontSize: 14 }}>
                 Title (Optional)
                 <input
                   maxLength={100}
@@ -387,7 +387,7 @@ function TemplatesTab() {
             )}
 
             {channel === "whatsapp" && (
-              <label style={{ fontSize: 12 }}>
+              <label style={{ fontSize: 14 }}>
                 Meta WhatsApp Approved Template Name *
                 <input
                   required
@@ -401,7 +401,7 @@ function TemplatesTab() {
               </label>
             )}
 
-            <label style={{ fontSize: 12 }}>
+            <label style={{ fontSize: 14 }}>
               Message Body * (Use <code>&#123;&#123;var&#125;&#125;</code> for placeholders)
               <textarea
                 required
@@ -415,17 +415,17 @@ function TemplatesTab() {
             </label>
 
             {detectedVariables.length > 0 && (
-              <div style={{ fontSize: 11, color: "var(--admin-muted)" }}>
+              <div style={{ fontSize: 13, color: "var(--admin-muted)" }}>
                 Detected variables:{" "}
                 {detectedVariables.map((v, i) => (
-                  <span key={i} className="admin-badge admin-badge-active" style={{ marginRight: 4, fontSize: 10 }}>
+                  <span key={i} className="admin-badge admin-badge-active" style={{ marginRight: 4, fontSize: 12 }}>
                     {v}
                   </span>
                 ))}
               </div>
             )}
 
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
               <input
                 type="checkbox"
                 checked={isActive}
@@ -485,8 +485,8 @@ function TemplatesTab() {
                         {t.channel}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12 }}>{t.category}</td>
-                    <td style={{ fontSize: 12, maxWidth: 300, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <td style={{ fontSize: 14 }}>{t.category}</td>
+                    <td style={{ fontSize: 14, maxWidth: 300, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {t.title ? <strong>{t.title}: </strong> : null}
                       {t.body}
                     </td>
@@ -498,7 +498,7 @@ function TemplatesTab() {
                     <td>
                       <button
                         onClick={() => startEdit(t)}
-                        style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                        style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13 }}
                       >
                         Edit
                       </button>
@@ -574,7 +574,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
   return (
     <form className="admin-panel admin-role-form" onSubmit={submit} style={{ maxWidth: 580 }}>
       <h2>Targeted Customer Broadcast</h2>
-      <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+      <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
         Send promotional alerts or emergency service notifications to active customers in selected delivery zones.
       </p>
 
@@ -584,15 +584,15 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
       <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
         <fieldset style={{ border: "1px solid var(--admin-border)", borderRadius: 6, padding: "10px 14px", margin: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <legend style={{ fontSize: 12, fontWeight: 600 }}>Target Delivery Zones *</legend>
+            <legend style={{ fontSize: 14, fontWeight: 600 }}>Target Delivery Zones *</legend>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="admin-text-button" onClick={selectAllZones} style={{ fontSize: 11, padding: 0 }}>All</button>
-              <button type="button" className="admin-text-button" onClick={clearAllZones} style={{ fontSize: 11, padding: 0 }}>Clear</button>
+              <button type="button" className="admin-text-button" onClick={selectAllZones} style={{ fontSize: 13, padding: 0 }}>All</button>
+              <button type="button" className="admin-text-button" onClick={clearAllZones} style={{ fontSize: 13, padding: 0 }}>Clear</button>
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
             {zones.map((z) => (
-              <label key={z.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <label key={z.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
                 <input
                   type="checkbox"
                   checked={selectedZones.includes(z.id)}
@@ -606,9 +606,9 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
         </fieldset>
 
         <fieldset style={{ border: "1px solid var(--admin-border)", borderRadius: 6, padding: "10px 14px", margin: 0 }}>
-          <legend style={{ fontSize: 12, fontWeight: 600 }}>Broadcast Channels *</legend>
+          <legend style={{ fontSize: 14, fontWeight: 600 }}>Broadcast Channels *</legend>
           <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
               <input
                 type="checkbox"
                 checked={channels.includes("push")}
@@ -620,7 +620,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
               />
               Mobile Push Notification
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
               <input
                 type="checkbox"
                 checked={channels.includes("whatsapp")}
@@ -635,7 +635,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
           </div>
         </fieldset>
 
-        <label style={{ fontSize: 12 }}>
+        <label style={{ fontSize: 14 }}>
           Broadcast Title *
           <input
             required
@@ -648,7 +648,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
           />
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label style={{ fontSize: 14 }}>
           Message Body *
           <textarea
             required
@@ -661,7 +661,7 @@ function BroadcastTab({ zones }: { zones: Zone[] }) {
           />
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label style={{ fontSize: 14 }}>
           In-App Deep Link (optional)
           <input
             pattern="^ds:\/\/[a-z]+(\/[A-Za-z0-9_-]+)?$"
@@ -808,18 +808,18 @@ function LogsTab() {
                 const isDelivered = log.status === "delivered";
                 return (
                   <tr key={log.id}>
-                    <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>{fmtDate(log.createdAt)}</td>
+                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{fmtDate(log.createdAt)}</td>
                     <td>
                       <span className="admin-badge" style={{ background: "#f3f1ee", color: "#c62828" }}>
                         {log.channel}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12, fontFamily: "monospace" }}>{log.recipient}</td>
-                    <td style={{ fontSize: 12, maxWidth: 260 }}>
+                    <td style={{ fontSize: 14, fontFamily: "monospace" }}>{log.recipient}</td>
+                    <td style={{ fontSize: 14, maxWidth: 260 }}>
                       {log.title && <strong>{log.title}: </strong>}
                       {log.body}
                       {log.error && (
-                        <div style={{ color: "#a73535", fontSize: 11, marginTop: 2 }}>Error: {log.error}</div>
+                        <div style={{ color: "#a73535", fontSize: 13, marginTop: 2 }}>Error: {log.error}</div>
                       )}
                     </td>
                     <td>
@@ -832,7 +832,7 @@ function LogsTab() {
                         <button
                           disabled={busy}
                           onClick={() => retryDelivery(log.id)}
-                          style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 11, color: "var(--admin-accent)" }}
+                          style={{ border: "1px solid #cbc5ba", borderRadius: 4, padding: "4px 8px", background: "#fff", cursor: "pointer", fontSize: 13, color: "var(--admin-accent)" }}
                         >
                           Retry
                         </button>
