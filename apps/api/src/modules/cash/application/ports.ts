@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { LedgerEntry, LedgerType, Reconciliation, ReconciliationOutcome } from "../domain/cash.js";
 
 export type NewEntry = Omit<LedgerEntry, "id" | "balanceAfter">;
@@ -14,10 +13,10 @@ export interface RiderBalance { riderId: string; total: number; byWarehouse: { w
 export interface CashStore {
   ensureIndexes(): Promise<void>;
   /**
-   * Adds one ledger entry, moves the rider's balances and writes any reconciliation items and audit record, all in one transaction.
+   * Adds one ledger entry, moves the rider's balances and writes any reconciliation items, all in one transaction.
    * With `limit` the warehouse balance must cover a negative amount (a deposit).
    */
-  post(entry: NewEntry, options?: { limit?: boolean; reconciliations?: NewReconciliation[]; audit?: AuditEvent }): Promise<LedgerEntry>;
+  post(entry: NewEntry, options?: { limit?: boolean; reconciliations?: NewReconciliation[] }): Promise<LedgerEntry>;
   collectedFor(orderId: string): Promise<LedgerEntry | null>;
   /** The net cash recorded for an order: collected plus any adjustment made for it. */
   netForOrder(orderId: string): Promise<number>;
@@ -35,7 +34,6 @@ export interface CashStore {
   /** Closes an open item once. False when it was already closed. */
   closeReconciliation(id: string, patch: { outcome: ReconciliationOutcome; note: string | null; bankReference: string | null; by: string; at: Date }): Promise<boolean>;
   reopenReconciliation(id: string): Promise<void>;
-  recordAudit(entry: AuditEvent): Promise<void>;
 }
 
 export interface RiderDirectory {

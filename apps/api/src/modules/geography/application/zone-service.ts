@@ -3,7 +3,7 @@ import { conflict, forbidden, notFound } from "../domain/errors.js";
 import { polygonsOverlap, validatePolygon, type GeoPolygon } from "../domain/geometry.js";
 import { zoneOverlap } from "../domain/errors.js";
 import { normalizeZoneName, toZoneDTO, type Zone, type ZoneDTO, type ZonePause } from "../domain/zone.js";
-import type { CityStore, GeographyActor, LockActorFn, WriteAuditFn, ZoneStore } from "./ports.js";
+import type { CityStore, GeographyActor, LockActorFn, ZoneStore } from "./ports.js";
 
 export interface CreateZoneInput {
   cityId: string;
@@ -22,7 +22,6 @@ export interface UpdateZoneInput {
 export interface ZoneServiceDependencies {
   zoneStore: ZoneStore;
   cityStore: CityStore;
-  writeAudit: WriteAuditFn;
   withTransaction: <T>(fn: (session: ClientSession) => Promise<T>) => Promise<T>;
   newId: () => string;
   lockActor?: LockActorFn | undefined;
@@ -119,29 +118,6 @@ export function createZoneService(deps: ZoneServiceDependencies) {
         const created = await deps.zoneStore.create(zoneRecord, session);
         const dto = toZoneDTO(created);
 
-        // 6. Write audit log
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "zone.create",
-            entityType: "zone",
-            entityId: id,
-            requestId,
-            zoneChange: {
-              before: null,
-              after: {
-                id: dto.id,
-                cityId: dto.cityId,
-                name: dto.name,
-                isEnabled: dto.isEnabled,
-                pause: dto.pause,
-              },
-            },
-          },
-          session
-        );
-
         return dto;
       });
     },
@@ -229,34 +205,6 @@ export function createZoneService(deps: ZoneServiceDependencies) {
 
         const beforeDTO = toZoneDTO(current);
         const afterDTO = toZoneDTO(updated);
-
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "zone.update",
-            entityType: "zone",
-            entityId: id,
-            requestId,
-            zoneChange: {
-              before: {
-                id: beforeDTO.id,
-                cityId: beforeDTO.cityId,
-                name: beforeDTO.name,
-                isEnabled: beforeDTO.isEnabled,
-                pause: beforeDTO.pause,
-              },
-              after: {
-                id: afterDTO.id,
-                cityId: afterDTO.cityId,
-                name: afterDTO.name,
-                isEnabled: afterDTO.isEnabled,
-                pause: afterDTO.pause,
-              },
-            },
-          },
-          session
-        );
 
         return afterDTO;
       });

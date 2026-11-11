@@ -52,7 +52,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F23 notifications", () => {
     const expected = documented("F23-notifications.md");
-    expect(expected).toHaveLength(10);
+    expect(expected).toHaveLength(7);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -70,7 +70,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F18 dispatch and assignment", () => {
     const expected = documented("F18-dispatch-and-assignment.md");
-    expect(expected).toHaveLength(13);
+    expect(expected).toHaveLength(15);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -82,7 +82,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F20 ETA and live tracking", () => {
     const expected = documented("F20-eta-and-live-tracking.md");
-    expect(expected).toHaveLength(3);
+    expect(expected).toHaveLength(4);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -168,7 +168,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
       expect(res.status, `${route.method} ${route.path}`).toBe(401);
       expect(res.body.error).toMatchObject({ code: "UNAUTHORIZED", requestId: res.headers["x-request-id"] });
     }
-  });
+  }, 30_000);
 
   it("lets guests browse the catalog: a call with no zone is a 400, never a 401", async () => {
     const app = createApp();

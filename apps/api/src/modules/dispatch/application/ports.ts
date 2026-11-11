@@ -1,7 +1,6 @@
 import type { Rider } from "../../riders/riders.public.js";
 import type { Assignment, AssignmentStatus, Batch, FeedEntry, FeedEvent, Problem } from "../domain/dispatch.js";
 
-export interface AuditEntry { actorId: string; actorRole: string; action: string; entityType: string; entityId: string; requestId: string; warehouseId?: string }
 
 export interface AssignmentFilters {
   status?: AssignmentStatus | undefined; riderId?: string | undefined; warehouseId?: string | undefined;
@@ -56,7 +55,6 @@ export interface DispatchStore {
   insertProblem(problem: Problem): Promise<void>;
   recentProblems(since: Date, limit: number): Promise<Problem[]>;
 
-  recordAudit(entry: AuditEntry): Promise<void>;
 }
 
 /** What dispatch needs from rider profiles, shifts and capacity. */

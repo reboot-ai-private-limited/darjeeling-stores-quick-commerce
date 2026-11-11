@@ -1,5 +1,4 @@
 import type { Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import { DuplicateMediaError } from "../application/errors.js";
 import type { MediaStore } from "../application/ports.js";
 import type { MediaFile } from "../domain/media.js";
@@ -11,7 +10,6 @@ const toDoc = ({ id, ...rest }: MediaFile): MediaDoc => ({ _id: id, ...rest });
 
 export function createMongoMediaStore(connection: Connection): MediaStore {
   const files = () => connection.collection<MediaDoc>("media_files");
-  const writeAudit = createAuditWriter(connection);
 
   return {
     async ensureIndexes() {
@@ -35,17 +33,7 @@ export function createMongoMediaStore(connection: Connection): MediaStore {
     async update(id, patch, options = {}) {
       const { id: _ignored, ...fields } = patch;
       const filter = { _id: id, ...(options.from && { status: { $in: [...options.from] } }) };
-      if (!options.audit) return (await files().updateOne(filter, { $set: fields })).modifiedCount === 1;
-      // A change that must be audited is saved together with its audit entry or not at all.
-      const session = await connection.startSession();
-      try {
-        let changed = false;
-        await session.withTransaction(async () => {
-          changed = (await files().updateOne(filter, { $set: fields }, { session })).modifiedCount === 1;
-          if (changed) await writeAudit({ ...options.audit!, entityType: "media_file" }, session);
-        });
-        return changed;
-      } finally { await session.endSession(); }
+      return (await files().updateOne(filter, { $set: fields })).modifiedCount === 1;
     },
 
     countPending(userId, now) { return files().countDocuments({ uploadedBy: userId, status: "pending", uploadExpiresAt: { $gt: now } }); },

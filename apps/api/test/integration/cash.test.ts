@@ -219,7 +219,6 @@ describe("deposits", () => {
     const row = (await f.get("/admin/cash/riders")).body;
     expect(row.data).toEqual([]);
     expect((await col("cash_totals").findOne({ _id: r.id as never }))?.lastDepositAt).toEqual(expect.any(Date));
-    expect(await col("audit_log").countDocuments({ action: "cash.deposit" })).toBe(1);
   });
 
   it("can be partial, and never larger than the cash held for that warehouse", async () => {
@@ -267,7 +266,6 @@ describe("adjustments", () => {
     expect(short.body.data).toMatchObject({ type: "adjustment", amount: -200, balanceAfter: 8600, note: "Short by 200, rider will repay" });
     expect((await adjust({ amount: 50, note: "Found" })).body.data.balanceAfter).toBe(8650);
     expect(await col("cash_ledger").countDocuments({})).toBe(3);
-    expect(await col("audit_log").countDocuments({ action: "cash.adjust" })).toBe(2);
   });
 
   it("needs a reason, a non-zero amount, and the right rider and warehouse", async () => {
@@ -326,7 +324,6 @@ describe("reconciliation", () => {
     expect(f.orders.get(order.id)).toMatchObject({ collectionMethod: "upi_verified", collectionAmount: 8800 });
     expect((await f.get("/admin/reconciliation")).body.meta.openCount).toBe(0);
     expect((await f.get("/admin/reconciliation?status=resolved")).body.data).toHaveLength(1);
-    expect(await col("audit_log").countDocuments({ action: "cash.resolve_reconciliation" })).toBe(1);
   });
 
   it("raises a discrepancy against the rider when the UPI money never arrived", async () => {
@@ -388,7 +385,6 @@ describe("correcting a collection", () => {
     expect(await col("cash_ledger").findOne({ orderId: order.id, type: "collected" })).toMatchObject({ amount: 8800 });
     expect(await col("cash_ledger").findOne({ orderId: order.id, type: "adjustment" })).toMatchObject({ amount: -800, note: "Customer gave 80, not 88", riderId: r.id, warehouseId: W1 });
     expect(await cashOf(r)).toBe(8000);
-    expect(await col("audit_log").countDocuments({ action: "cash.fix_collection" })).toBe(1);
     // Fixing it to what it already is changes nothing.
     await fix(order.id, { method: "cash", amount: 8000, reason: "Check" });
     expect(await col("cash_ledger").countDocuments({ orderId: order.id })).toBe(2);

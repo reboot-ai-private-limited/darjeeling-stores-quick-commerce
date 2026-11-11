@@ -11,8 +11,6 @@ export interface RequestInput { reason: "damaged_item" | "missing_item" | "other
 const REASON_OF: Record<AutoRefundInput["kind"], RefundReason> = {
   cancel: "cancelled", item_removed: "item_unavailable", failed_delivery: "cancelled", overpaid: "overpaid", late_payment: "late_payment",
 };
-const audit = (ctx: Ctx, action: string, refundId: string, warehouseId: string) =>
-  ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId, action, entityType: "refund", entityId: refundId, warehouseId });
 
 /** Refunds are manual in version one: the admin pays outside the system and records it here (F16). */
 export function createRefundService(deps: RefundDeps) {
@@ -128,7 +126,7 @@ export function createRefundService(deps: RefundDeps) {
         amount: input.amount, reason: input.reason, source: "admin", status: "requested", customerNote: null, photos: [], items: [], rejectReason: null, method: null, reference: null, note: input.note,
         dedupeKey: null, createdBy: ctx.actor.userId, decidedBy: null, createdAt: now(), decidedAt: null, markedDoneAt: null,
       };
-      await store.insert(refund, audit(ctx, "refunds.create", refund.id, refund.warehouseId));
+      await store.insert(refund);
       await orders.setRefundStatus(order.id, "pending");
       return refundView(refund);
     },
@@ -136,7 +134,7 @@ export function createRefundService(deps: RefundDeps) {
     async approve(ctx: Ctx, id: string) {
       const refund = await load(ctx, id);
       const next = { status: "approved" as const, decidedBy: ctx.actor.userId, decidedAt: now() };
-      if (!(await store.decide(id, ["requested"], next, audit(ctx, "refunds.approve", id, refund.warehouseId)))) throw conflict("This refund is not waiting for a decision", { status: (await store.get(id))?.status });
+      if (!(await store.decide(id, ["requested"], next))) throw conflict("This refund is not waiting for a decision", { status: (await store.get(id))?.status });
       const updated = { ...refund, ...next };
       await notifier.approved(refund.userId, updated).catch(() => undefined);
       return refundView(updated);
@@ -145,7 +143,7 @@ export function createRefundService(deps: RefundDeps) {
     async reject(ctx: Ctx, id: string, reason: string) {
       const refund = await load(ctx, id);
       const next = { status: "rejected" as const, rejectReason: reason, decidedBy: ctx.actor.userId, decidedAt: now() };
-      if (!(await store.decide(id, ["requested"], next, audit(ctx, "refunds.reject", id, refund.warehouseId)))) throw conflict("This refund is not waiting for a decision", { status: (await store.get(id))?.status });
+      if (!(await store.decide(id, ["requested"], next))) throw conflict("This refund is not waiting for a decision", { status: (await store.get(id))?.status });
       await syncOrder(refund.orderId);
       const updated = { ...refund, ...next };
       await notifier.rejected(refund.userId, updated).catch(() => undefined);
@@ -161,7 +159,7 @@ export function createRefundService(deps: RefundDeps) {
         if (done + refund.amount > orderTotal(order)) throw new AppError("REFUND_EXCEEDS_AMOUNT", "Paying this would refund more than the order cost", { refundable: orderTotal(order) - done });
       }
       const next = { status: "done" as const, method: input.method, reference: input.reference, note: input.note ?? refund.note, decidedBy: refund.decidedBy ?? ctx.actor.userId, markedDoneAt: now() };
-      if (!(await store.decide(id, ["requested", "approved"], next, audit(ctx, "refunds.mark_done", id, refund.warehouseId)))) {
+      if (!(await store.decide(id, ["requested", "approved"], next))) {
         throw conflict("This refund is already closed", { status: (await store.get(id))?.status });
       }
       await syncOrder(refund.orderId);

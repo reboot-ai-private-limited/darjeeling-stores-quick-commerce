@@ -19,8 +19,6 @@ const IST_MS = 5.5 * 3_600_000;
 const startOfIstDay = (at: Date) => { const d = new Date(at.getTime() + IST_MS); d.setUTCHours(0, 0, 0, 0); return new Date(d.getTime() - IST_MS); };
 const byRider = (rider: Rider): OrderActor => ({ kind: "rider", id: rider.userId });
 const byAdmin = (ctx: Ctx): OrderActor => ({ kind: "admin", id: ctx.actor.userId });
-const audit = (ctx: Ctx, action: string, entityType: string, entityId: string, warehouseId?: string) =>
-  ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId, action, entityType, entityId, ...(warehouseId && { warehouseId }) });
 
 /** Cash and doorstep UPI taken by riders, the append-only ledger, deposits, and the items an admin must review (F22). */
 export function createCashService(deps: CashDeps) {
@@ -166,7 +164,7 @@ export function createCashService(deps: CashDeps) {
       try {
         const entry = await store.post(
           { riderId: input.riderId, warehouseId: input.warehouseId, type: "deposit", amount: -input.amount, orderId: null, orderNo: null, note: input.note, by: ctx.actor.userId, flags: [], at: now() },
-          { limit: true, audit: audit(ctx, "cash.deposit", "cash_ledger", input.riderId, input.warehouseId) },
+          { limit: true },
         );
         return ledgerView(entry);
       } catch (error) {
@@ -181,7 +179,6 @@ export function createCashService(deps: CashDeps) {
       if (!(await geography.warehouse(input.warehouseId))) throw notFound("Warehouse");
       const entry = await store.post(
         { riderId: input.riderId, warehouseId: input.warehouseId, type: "adjustment", amount: input.amount, orderId: null, orderNo: null, note: input.note, by: ctx.actor.userId, flags: [], at: now() },
-        { audit: audit(ctx, "cash.adjust", "cash_ledger", input.riderId, input.warehouseId) },
       );
       return ledgerView(entry);
     },
@@ -220,7 +217,6 @@ export function createCashService(deps: CashDeps) {
           case "adjust": await ledgerAdjustment(input.amount ?? -item.amount, input.note ?? `Adjustment for ${item.orderNo}`, []); break;
           case "keep": break;
         }
-        await store.recordAudit(audit(ctx, "cash.resolve_reconciliation", "cash_reconciliation", id, item.warehouseId));
       } catch (error) {
         await store.reopenReconciliation(id);
         throw error;
@@ -241,9 +237,7 @@ export function createCashService(deps: CashDeps) {
         await store.post({
           riderId: riderId!, warehouseId: previous?.warehouseId ?? order.warehouseId, type: "adjustment", amount: delta, orderId, orderNo: order.orderNo,
           note: input.reason, by: ctx.actor.userId, flags: [], at: now(),
-        }, { audit: audit(ctx, "cash.fix_collection", "order", orderId, order.warehouseId) });
-      } else {
-        await store.recordAudit(audit(ctx, "cash.fix_collection", "order", orderId, order.warehouseId));
+        });
       }
       if (input.method === "upi" && riderId) {
         const rider = await riders.get(riderId);

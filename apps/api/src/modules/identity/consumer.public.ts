@@ -27,10 +27,10 @@ export async function createConsumerRoutes(connection: Connection, jwtSecret: st
           "phone-verify": phoneVerify, "delete-request": deletionRequest, "register-device": deviceInput, "remove-device": fcmToken }[operation];
         const parsed = schema.safeParse(operation === "remove-device" ? req.params.fcmToken : req.body ?? {});
         if (!parsed.success) throw new IdentityError(400, "VALIDATION_ERROR", "Invalid identity fields");
-        const token = accessCredential(req), requestId = String(res.getHeader("X-Request-Id"));
+        const token = accessCredential(req);
         if (operation === "request") return res.json({ data: await otp.requestLogin(otpRequest.parse(parsed.data), req.ip ?? "unknown") });
         if (operation === "verify") {
-          const result = await otp.verifyLogin(otpVerify.parse(parsed.data), requestId);
+          const result = await otp.verifyLogin(otpVerify.parse(parsed.data));
           if (!result.pair || !result.user) throw new IdentityError(401, "UNAUTHORIZED", "Sign in again");
           const native = nativeClient(req);
           if (native && native !== result.user.kind) { await sessions.revoke(result.pair.accessToken, result.pair.refreshToken); throw new IdentityError(403, "FORBIDDEN", "Client app does not match this account"); }
@@ -39,12 +39,12 @@ export async function createConsumerRoutes(connection: Connection, jwtSecret: st
             ...(native ? { accessToken: result.pair.accessToken, refreshToken: result.pair.refreshToken } : !req.get("Origin") && !req.get("Cookie") && req.get("X-Client") !== "admin" && req.get("X-Client") !== "web" ? { accessToken: result.pair.accessToken } : {}),
             ...(options.mockOTP && { mockOTP: true }) } });
         }
-        if (operation === "update") return res.json({ data: await accounts.update(token, profileUpdate.parse(parsed.data), requestId) });
+        if (operation === "update") return res.json({ data: await accounts.update(token, profileUpdate.parse(parsed.data)) });
         if (operation === "phone-request") return res.json({ data: await otp.requestPhone(token, phoneRequest.parse(parsed.data).phone, req.ip ?? "unknown") });
-        if (operation === "phone-verify") return res.json({ data: (await otp.verifyPhone(token, phoneVerify.parse(parsed.data), requestId)).user });
-        if (operation === "register-device") return res.json({ data: await accounts.registerDevice(token, deviceInput.parse(parsed.data), requestId) });
-        if (operation === "remove-device") return res.json({ data: await accounts.removeDevice(token, fcmToken.parse(parsed.data), requestId) });
-        const data = await accounts.deleteRequest(token, deletionRequest.parse(parsed.data).reason, requestId);
+        if (operation === "phone-verify") return res.json({ data: (await otp.verifyPhone(token, phoneVerify.parse(parsed.data))).user });
+        if (operation === "register-device") return res.json({ data: await accounts.registerDevice(token, deviceInput.parse(parsed.data)) });
+        if (operation === "remove-device") return res.json({ data: await accounts.removeDevice(token, fcmToken.parse(parsed.data)) });
+        const data = await accounts.deleteRequest(token, deletionRequest.parse(parsed.data).reason);
         clearSessionCookies(res, secureCookies || req.secure, settings.AUTH_COOKIE_SAME_SITE);
         return res.json({ data });
       } catch (error) {

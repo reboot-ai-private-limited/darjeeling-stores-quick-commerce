@@ -1,6 +1,5 @@
 import type { ClientSession, Connection } from "mongoose";
 import { Types } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import { LiveAssignmentExistsError, type DispatchStore } from "../application/ports.js";
 import type { Assignment, Batch, FeedEntry, Problem } from "../domain/dispatch.js";
 
@@ -19,7 +18,6 @@ export function createMongoDispatchStore(connection: Connection): DispatchStore 
   const feed = () => connection.collection<FeedDoc>("assignment_feed");
   const problems = () => connection.collection<ProblemDoc>("rider_problems");
   const counters = () => connection.collection<{ _id: string; value: number }>("dispatch_counters");
-  const writeAudit = createAuditWriter(connection);
 
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
@@ -123,6 +121,5 @@ export function createMongoDispatchStore(connection: Connection): DispatchStore 
       return (await problems().find({ createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(limit).toArray()).map(({ _id, ...rest }) => ({ id: _id, ...rest }));
     },
 
-    async recordAudit(entry) { await inTransaction(session => writeAudit(entry, session)); },
   };
 }

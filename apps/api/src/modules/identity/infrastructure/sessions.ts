@@ -32,7 +32,7 @@ export function createSessionStore(connection: Connection, jwtSecret: string, op
     if (user.status !== "active") return false;
     if (user.kind !== "staff" || user.devMockAccount) return true;
     const role = await connection.collection("roles").findOne({ _id: user.roleId }, options);
-    return !!role && !nextStaffAction({ ...user, kind: "staff" }, role.name);
+    return !!role && !nextStaffAction({ ...user, kind: "staff" });
   }
   return {
     async initialize() {

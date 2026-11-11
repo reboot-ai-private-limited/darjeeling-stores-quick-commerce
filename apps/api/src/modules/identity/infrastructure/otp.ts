@@ -1,7 +1,6 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { Types, type ClientSession, type Connection } from "mongoose";
 import { createAccessStore } from "../../access/access.public.js";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import { sessionSettings } from "../../../config/env.js";
 import { IdentityError } from "../domain/consumer-policy.js";
 import { createSessionStore } from "./sessions.js";
@@ -25,7 +24,6 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
   const limits = connection.collection<{ _id: string; count: number; expiresAt: Date }>("otp_limits");
   const access = createAccessStore(connection);
   const sessions = createSessionStore(connection, jwtSecret, settings);
-  const audit = createAuditWriter(connection);
   const hash = (value: string) => createHmac("sha256", Buffer.from(jwtSecret, "hex")).update(`consumer-otp:${value}`).digest("hex");
   const challengeId = (purpose: string, phone: string, userId?: Types.ObjectId) => hash(`${purpose}:${userId ?? ""}:${phone}`);
   const unavailable = () => { if (!options.mockOTP && !options.transport) throw new IdentityError(503, "OTP_DELIVERY_UNAVAILABLE", "OTP delivery is not configured"); };
@@ -109,7 +107,7 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
       return { expiresInSeconds: ttlSeconds, channel, ...(options.mockOTP && { mockOTP: true }) };
     } catch (error) { await challenges.deleteOne({ _id: id, nonce }); throw error; }
   }
-  async function verify(input: { phone: string; otp: string; deviceInfo?: string | undefined }, requestId: string, token?: string) {
+  async function verify(input: { phone: string; otp: string; deviceInfo?: string | undefined }, token?: string) {
     unavailable();
     const customer = token !== undefined ? await activeCustomer(token) : undefined;
     const id = challengeId(customer ? "phone_change" : "login", input.phone, customer?._id);
@@ -132,8 +130,6 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
         await users.updateOne({ _id: user._id }, { $set: { phone: input.phone, updatedAt: new Date() }, $inc: { credentialRevision: 1 } }, { session });
         await challenges.deleteMany({ userId: user._id, _id: { $ne: id } }, { session });
         await sessions.revokeOtherSessions(user._id, token!, session);
-        const role = await access.getRole(String(user.roleId));
-        await audit({ actorId: String(user._id), actorRole: role?.name ?? "customer", action: "identity.phone_change", entityType: "user", entityId: String(user._id), requestId }, session);
         return { user: await readProfile(connection, user._id, options.mockOTP, session), isNewUser: false };
       }
       const roleRow = await connection.collection("roles").findOne({ name: challenge.app === "admin" ? "super_admin" : challenge.app }, { session });
@@ -149,7 +145,6 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
         ? options.mockOTP && user.kind === "staff" && user.devMockAccount && input.phone === "+919000000001" : user.kind === challenge.app);
       if (!user || !allowed) return { error: new IdentityError(403, "FORBIDDEN", "Account unavailable") } satisfies Failure;
       await users.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } }, { session });
-      await audit({ actorId: String(user._id), actorRole: role.name, action: "identity.login", entityType: "user", entityId: String(user._id), requestId }, session);
       return { user: await readProfile(connection, user._id, options.mockOTP, session), pair: await sessions.issue(user._id, session, input.deviceInfo), isNewUser };
     });
     if ("error" in result) throw result.error;
@@ -158,8 +153,8 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
   return {
     async initialize() { await challenges.createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 }); await limits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }); await sessions.initialize(); },
     requestLogin: (input: { phone: string; app: Challenge["app"]; channel: "sms" | "whatsapp" }, ip: string) => request(input, ip),
-    verifyLogin: (input: { phone: string; otp: string; deviceInfo?: string | undefined }, requestId: string) => verify(input, requestId),
+    verifyLogin: (input: { phone: string; otp: string; deviceInfo?: string | undefined }) => verify(input),
     async requestPhone(token: string, phone: string, ip: string) { const user = await activeCustomer(token); return request({ phone, app: "customer", channel: "whatsapp" }, ip, user); },
-    verifyPhone: (token: string, input: { phone: string; otp: string }, requestId: string) => verify(input, requestId, token),
+    verifyPhone: (token: string, input: { phone: string; otp: string }) => verify(input, token),
   };
 }

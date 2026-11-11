@@ -59,7 +59,6 @@ beforeEach(async () => {
   await db.collection("cities").deleteMany({});
   await db.collection("zones").deleteMany({});
   await db.collection("geography_versions").deleteMany({});
-  await db.collection("audit_log").deleteMany({});
 
   // Seed two test cities
   const c1 = await geoModule.cityService.createCity(
@@ -77,7 +76,7 @@ beforeEach(async () => {
 });
 
 describe("F03-04: Zone create, list, and detail with serialized overlap check", () => {
-  it("creates a zone with valid polygon and returns safe DTO with audit log", async () => {
+  it("creates a zone with valid polygon and returns safe DTO", async () => {
     const res = await request(app)
       .post("/api/v1/admin/zones")
       .set(adminHeaders)
@@ -98,21 +97,6 @@ describe("F03-04: Zone create, list, and detail with serialized overlap check", 
     expect(res.body.data.id).toMatch(/^[a-fA-F0-9]{24}$/);
     expect(res.body.data.polygon).toEqual(SYNTHETIC_POLYGONS.zoneA);
 
-    // Verify audit log write
-    const audit = await db.collection("audit_log").findOne({
-      entityType: "zone",
-      action: "zone.create",
-      entityId: res.body.data.id,
-    });
-    expect(audit).not.toBeNull();
-    expect(audit?.zoneChange?.before).toBeNull();
-    expect(audit?.zoneChange?.after).toMatchObject({
-      id: res.body.data.id,
-      cityId: city1Id,
-      name: "Mall Road & Chowrasta",
-      isEnabled: true,
-      pause: null,
-    });
   });
 
   it("lists all zones and filters by cityId", async () => {
@@ -460,37 +444,8 @@ describe("F03-04: Zone create, list, and detail with serialized overlap check", 
     expect(noCsrf.status).toBe(403);
   });
 
-  it("rolls back zone creation when audit write fails", async () => {
-    try {
-      await db.createCollection("audit_log");
-    } catch {}
-    await db.db!.command({
-      collMod: "audit_log",
-      validator: { required_audit_test_field: { $exists: true } },
-      validationLevel: "strict",
-    });
-
-    try {
-      const response = await request(app)
-        .post("/api/v1/admin/zones")
-        .set(adminHeaders)
-        .send({
-          cityId: city1Id,
-          name: "Rollback Zone",
-          polygon: SYNTHETIC_POLYGONS.zoneA,
-        });
-
-      expect(response.status).toBe(500);
-      expect(
-        await db.collection("zones").countDocuments({ name: "Rollback Zone" })
-      ).toBe(0);
-    } finally {
-      await db.db!.command({ collMod: "audit_log", validator: {} });
-    }
-  });
-
   describe("F03-05: Zone edit, re-enable and pause", () => {
-    it("updates zone name and polygon with audit record", async () => {
+    it("updates zone name and polygon", async () => {
       const created = await request(app)
         .post("/api/v1/admin/zones")
         .set(adminHeaders)
@@ -520,20 +475,6 @@ describe("F03-04: Zone create, list, and detail with serialized overlap check", 
       });
 
       // Audit check
-      const audit = await db.collection("audit_log").findOne({
-        entityType: "zone",
-        action: "zone.update",
-        entityId: zoneId,
-      });
-      expect(audit).not.toBeNull();
-      expect(audit?.zoneChange?.before).toMatchObject({
-        id: zoneId,
-        name: "Original Name",
-      });
-      expect(audit?.zoneChange?.after).toMatchObject({
-        id: zoneId,
-        name: "Updated Name",
-      });
     });
 
     it("PUT /admin/zones/:id returns 404 for unknown or malformed ID", async () => {
@@ -745,7 +686,7 @@ describe("F03-04: Zone create, list, and detail with serialized overlap check", 
           pause: {
             active: true,
             message: "Landslide on Hill Cart Road",
-            until: "2026-11-10T14:00:00.000Z",
+            until: "2036-11-10T14:00:00.000Z",
           },
         });
       expect(forbiddenPause.status).toBe(403);
@@ -760,7 +701,7 @@ describe("F03-04: Zone create, list, and detail with serialized overlap check", 
           pause: {
             active: true,
             message: "Landslide on Hill Cart Road",
-            until: "2026-11-10T14:00:00.000Z",
+            until: "2036-11-10T14:00:00.000Z",
           },
         });
 
@@ -768,7 +709,7 @@ describe("F03-04: Zone create, list, and detail with serialized overlap check", 
       expect(pauseSuccess.body.data.pause).toMatchObject({
         active: true,
         message: "Landslide on Hill Cart Road",
-        until: "2026-11-10T14:00:00.000Z",
+        until: "2036-11-10T14:00:00.000Z",
       });
 
       // Clear pause with null
@@ -823,41 +764,6 @@ describe("F03-04: Zone create, list, and detail with serialized overlap check", 
         .set(adminHeaders);
       const item = list.body.data.find((z: { id: string }) => z.id === zoneId);
       expect(item.pause.active).toBe(false);
-    });
-
-    it("rolls back zone update when audit write fails", async () => {
-      const created = await request(app)
-        .post("/api/v1/admin/zones")
-        .set(adminHeaders)
-        .send({
-          cityId: city1Id,
-          name: "Rollback Update Zone",
-          polygon: SYNTHETIC_POLYGONS.zoneA,
-        });
-      const zoneId = created.body.data.id;
-
-      await db.db!.command({
-        collMod: "audit_log",
-        validator: { required_audit_test_field: { $exists: true } },
-        validationLevel: "strict",
-      });
-
-      try {
-        const updateRes = await request(app)
-          .put(`/api/v1/admin/zones/${zoneId}`)
-          .set(adminHeaders)
-          .send({ name: "Failed Rename" });
-
-        expect(updateRes.status).toBe(500);
-
-        // Verification: name was not changed in DB
-        const zoneInDb = await db
-          .collection("zones")
-          .findOne({ _id: new mongoose.Types.ObjectId(zoneId) });
-        expect(zoneInDb?.name).toBe("Rollback Update Zone");
-      } finally {
-        await db.db!.command({ collMod: "audit_log", validator: {} });
-      }
     });
   });
 });

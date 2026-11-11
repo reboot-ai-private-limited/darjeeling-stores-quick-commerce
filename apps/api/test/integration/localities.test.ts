@@ -60,7 +60,6 @@ beforeEach(async () => {
   await db.collection("cities").deleteMany({});
   await db.collection("zones").deleteMany({});
   await db.collection("localities").deleteMany({});
-  await db.collection("audit_log").deleteMany({});
 
   // Seed two cities
   const c1 = await geoModule.cityService.createCity(
@@ -249,7 +248,7 @@ describe("F03-06: Locality administration and public picker", () => {
     });
   });
 
-  it("POST /admin/localities creates a locality and writes audit event", async () => {
+  it("POST /admin/localities creates a locality", async () => {
     const res = await request(app)
       .post("/api/v1/admin/localities")
       .set(adminHeaders)
@@ -274,19 +273,6 @@ describe("F03-06: Locality administration and public picker", () => {
     });
     expect(res.body.data.id).toMatch(/^[a-fA-F0-9]{24}$/);
 
-    const audit = await db.collection("audit_log").findOne({
-      entityType: "locality",
-      action: "locality.create",
-      entityId: res.body.data.id,
-    });
-    expect(audit).not.toBeNull();
-    expect(audit?.localityChange?.before).toBeNull();
-    expect(audit?.localityChange?.after).toMatchObject({
-      id: res.body.data.id,
-      name: "Chowrasta",
-      zoneId: zone1City1Id,
-      travelMinutes: 8,
-    });
   });
 
   it("POST /admin/localities rejects missing references and cross-city zone mismatch", async () => {
@@ -470,21 +456,6 @@ describe("F03-06: Locality administration and public picker", () => {
     expect(cleared.body.data.zoneId).toBeNull();
     expect(cleared.body.data.travelMinutes).toBeNull();
 
-    // Verify audit log
-    const audit = await db.collection("audit_log").findOne(
-      {
-        entityType: "locality",
-        action: "locality.update",
-        entityId: locId,
-      },
-      { sort: { _id: -1 } }
-    );
-    expect(audit).not.toBeNull();
-    expect(audit?.localityChange?.after).toMatchObject({
-      id: locId,
-      zoneId: null,
-      travelMinutes: null,
-    });
   });
 
   it("PUT /admin/localities/:id preserves cross-city integrity when moving city", async () => {
@@ -597,34 +568,5 @@ describe("F03-06: Locality administration and public picker", () => {
       })
       .send({ cityId: city1Id, name: "L", location: { lat: 27.04, lng: 88.26 } });
     expect(noCsrf.status).toBe(403);
-  });
-
-  it("rolls back locality creation when audit write fails", async () => {
-    try {
-      await db.createCollection("audit_log");
-    } catch {}
-    await db.db!.command({
-      collMod: "audit_log",
-      validator: { required_audit_test_field: { $exists: true } },
-      validationLevel: "strict",
-    });
-
-    try {
-      const response = await request(app)
-        .post("/api/v1/admin/localities")
-        .set(adminHeaders)
-        .send({
-          cityId: city1Id,
-          name: "Rollback Locality",
-          location: { lat: 27.04, lng: 88.26 },
-        });
-
-      expect(response.status).toBe(500);
-      expect(
-        await db.collection("localities").countDocuments({ name: "Rollback Locality" })
-      ).toBe(0);
-    } finally {
-      await db.db!.command({ collMod: "audit_log", validator: {} });
-    }
   });
 });

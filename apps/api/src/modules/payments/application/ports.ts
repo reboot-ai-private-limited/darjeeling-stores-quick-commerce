@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Payment, PaymentEvent, ProviderCapture, Reconciliation } from "../domain/payment.js";
 
 export class DuplicateEventError extends Error {}
@@ -11,9 +10,9 @@ export interface PaymentStore {
   byLink(linkId: string): Promise<Payment | null>;
   forGroup(groupId: string): Promise<Payment[]>;
   list(filter: { status?: string; method?: string; groupIds?: readonly string[]; from?: Date; to?: Date }, limit: number, beforeId?: string): Promise<Payment[]>;
-  update(id: string, patch: Partial<Payment>, audit?: AuditEvent): Promise<void>;
+  update(id: string, patch: Partial<Payment>): Promise<void>;
   /** Marks a payment captured once. False when it already was. */
-  capture(id: string, patch: Partial<Payment>, audit?: AuditEvent): Promise<boolean>;
+  capture(id: string, patch: Partial<Payment>): Promise<boolean>;
   /** Records a provider event once. Throws DuplicateEventError if it was seen before. */
   recordEvent(event: PaymentEvent): Promise<void>;
   setEventResult(eventId: string, result: string): Promise<void>;

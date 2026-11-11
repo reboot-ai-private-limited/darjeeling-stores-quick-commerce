@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Group, ScopeRef, ScopeType } from "../domain/registry.js";
 
 export interface HistoryRow { group: string; key: string; scope: ScopeRef; oldValue: unknown; newValue: unknown; by: string; at: Date }
@@ -13,14 +12,13 @@ export interface StoredSetting { key: string; scope: ScopeType; value: unknown; 
 export interface SettingChange { key: string; value: unknown }
 export interface ApplyInput {
   group: Group; scope: ScopeRef; changes: readonly SettingChange[]; by: string; at: Date;
-  audit(change: { key: string; before: unknown; after: unknown }): AuditEvent;
 }
 
 export interface SettingsStore {
   ensureIndexes(): Promise<void>;
   /** The stored overrides of a group at each scope in the chain. */
   layers(group: Group, chain: readonly ScopeRef[]): Promise<StoredSetting[]>;
-  /** Applies every change with its history row and audit event in one transaction. */
+  /** Applies every change with its history row in one transaction. */
   apply(input: ApplyInput): Promise<void>;
   history(query: HistoryQuery): Promise<{ rows: HistoryRow[]; nextCursor: string | null }>;
   /** The zone of a warehouse, or null when the warehouse does not exist. */

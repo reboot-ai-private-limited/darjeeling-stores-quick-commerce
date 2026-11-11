@@ -77,7 +77,6 @@ export interface OfferingsTx extends OfferingsReads {
   getReservation(key: string): Promise<Reservation | null>;
   insertReservation(reservation: Reservation): Promise<void>;
   saveReservation(reservation: Reservation): Promise<void>;
-  audit(ctx: Ctx, entry: { action: string; entityType: string; entityId: string; warehouseId?: string }): Promise<void>;
 }
 
 export class DuplicateRestoreError extends Error { constructor() { super("This restore was already applied"); this.name = "DuplicateRestoreError"; } }

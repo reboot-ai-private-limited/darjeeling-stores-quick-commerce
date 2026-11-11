@@ -1,5 +1,4 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import type { TipFilter, TipRow, TipStore, TipTotals } from "../application/ports.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,7 +10,6 @@ const TIP_OF_ORDER = { $sum: { $map: { input: { $filter: { input: "$o.allocatedC
  * the orders. The only thing stored here is which tips the owner has already paid out: one `rider_tip_payments` row per order.
  */
 export function createMongoTipStore(connection: Connection): TipStore {
-  const writeAudit = createAuditWriter(connection);
   const payments = () => connection.collection("rider_tip_payments");
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
@@ -56,7 +54,7 @@ export function createMongoTipStore(connection: Connection): TipStore {
       return grouped.map(g => ({ riderId: String(g._id), riderName: names.get(String(g._id)) ?? "", ...toTotals(g) }));
     },
 
-    async pay({ riderId, orderIds, before, warehouseIds, by, note, at, audit }) {
+    async pay({ riderId, orderIds, before, warehouseIds, by, note, at }) {
       return inTransaction(async session => {
         const wide = { start: new Date(0), end: new Date(8_640_000_000_000_000), riderId, warehouseIds };
         const owed = (await aggregate(rows(wide, [{ $match: { paid: false } }]), session))
@@ -64,7 +62,6 @@ export function createMongoTipStore(connection: Connection): TipStore {
         if (owed.length === 0) return { count: 0, amount: 0 };
         const amount = owed.reduce((sum, d) => sum + (d.tip as number), 0);
         await payments().insertMany(owed.map(d => ({ _id: String(d.orderId) as never, riderId, amount: d.tip, warehouseId: String(d.o.warehouseId), paidAt: at, paidBy: by, note })), { session });
-        await writeAudit(audit({ count: owed.length, amount }), session);
         return { count: owed.length, amount };
       });
     },

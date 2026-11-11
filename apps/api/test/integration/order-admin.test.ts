@@ -208,7 +208,6 @@ describe("items missing at packing", () => {
     expect((await f.get(`/order-groups/${o.group.id}`, A)).body.data.pricing.total).toBe(5800);
     await f.runJobs();
     expect(f.msg.pushed.some(p => p.title === "An item is unavailable")).toBe(false);
-    expect(await col("audit_log").countDocuments({ action: "orders.item_unavailable" })).toBe(1);
     expect((await adminOrder(o.id)).timeline.map((t: { type: string }) => t.type)).toContain("item_unavailable");
   });
 
@@ -269,7 +268,7 @@ describe("items missing at packing", () => {
 });
 
 describe("cancelling", () => {
-  it("cancels before pickup: stock back, customer told, event and audit written", async () => {
+  it("cancels before pickup: stock back, customer told, event written", async () => {
     const o = await order(s => [line(s.tomato.id, s.tomato.v500, 2)]);
     expect(await stockGrams()).toBe(19_000);
     const res = await post(`/admin/orders/${o.id}/cancel`, { reason: "Customer called to cancel" });
@@ -277,7 +276,6 @@ describe("cancelling", () => {
     expect(res.body.data.status).toBe("CANCELLED");
     expect(await stockGrams()).toBe(20_000);
     expect((await col("orders").findOne({ _id: o.id as never }))).toMatchObject({ cancel: { role: expect.any(String), reason: "Customer called to cancel" }, stamps: { cancelledAt: expect.any(Date) } });
-    expect(await col("audit_log").countDocuments({ action: "orders.cancel" })).toBe(1);
     await f.runJobs();
     expect(f.msg.pushed.some(p => p.title === "Order cancelled")).toBe(false);
     expect((await f.get(`/order-groups/${o.group.id}`, A)).body.data.status).toBe("CANCELLED");
@@ -332,13 +330,12 @@ describe("cancelling", () => {
 });
 
 describe("admin overrides and notes", () => {
-  it("forces a status with a reason, and audits it", async () => {
+  it("forces a status with a reason", async () => {
     const o = await order(s => [line(s.tomato.id, s.tomato.v500, 1)]);
     const res = await post(`/admin/orders/${o.id}/force-status`, { to: "READY", reason: "Order was packed but not marked" });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.data.status).toBe("READY");
     expect(res.body.data.timeline.at(-1)).toMatchObject({ type: "status_change", from: "CONFIRMED", to: "READY", meta: { reason: "Order was packed but not marked", forced: true } });
-    expect(await col("audit_log").countDocuments({ action: "orders.force_status" })).toBe(1);
     expect((await post(`/admin/orders/${o.id}/force-status`, { to: "READY" })).status).toBe(400);
     expect((await post(`/admin/orders/${o.id}/force-status`, { to: "FLYING", reason: "x" })).status).toBe(400);
     expect((await post(`/admin/orders/${o.id}/force-status`, { to: "PACKING", reason: "x" }, viewer)).status).toBe(403);

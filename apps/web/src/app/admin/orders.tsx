@@ -140,7 +140,7 @@ function OrderDetail({ id, canManage, onClose, onChanged }: { id: string; canMan
         {panel === "force" && (
           <form onSubmit={(e: FormEvent) => { e.preventDefault(); void run("Status changed", () => post("force-status", { to: forceTo, reason }), () => { setPanel(""); setReason(""); }); }} style={{ display: "grid", gap: 8, padding: 12, border: "1px solid var(--admin-border)", borderRadius: 8 }}>
             <strong>Fix the status</strong>
-            <span style={{ color: "var(--admin-muted)" }}>Use only when the real situation and the order disagree (for example it was packed but not marked). This is recorded in the audit log.</span>
+            <span style={{ color: "var(--admin-muted)" }}>Use only when the real situation and the order disagree (for example it was packed but not marked). It is noted on the order's timeline.</span>
             <Field label="Set status to"><select value={forceTo} onChange={e => setForceTo(e.target.value as Status)} style={inputStyle}>{STATUSES.map(s => <option key={s} value={s}>{LABEL[s]}</option>)}</select></Field>
             <Field label="Why"><input value={reason} onChange={e => setReason(e.target.value)} maxLength={200} required style={inputStyle} /></Field>
             <button className="admin-role-button" disabled={busy || !reason.trim()} style={{ justifySelf: "start" }}>Change status</button>

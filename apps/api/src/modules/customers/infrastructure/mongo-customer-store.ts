@@ -1,5 +1,4 @@
 import { Types, type ClientSession, type Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import type { CustomerDetail, CustomerRow, CustomerStore, Outcome } from "../application/ports.js";
 import { escapeRegex, NO_STATS, REQUIRED_STATUS, searchFilter, STATUSES, type Customer, type CustomerStats, type CustomerStatus } from "../domain/customer.js";
 
@@ -20,7 +19,6 @@ const toCustomer = (d: Doc): Customer => ({
 export function createMongoCustomerStore(connection: Connection): CustomerStore {
   const users = () => connection.collection("users");
   const orders = () => connection.collection("orders");
-  const writeAudit = createAuditWriter(connection);
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
     try { let result!: T; await session.withTransaction(async () => { result = await fn(session); }); return result; }
@@ -98,7 +96,7 @@ export function createMongoCustomerStore(connection: Connection): CustomerStore 
       return doc && typeof doc.name === "string" && doc.name ? doc.name : null;
     },
 
-    async edit({ id, codAllowed, note, at, audit }) {
+    async edit({ id, codAllowed, note, at }) {
       return inTransaction(async (session): Promise<Outcome<Customer>> => {
         const before = await load(id, session);
         if (!before) return { ok: false, reason: "not_found" };
@@ -106,12 +104,11 @@ export function createMongoCustomerStore(connection: Connection): CustomerStore 
         if (codAllowed !== undefined) set.codAllowed = codAllowed;
         await users().updateOne({ _id: oid(id) }, { $set: set, ...(note && { $push: { internalNotes: { text: note.text, by: note.by, at } } }) } as never, { session });
         const after = (await load(id, session))!;
-        await writeAudit(audit(before, after), session);
         return { ok: true, value: after };
       });
     },
 
-    async transition({ id, action, reason, by, at, audit }) {
+    async transition({ id, action, reason, by, at }) {
       return inTransaction(async (session): Promise<Outcome<Customer>> => {
         const before = await load(id, session);
         if (!before) return { ok: false, reason: "not_found" };
@@ -123,12 +120,11 @@ export function createMongoCustomerStore(connection: Connection): CustomerStore 
         const result = await users().updateOne({ _id: oid(id), kind: "customer", status: REQUIRED_STATUS[action] }, update, { session });
         if (result.matchedCount === 0) return { ok: false, reason: "wrong_status" };
         const after = (await load(id, session))!;
-        await writeAudit(audit(before, after), session);
         return { ok: true, value: after };
       });
     },
 
-    async finalise({ id, by, at, audit }) {
+    async finalise({ id, by, at }) {
       return inTransaction(async (session): Promise<Outcome<{ customer: Customer; addressIds: string[] }>> => {
         const doc = OBJECT_ID.test(id) ? await users().findOne({ _id: oid(id), kind: "customer" }, { session }) : null;
         if (!doc) return { ok: false, reason: "not_found" };
@@ -155,11 +151,9 @@ export function createMongoCustomerStore(connection: Connection): CustomerStore 
         await connection.collection("otps").deleteMany({ $or: [{ userId: doc._id }, ...(phone ? [{ phone }] : [])] }, { session });
         await connection.collection("stock_subscriptions").updateMany({ userId: id, status: "waiting" }, { $set: { status: "cancelled", cancelledAt: at, updatedAt: at } }, { session });
         const after = (await load(id, session))!;
-        await writeAudit(audit(before, after), session);
         return { ok: true, value: { customer: after, addressIds: addresses.map(a => String(a._id)) } };
       });
     },
 
-    async recordExport(event) { await inTransaction(async session => { await writeAudit(event, session); }); },
   };
 }

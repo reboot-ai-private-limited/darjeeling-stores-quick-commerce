@@ -81,7 +81,6 @@ beforeEach(async () => {
   await db.collection("cities").deleteMany({});
   await db.collection("zones").deleteMany({});
   await db.collection("warehouses").deleteMany({});
-  await db.collection("audit_log").deleteMany({});
 
   // Seed City 1
   const c1 = await geoModule.cityService.createCity(
@@ -154,18 +153,6 @@ describe("F03-09: Warehouse creation", () => {
     expect(res.body.data.id).toMatch(/^[a-fA-F0-9]{24}$/);
 
     // Audit write check
-    const audit = await db.collection("audit_log").findOne({
-      entityType: "warehouse",
-      action: "warehouse.create",
-      entityId: res.body.data.id,
-    });
-    expect(audit).not.toBeNull();
-    expect(audit?.warehouseId).toBe(res.body.data.id);
-    expect(audit?.warehouseChange?.before).toBeNull();
-    expect(audit?.warehouseChange?.after).toMatchObject({
-      id: res.body.data.id,
-      code: "SEC-2",
-    });
   });
 
   it("enforces authority: requires warehouses:manage with all: true scope", async () => {
@@ -323,39 +310,10 @@ describe("F03-09: Warehouse creation", () => {
       ).status
     ).toBe(400);
   });
-
-  it("rolls back warehouse creation when audit write fails", async () => {
-    try {
-      await db.createCollection("audit_log");
-    } catch {}
-    await db.db!.command({
-      collMod: "audit_log",
-      validator: { required_audit_test_field: { $exists: true } },
-      validationLevel: "strict",
-    });
-
-    try {
-      const response = await request(app)
-        .post("/api/v1/admin/warehouses")
-        .set(adminHeaders)
-        .send({
-          zoneId: zone1Id,
-          name: "Rollback Store",
-          code: "ROLL-1",
-          location: { lat: 27.04, lng: 88.26 },
-          address: "Rollback Address",
-        });
-
-      expect(response.status).toBe(500);
-      expect(await db.collection("warehouses").countDocuments({ code: "ROLL-1" })).toBe(0);
-    } finally {
-      await db.db!.command({ collMod: "audit_log", validator: {} });
-    }
-  });
 });
 
 describe("F03-10: Warehouse edits and guarded disable", () => {
-  it("updates mutable fields and writes audit record", async () => {
+  it("updates mutable fields", async () => {
     const res = await request(app)
       .put(`/api/v1/admin/warehouses/${wh1Id}`)
       .set(adminHeaders)
@@ -376,21 +334,6 @@ describe("F03-10: Warehouse edits and guarded disable", () => {
       code: "INIT-1", // immutable
     });
 
-    // Check audit
-    const audit = await db.collection("audit_log").findOne(
-      {
-        entityType: "warehouse",
-        action: "warehouse.update",
-        entityId: wh1Id,
-      },
-      { sort: { _id: -1 } }
-    );
-    expect(audit).not.toBeNull();
-    expect(audit?.warehouseChange?.after).toMatchObject({
-      id: wh1Id,
-      name: "Renamed Store",
-      priority: 3,
-    });
   });
 
   it("rejects updating immutable fields (code, zoneId)", async () => {
@@ -441,7 +384,7 @@ describe("F03-10: Warehouse edits and guarded disable", () => {
         pause: {
           active: true,
           message: "Inventory count",
-          until: "2026-11-10T14:00:00.000Z",
+          until: "2036-11-10T14:00:00.000Z",
         },
       });
     expect(noOps.status).toBe(403);
@@ -456,7 +399,7 @@ describe("F03-10: Warehouse edits and guarded disable", () => {
         pause: {
           active: true,
           message: "Inventory count",
-          until: "2026-11-10T14:00:00.000Z",
+          until: "2036-11-10T14:00:00.000Z",
         },
       });
     expect(withOps.status).toBe(200);
@@ -525,31 +468,5 @@ describe("F03-10: Warehouse edits and guarded disable", () => {
       .collection("warehouses")
       .findOne({ _id: new mongoose.Types.ObjectId(wh1Id) });
     expect(whInDb?.isEnabled).toBe(false);
-  });
-
-  it("rolls back warehouse update when audit write fails", async () => {
-    dependencyCheckResult = { safe: true, activeOrders: 0 };
-
-    await db.db!.command({
-      collMod: "audit_log",
-      validator: { required_audit_test_field: { $exists: true } },
-      validationLevel: "strict",
-    });
-
-    try {
-      const response = await request(app)
-        .put(`/api/v1/admin/warehouses/${wh1Id}`)
-        .set(adminHeaders)
-        .send({ name: "Failed Rename Store" });
-
-      expect(response.status).toBe(500);
-
-      const whInDb = await db
-        .collection("warehouses")
-        .findOne({ _id: new mongoose.Types.ObjectId(wh1Id) });
-      expect(whInDb?.name).not.toBe("Failed Rename Store");
-    } finally {
-      await db.db!.command({ collMod: "audit_log", validator: {} });
-    }
   });
 });

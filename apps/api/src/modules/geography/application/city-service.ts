@@ -9,7 +9,7 @@ import {
   validateCityInput,
 } from "../domain/city.js";
 import { conflict, forbidden, notFound, validationError } from "../domain/errors.js";
-import type { CityStore, GeographyActor, LockActorFn, WriteAuditFn } from "./ports.js";
+import type { CityStore, GeographyActor, LockActorFn } from "./ports.js";
 
 export interface CreateCityInput {
   name: string;
@@ -24,7 +24,6 @@ export interface UpdateCityInput {
 
 export interface CityServiceDependencies {
   store: CityStore;
-  writeAudit: WriteAuditFn;
   withTransaction: <T>(fn: (session: ClientSession) => Promise<T>) => Promise<T>;
   newId: () => string;
   lockActor?: LockActorFn | undefined;
@@ -89,22 +88,6 @@ export function createCityService(deps: CityServiceDependencies) {
         const created = await deps.store.create(cityRecord, session);
         const dto = toCityDTO(created);
 
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "city.create",
-            entityType: "city",
-            entityId: id,
-            requestId,
-            cityChange: {
-              before: null,
-              after: dto,
-            },
-          },
-          session
-        );
-
         return dto;
       });
     },
@@ -168,22 +151,6 @@ export function createCityService(deps: CityServiceDependencies) {
 
         const beforeDTO = toCityDTO(current);
         const afterDTO = toCityDTO(updated);
-
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "city.update",
-            entityType: "city",
-            entityId: id,
-            requestId,
-            cityChange: {
-              before: beforeDTO,
-              after: afterDTO,
-            },
-          },
-          session
-        );
 
         return afterDTO;
       });

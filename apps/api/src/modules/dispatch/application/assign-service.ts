@@ -5,7 +5,7 @@ import {
   assignmentView, batchLimit, batchView, buildStops, ineligibleReasons, rankCandidates, type Assignment, type Batch, type IneligibleReason,
 } from "../domain/dispatch.js";
 import type { BatchService } from "./batch-service.js";
-import { auditFor, orderActorOf, type Decider, type DispatchDeps } from "./context.js";
+import { orderActorOf, type Decider, type DispatchDeps } from "./context.js";
 import { eligibilityError, invalidTransition, transitionError } from "./errors.js";
 
 export type GroupDispatch =
@@ -31,10 +31,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
     const rider = await riders.get(riderId);
     if (!rider) throw notFound("Rider");
     return rider;
-  }
-  async function audit(who: Decider, action: string, order: DeliveryOrder) {
-    const entry = auditFor(who, action, "order", order.id, order.warehouseId);
-    if (entry) await store.recordAudit(entry);
   }
 
   /** Ends a live assignment and gives the rider the capacity back. False if someone else already ended it. */
@@ -146,7 +142,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const batch = input.batchId ? await store.getBatch(input.batchId) : null;
       if (input.batchId && !batch) throw notFound("Batch");
       const done = await assignOrder(order, rider, { who: { kind: "admin", ctx }, mode: "manual", batch });
-      await audit({ kind: "admin", ctx }, "dispatch.assign", order);
       return { assignment: assignmentView(done.assignment), order: { id: order.id, status: done.order.status } };
     },
 
@@ -157,7 +152,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const moved = await orders.transition(orderId, "READY", { kind: "admin", id: ctx.actor.userId }, { reason });
       if (!moved.ok) throw transitionError(moved, "READY");
       if (live) await takeBack(live, reason ?? "unassigned", order);
-      await audit({ kind: "admin", ctx }, "dispatch.unassign", order);
       return { order: { id: orderId, status: moved.order.status } };
     },
 
@@ -193,7 +187,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
         await store.insertBatch(batch);
         try { for (const child of children) done.push((await assignOrder(child, rider, { who, mode: "manual", batch })).assignment); }
         catch (error) { await undo(batch); throw error; }
-        await store.recordAudit({ ...auditFor(who, "dispatch.dispatch_group", "order_group", groupId)! });
         return { batch: batchView(batch), assignments: done.map(assignmentView) };
       }
 
@@ -204,7 +197,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       try {
         for (const child of children.filter(c => wanted.has(c.id))) done.push((await assignOrder(child, await riderFor(wanted.get(child.id)!), { who, mode: "manual", batch: null })).assignment);
       } catch (error) { await undo(null); throw error; }
-      await store.recordAudit({ ...auditFor(who, "dispatch.dispatch_group", "order_group", groupId)! });
       return { batch: null, assignments: done.map(assignmentView) };
     },
 
@@ -243,7 +235,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const from = await riders.get(old.riderId);
       if (from) await quietly(notifier.cancelled(from, { assignmentId: old.id, orderId, orderNo: order.orderNo }));
       await quietly(notifier.assigned(rider, { assignmentId: next.id, orderNo: order.orderNo, ackDeadlineAt: next.ackDeadlineAt }));
-      await audit({ kind: "admin", ctx }, "dispatch.reassign", order);
       return { assignment: assignmentView(next), order: { id: orderId, status: order.status } };
     },
 
@@ -283,7 +274,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const from = await riders.get(old.riderId);
       if (from) await quietly(notifier.cancelled(from, { assignmentId: old.id, orderId, orderNo: order.orderNo }));
       await quietly(notifier.handover(rider, { assignmentId: next.id, orderId, orderNo: order.orderNo, ackDeadlineAt: next.ackDeadlineAt }));
-      await audit({ kind: "admin", ctx }, "dispatch.handover", order);
       return { assignment: assignmentView(next), order: { id: orderId, status: order.status } };
     },
 
@@ -306,7 +296,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       }
       const at = now();
       for (const a of await store.failedForOrder(orderId)) await store.updateAssignment(a.id, { failedResolvedAt: at, updatedAt: at });
-      await audit({ kind: "admin", ctx }, "dispatch.resolve_failed", order);
       return { order: { id: orderId, status }, refund };
     },
 

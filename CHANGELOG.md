@@ -21,6 +21,11 @@ This section records the current working-tree foundation and documentation. It d
 - Customer app: browse, cart, coupons, checkout (cash or online), pre-orders, tracking, cancellation, refund requests and account screens.
 - Rider app connected to the real backend.
 
+### Removed
+
+- The audit log: no audit records are written, the `/admin/audit` search and its screen are gone, and the `audit:view` permission no longer exists. Old records stay in the `audit_log` collection until you delete them. Order, stock-price, setting and rider-shift histories that have their own screens are unaffected.
+- Staff two-factor authentication: staff sign in with email and password only, the authenticator setup and reset screens and endpoints are gone, and `STAFF_TOTP_KEY` is no longer used. Run `apps/api/.migrate-remove-audit-2fa.ts` once on an existing database to clean up leftover data.
+
 ### Limitations
 
 - The rider app and the customer app are built against the real backend but have not been tested on real devices or released. The customer app's notifications list is built from orders (no server inbox); online payment is untested with Razorpay keys.

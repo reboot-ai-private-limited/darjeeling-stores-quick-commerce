@@ -56,7 +56,6 @@ describe("warehouse hours", () => {
     const res = await setHours(W1, body);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.data).toEqual({ warehouseId: W1, ...body, preOrder: { enabled: false, slots: [], cutoffMinutesBeforeSlot: 60, packLeadMinutes: 45 } });
-    expect(await col("audit_log").countDocuments({ action: "hours.set_hours", entityId: W1 })).toBe(1);
     const again = await setHours(W1, { ...body, afterHoursMode: "closed" });
     expect(again.body.data.afterHoursMode).toBe("closed");
   });
@@ -116,7 +115,6 @@ describe("pausing orders", () => {
     expect(blocked.status).toBe(409);
     expect(blocked.body.error).toMatchObject({ code: "ZONE_PAUSED", details: { message: expect.any(String) } });
     expect((await f.get(`/store/status?zoneId=${ZONE1}`, A)).status).toBe(200);
-    expect(await col("audit_log").countDocuments({ action: "hours.pause" })).toBe(2);
   });
 
   it("pauses a whole zone and lets it resume", async () => {
@@ -127,7 +125,6 @@ describe("pausing orders", () => {
     expect((await resume({ scope: "zone", id: ZONE1 })).body).toEqual({ data: { ok: true } });
     expect((await quote()).status).toBe(201);
     expect((await resume({ scope: "zone", id: ZONE1 })).status).toBe(200);
-    expect(await col("audit_log").countDocuments({ action: "hours.resume" })).toBeGreaterThanOrEqual(1);
   });
 
   it("ends a timed pause on its own", async () => {

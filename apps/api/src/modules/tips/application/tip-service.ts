@@ -56,10 +56,6 @@ export function createTipService({ store, now }: TipsDeps) {
       const note = input.note ?? null;
       const result = await store.pay({
         riderId: input.riderId, orderIds: input.orderIds, before, warehouseIds: ctx.actor.scope.all ? null : ctx.actor.scope.warehouseIds, by: ctx.actor.userId, note, at: now(),
-        audit: ({ count, amount }) => ({
-          actorId: ctx.actor.userId, actorRole: ctx.actor.role, action: "tips.pay", entityType: "rider", entityId: input.riderId, requestId: ctx.requestId,
-          reason: `${note ? `${note}: ` : ""}paid ${count} tip${count === 1 ? "" : "s"} totalling ${amount} paise`.slice(0, 500),
-        }),
       });
       return { riderId: input.riderId, paidCount: result.count, paidAmount: result.amount };
     },

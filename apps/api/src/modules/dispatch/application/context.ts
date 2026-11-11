@@ -14,12 +14,6 @@ export type Decider = { kind: "admin"; ctx: Ctx } | { kind: "system" };
 
 export const orderActorOf = (who: Decider): OrderActor => (who.kind === "admin" ? { kind: "admin", id: who.ctx.actor.userId } : { kind: "system", id: "dispatch" });
 
-export function auditFor(who: Decider, action: string, entityType: string, entityId: string, warehouseId?: string) {
-  return who.kind === "admin"
-    ? { actorId: who.ctx.actor.userId, actorRole: who.ctx.actor.role, requestId: who.ctx.requestId, action, entityType, entityId, ...(warehouseId && { warehouseId }) }
-    : null;
-}
-
 /** The part of an order a rider needs on a list. */
 export async function orderSummary(deps: DispatchDeps, order: DeliveryOrder) {
   const warehouse = await deps.geography.warehouse(order.warehouseId);

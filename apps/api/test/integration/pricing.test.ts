@@ -16,12 +16,11 @@ const DAY = "2026-11-05T14:30:00+05:30";
 const LATE = "2026-11-05T23:00:00+05:30";
 
 describe("delivery fee rules", () => {
-  it("creates a rule, shows it, and audits the change", async () => {
+  it("creates a rule and shows it", async () => {
     const res = await rule(feeBody());
     expect(res.status, JSON.stringify(res.body)).toBe(201);
     expect(res.body.data).toEqual({ id: expect.stringMatching(/^[a-f0-9]{24}$/), type: "delivery_fee", zoneIds: [ZONE1], isActive: true, alwaysFree: false, minOrder: 10000, feeBasis: "afterDiscount", tiers: TIERS });
     expect((await f.get(`/admin/delivery-rules/${res.body.data.id}`)).body.data).toEqual(res.body.data);
-    expect(await col("audit_log").countDocuments({ action: "pricing.rule_create" })).toBe(1);
   });
 
   it("refuses tiers with a gap, a wrong start or no open end, and a rule with no zone or an unknown one", async () => {
@@ -215,7 +214,6 @@ describe("coupons", () => {
       firstOrderOnly: true, zoneIds: [ZONE1], warehouseIds: [], startsAt: "2026-11-01T00:00:00.000Z", endsAt: "2026-12-01T00:00:00.000Z", isActive: true, description: null,
     });
     expect((await f.get(`/admin/coupons/${res.body.data.id}`)).body.data).toEqual(res.body.data);
-    expect(await col("audit_log").countDocuments({ action: "pricing.coupon_create" })).toBe(1);
   });
 
   it("refuses a duplicate code and invalid values", async () => {

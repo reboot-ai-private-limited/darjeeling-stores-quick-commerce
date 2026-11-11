@@ -1,6 +1,5 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
-import { DuplicateRiderError, type AuditEntry, type RiderStore } from "../application/ports.js";
+import { DuplicateRiderError, type RiderStore } from "../application/ports.js";
 import type { Rider, RiderStatus, Shift } from "../domain/rider.js";
 
 // Ids are 24-character hex strings stored as strings, like the other Dev 2 modules. The last position is a GeoJSON point.
@@ -18,10 +17,9 @@ function patchDoc(patch: Partial<Rider>): Record<string, unknown> {
 }
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export function createMongoRiderStore(connection: Connection): RiderStore & { recordAudit(entry: AuditEntry): Promise<void> } {
+export function createMongoRiderStore(connection: Connection): RiderStore {
   const riders = () => connection.collection<RiderDoc>("riders");
   const shifts = () => connection.collection<ShiftDoc>("rider_shifts");
-  const writeAudit = createAuditWriter(connection);
 
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
@@ -42,8 +40,8 @@ export function createMongoRiderStore(connection: Connection): RiderStore & { re
       await shifts().createIndex({ warehouseId: 1, startedAt: -1 });
     },
 
-    async insert(rider, audit) {
-      try { await inTransaction(async session => { await riders().insertOne(toRiderDoc(rider), { session }); await writeAudit(audit, session); }); }
+    async insert(rider) {
+      try { await riders().insertOne(toRiderDoc(rider)); }
       catch (error) {
         const e = error as { code?: number; keyPattern?: Record<string, unknown> } | null;
         if (e?.code === 11000) throw new DuplicateRiderError(e.keyPattern && "userId" in e.keyPattern ? "userId" : "phone");
@@ -67,14 +65,9 @@ export function createMongoRiderStore(connection: Connection): RiderStore & { re
     },
     async listActive() { return (await riders().find({ isActive: true }).toArray()).map(toRider); },
 
-    async update(id, patch, when, audit) {
+    async update(id, patch, when) {
       const filter = { _id: id, ...(when?.currentShiftId !== undefined && { currentShiftId: when.currentShiftId }), ...(when?.isActive !== undefined && { isActive: when.isActive }) };
-      if (!audit) return (await riders().updateOne(filter, { $set: patchDoc(patch) })).matchedCount === 1;
-      return inTransaction(async session => {
-        const done = await riders().updateOne(filter, { $set: patchDoc(patch) }, { session });
-        if (done.matchedCount === 1) await writeAudit(audit, session);
-        return done.matchedCount === 1;
-      });
+      return (await riders().updateOne(filter, { $set: patchDoc(patch) })).matchedCount === 1;
     },
 
     async claimShift(riderId, shiftId, patch) {
@@ -113,6 +106,5 @@ export function createMongoRiderStore(connection: Connection): RiderStore & { re
       return stale.map(toRider);
     },
 
-    async recordAudit(entry) { await inTransaction(session => writeAudit(entry, session)); },
   };
 }

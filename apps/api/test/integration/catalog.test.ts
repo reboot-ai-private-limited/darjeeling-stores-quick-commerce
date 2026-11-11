@@ -109,7 +109,7 @@ describe("categories", () => {
     expect((await send("post", "/admin/categories/reorder", { parentId: null, orderedIds: [a.id, b.id] })).status).toBe(400);
     expect((await send("post", "/admin/categories/reorder", { parentId: null, orderedIds: [a.id, a.id, b.id] })).status).toBe(400);
   });
-  it("deletes only an empty category and records an audit entry", async () => {
+  it("deletes only an empty category", async () => {
     const veg = await category("Vegetables");
     await category("Roots", { parentId: veg.id });
     const withChild = await send("delete", `/admin/categories/${veg.id}`);
@@ -120,7 +120,6 @@ describe("categories", () => {
     expect((await send("delete", `/admin/categories/${full.id}`)).body.error.details).toEqual({ reason: "has_products" });
     const empty = await category("Empty");
     expect((await send("delete", `/admin/categories/${empty.id}`)).status).toBe(200);
-    expect(await h.connection.collection("audit_log").countDocuments({ action: "catalog.category.delete", entityId: empty.id })).toBe(1);
   });
 });
 
@@ -181,10 +180,9 @@ describe("products", () => {
     expect(res.status).toBe(409);
     expect(res.body.error.details).toEqual({ reason: "has_offerings" });
   });
-  it("archives with an audit entry, restores to inactive and refuses a second restore", async () => {
+  it("archives, restores to inactive and refuses a second restore", async () => {
     const p = await product();
     expect((await send("post", `/admin/products/${p.id}/archive`)).body.data.status).toBe("archived");
-    expect(await h.connection.collection("audit_log").countDocuments({ action: "catalog.product.archive", entityId: p.id })).toBe(1);
     expect((await send("put", `/admin/products/${p.id}`, { status: "active" })).status).toBe(409);
     expect((await send("post", `/admin/products/${p.id}/restore`)).body.data.status).toBe("inactive");
     expect((await send("post", `/admin/products/${p.id}/restore`)).status).toBe(409);
@@ -199,7 +197,6 @@ describe("products", () => {
     expect((await send("delete", `/admin/products/${p.id}`)).status).toBe(200);
     expect((await get(`/admin/products/${p.id}`)).status).toBe(404);
     expect(media.remove).toHaveBeenCalledWith(MEDIA_A, "product_deleted");
-    expect(await h.connection.collection("audit_log").countDocuments({ action: "catalog.product.delete" })).toBe(1);
   });
 });
 
@@ -235,7 +232,7 @@ describe("variants", () => {
 });
 
 describe("images", () => {
-  it("attaches images with resolved URLs, reorders them and removes one with an audit entry", async () => {
+  it("attaches images with resolved URLs, reorders them and removes one", async () => {
     const p = await product();
     const first = await send("post", `/admin/products/${p.id}/images`, { mediaId: MEDIA_A, alt: "Tomatoes" });
     expect(first.status).toBe(201);
@@ -246,7 +243,6 @@ describe("images", () => {
     expect((await send("delete", `/admin/products/${p.id}/images/${MEDIA_B}`)).status).toBe(200);
     expect(media.remove).toHaveBeenCalledWith(MEDIA_B, "product_image_removed");
     expect((await get(`/admin/products/${p.id}`)).body.data.images).toEqual([expect.objectContaining({ mediaId: MEDIA_A, sortOrder: 0 })]);
-    expect(await h.connection.collection("audit_log").countDocuments({ action: "catalog.product.image_remove" })).toBe(1);
   });
   it("rejects unknown media, a repeated image, a bad order list and removing an image that is not attached", async () => {
     const p = await product();
@@ -267,14 +263,13 @@ describe("duplicate check and export", () => {
     expect(res.body.data.similar).toEqual([expect.objectContaining({ id: p.id, name: "Fresh Tomato (Local)" })]);
     expect((await send("post", "/admin/products/check-duplicate", { name: "Dragon fruit" })).body.data.similar).toEqual([]);
   });
-  it("exports CSV (with an audit entry) and needs the manage permission", async () => {
+  it("exports CSV and needs the manage permission", async () => {
     await product();
     const res = await get("/admin/catalog/export");
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/text\/csv/);
     expect(res.text.split("\n")[0]).toContain("productId,name,category");
     expect(res.text).toContain("TOM-250");
-    expect(await h.connection.collection("audit_log").countDocuments({ action: "catalog.export" })).toBe(1);
     expect((await get("/admin/catalog/export", { "X-Test-Actor": "viewer" })).status).toBe(403);
   });
 });

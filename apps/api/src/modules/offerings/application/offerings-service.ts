@@ -167,7 +167,6 @@ export function createOfferingsService(deps: OfferingsDeps) {
     for (const other of touched) await tx.replaceOffering(other);
     await tx.insertMovements(moves);
     await tx.insertPriceHistory(history);
-    await tx.audit(ctx, { action: "offering.update", entityType: "warehouse_product", entityId: next.id, warehouseId: next.warehouseId });
     await stockSideEffects(tx, await thresholds({ warehouseId: next.warehouseId }), product, before, next, out, { revAlreadyBumped: true });
     return next;
   }
@@ -249,7 +248,6 @@ export function createOfferingsService(deps: OfferingsDeps) {
         if (!pooled) for (const l of lines) if ((l.stock ?? 0) > 0) moves.push(movement(offering, product, l.variantId, l.stock!, l.stock!, "correction", "Initial stock", ctx, at));
         await tx.insertMovements(moves);
         await tx.insertPriceHistory(lines.map(l => ({ id: newId(), warehouseId: offering.warehouseId, productId: offering.productId, variantId: l.variantId, oldPrice: 0, newPrice: l.price, oldMrp: 0, newMrp: l.mrp, by: ctx.actor.userId, at })));
-        await tx.audit(ctx, { action: "offering.create", entityType: "warehouse_product", entityId: offering.id, warehouseId: offering.warehouseId });
         await stockSideEffects(tx, await thresholds({ warehouseId: offering.warehouseId }), product, withZeroStock(product, offering), offering, out, { revAlreadyBumped: true });
         return offering;
       });
@@ -334,7 +332,6 @@ export function createOfferingsService(deps: OfferingsDeps) {
         out.length = 0;
         const fresh = (await tx.getOffering(offering.id))!;
         const changed = await changeStock(ctx, fresh, product, input.variantId, current => current + input.delta, input.reason, input.note, out, tx, now());
-        await tx.audit(ctx, { action: "stock.adjust", entityType: "warehouse_product", entityId: offering.id, warehouseId: offering.warehouseId });
         return { ...changed, rev: (await tx.getOffering(offering.id))!.rev };
       });
       await publish(out);
@@ -353,7 +350,6 @@ export function createOfferingsService(deps: OfferingsDeps) {
             out.length = 0;
             const fresh = (await tx.getOffering(offering.id))!;
             const changed = await changeStock(ctx, fresh, product, entry.variantId, () => entry.counted, "count", "Stock-take", out, tx, now());
-            await tx.audit(ctx, { action: "stock.count", entityType: "warehouse_product", entityId: offering.id, warehouseId: offering.warehouseId });
             return changed;
           });
           await publish(out);

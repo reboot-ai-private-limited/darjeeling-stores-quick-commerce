@@ -16,7 +16,7 @@ export const staffListInput = z.object({
   cursor: staffId.optional(),
 }).strict();
 export type StaffScope = z.infer<typeof scope>;
-export type StaffOperation = "create" | "update" | "deactivate" | "reactivate" | "reset-password" | "reset-2fa" | "force-logout";
+export type StaffOperation = "create" | "update" | "deactivate" | "reactivate" | "reset-password" | "force-logout";
 export class StaffError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }

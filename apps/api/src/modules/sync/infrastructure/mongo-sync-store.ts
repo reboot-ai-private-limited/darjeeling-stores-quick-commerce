@@ -1,6 +1,5 @@
 import type { ClientSession, Connection } from "mongoose";
 import { Types } from "mongoose";
-import { createAuditWriter, type AuditEvent } from "../../audit/audit.public.js";
 import type { Review } from "../domain/sync.js";
 import type { EventClaim, EventOutcome, NewReview, SyncStore } from "../application/ports.js";
 
@@ -11,7 +10,6 @@ const toReview = ({ _id, ...rest }: ReviewDoc): Review => ({ id: _id, ...rest })
 export function createMongoSyncStore(connection: Connection): SyncStore {
   const events = () => connection.collection<EventDoc>("sync_events");
   const reviews = () => connection.collection<ReviewDoc>("offline_reviews");
-  const writeAudit = createAuditWriter(connection);
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
     try { let result!: T; await session.withTransaction(async () => { result = await fn(session); }); return result; }
@@ -61,6 +59,5 @@ export function createMongoSyncStore(connection: Connection): SyncStore {
       return done.modifiedCount === 1;
     },
     async reopenReview(orderId) { await reviews().updateOne({ orderId }, { $set: { status: "open", outcome: null, note: null, resolvedBy: null, resolvedAt: null } }); },
-    async recordAudit(entry: AuditEvent) { await inTransaction(session => writeAudit(entry, session)); },
   };
 }

@@ -27,7 +27,7 @@ export function createStaffRoutes(connection: Connection, jwtSecret: string, ori
         const schema = operation === "create" ? createStaffInput : operation === "update" ? updateStaffInput : operation === "reset-password" ? resetPasswordInput : emptyStaffInput;
         const parsed = schema.safeParse(req.body ?? {});
         if (!parsed.success) throw new StaffError(400, "VALIDATION_ERROR", "Invalid staff fields");
-        const data = await service.mutate(token, operation, id, parsed.data, String(res.getHeader("X-Request-Id")));
+        const data = await service.mutate(token, operation, id, parsed.data);
         return res.status(operation === "create" ? 201 : 200).json({ data });
       } catch (error) {
         if (error instanceof StaffError) return res.status(error.status).json({ error: { code: error.code, message: error.message, requestId: res.getHeader("X-Request-Id") } });
@@ -40,7 +40,7 @@ export function createStaffRoutes(connection: Connection, jwtSecret: string, ori
     { method: "post", path: "/admin/staff", handler: handler("create") },
     { method: "get", path: "/admin/staff/:id", handler: handler("detail") },
     { method: "put", path: "/admin/staff/:id", handler: handler("update") },
-    ...(["deactivate", "reactivate", "reset-password", "reset-2fa", "force-logout"] as const).map(operation =>
+    ...(["deactivate", "reactivate", "reset-password", "force-logout"] as const).map(operation =>
       ({ method: "post" as const, path: `/admin/staff/:id/${operation}`, handler: handler(operation) })),
   ];
 }

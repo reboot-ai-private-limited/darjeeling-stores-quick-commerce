@@ -345,7 +345,6 @@ describe("the admin's payments", () => {
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.data).toMatchObject({ status: "captured", razorpayPaymentId: "pay_Nz2" });
     expect((await col("orders").findOne({ _id: o.id as never }))?.status).toBe("CONFIRMED");
-    expect(await col("audit_log").countDocuments({ action: "payments.mark_paid" })).toBe(1);
     const again = await post(`/admin/payments/${payment._id}/mark-paid`, { razorpayPaymentId: "pay_Nz2" });
     expect(again.status).toBe(409);
     expect((await post(`/admin/payments/${payment._id}/mark-paid`, {})).status).toBe(400);

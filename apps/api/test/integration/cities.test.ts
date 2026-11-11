@@ -53,7 +53,6 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.collection("cities").deleteMany({});
-  await db.collection("audit_log").deleteMany({});
   await db.collection("users").deleteMany({});
   await db.collection("roles").deleteMany({});
 });
@@ -287,7 +286,7 @@ describe("F03-02: City CRUD and public picker", () => {
     ).toBe(400);
   });
 
-  it("updates city name, state, and status with transactional audit log", async () => {
+  it("updates city name, state, and status", async () => {
     const createRes = await request(app)
       .post("/api/v1/admin/cities")
       .set(adminHeaders)
@@ -295,20 +294,6 @@ describe("F03-02: City CRUD and public picker", () => {
 
     const cityId = createRes.body.data.id;
 
-    // Check create audit event
-    const createAudit = await db.collection("audit_log").findOne({
-      entityType: "city",
-      action: "city.create",
-      entityId: cityId,
-    });
-    expect(createAudit).not.toBeNull();
-    expect(createAudit?.cityChange?.before).toBeNull();
-    expect(createAudit?.cityChange?.after).toMatchObject({
-      id: cityId,
-      name: "Darjeeling",
-      state: "West Bengal",
-      isActive: true,
-    });
 
     // PUT update
     const updateRes = await request(app)
@@ -324,23 +309,6 @@ describe("F03-02: City CRUD and public picker", () => {
       isActive: false,
     });
 
-    // Check update audit event
-    const updateAudit = await db.collection("audit_log").findOne({
-      entityType: "city",
-      action: "city.update",
-      entityId: cityId,
-    });
-    expect(updateAudit).not.toBeNull();
-    expect(updateAudit?.cityChange?.before).toMatchObject({
-      id: cityId,
-      name: "Darjeeling",
-      isActive: true,
-    });
-    expect(updateAudit?.cityChange?.after).toMatchObject({
-      id: cityId,
-      name: "Darjeeling Town",
-      isActive: false,
-    });
   });
 
   it("PUT /admin/cities/:id returns 404 for unknown or non-hex ID", async () => {
@@ -380,33 +348,6 @@ describe("F03-02: City CRUD and public picker", () => {
 
     expect(renameRes.status).toBe(409);
     expect(renameRes.body.error.code).toBe("CONFLICT");
-  });
-
-  it("rolls back city create when audit write fails", async () => {
-    try {
-      await db.createCollection("audit_log");
-    } catch {
-      // already exists
-    }
-    await db.db!.command({
-      collMod: "audit_log",
-      validator: { required_audit_test_field: { $exists: true } },
-      validationLevel: "strict",
-    });
-
-    try {
-      const response = await request(app)
-        .post("/api/v1/admin/cities")
-        .set(adminHeaders)
-        .send({ name: "Rollback City", state: "West Bengal" });
-
-      expect(response.status).toBe(500);
-      expect(
-        await db.collection("cities").countDocuments({ canonicalName: "rollback city" })
-      ).toBe(0);
-    } finally {
-      await db.db!.command({ collMod: "audit_log", validator: {} });
-    }
   });
 
   it("re-checks and locks actor inside transaction, rejecting in-flight deactivated staff with 403", async () => {

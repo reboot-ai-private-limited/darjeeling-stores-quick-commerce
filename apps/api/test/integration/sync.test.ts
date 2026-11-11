@@ -247,7 +247,6 @@ describe("offline delivery checks", () => {
     expect(orderStatus(order.id)).toBe("DELIVERED");
     expect(f.orders.get(order.id).deliveredOffline).toBe(true);
     expect((await col("riders").findOne({ _id: r.id as never }))?.activeOrderCount).toBe(0);
-    expect(await col("audit_log").countDocuments({ action: "sync.resolve_review" })).toBe(1);
   });
 
   it("sends a rejected wrong-code delivery to failed delivery", async () => {
