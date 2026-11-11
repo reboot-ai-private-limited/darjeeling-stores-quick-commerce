@@ -12,6 +12,9 @@ import { useCart } from "../state/cart";
 import { colors, radius, rupees, shadow, space, type } from "../theme";
 import { Icon, Press, tap } from "./ui";
 
+/** Pads a list with empty slots so the last row of a grid keeps its column width (a lone item no longer stretches across the screen). */
+export const fillRow = <T,>(items: T[], cols: number): (T | null)[] => (items.length % cols === 0 ? items : [...items, ...Array.from({ length: cols - (items.length % cols) }, () => null)]);
+
 /** Outlined "ADD" button that turns into a − n + stepper once the item is in the cart (quick-commerce style). */
 export function AddButton({ product }: { product: Product }) {
   const { qtyOf, add, remove } = useCart();

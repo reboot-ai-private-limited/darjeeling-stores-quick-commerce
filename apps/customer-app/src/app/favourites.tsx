@@ -1,7 +1,7 @@
 import { useFocusEffect } from "expo-router";
 import { FlatList, Text, View } from "react-native";
 import { useFavourites } from "../api/favourites";
-import { CartBar, ProductCard } from "../components/shop";
+import { fillRow, CartBar, ProductCard } from "../components/shop";
 import { Header, Icon, Screen } from "../components/ui";
 import { colors, space, type } from "../theme";
 
@@ -20,9 +20,9 @@ export default function Favourites() {
           </View>
         ) : (
           <FlatList
-            data={list} numColumns={3} keyExtractor={p => p.id} showsVerticalScrollIndicator={false}
+            data={fillRow(list, 3)} numColumns={3} keyExtractor={(p, i) => p?.id ?? `fill${i}`} showsVerticalScrollIndicator={false}
             columnWrapperStyle={{ gap: space.sm, paddingHorizontal: space.lg }} contentContainerStyle={{ gap: space.xl, paddingTop: space.md, paddingBottom: 140 }}
-            renderItem={({ item }) => <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View>}
+            renderItem={({ item }) => item ? <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View> : <View style={{ flex: 1 }} />}
           />
         )}
       </Screen>

@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from "
 import { searchProducts, type Product } from "../api/catalog";
 import { kv } from "../api/kv";
 import { Header, Icon, Press, Screen } from "../components/ui";
-import { CartBar, ProductCard } from "../components/shop";
+import { fillRow, CartBar, ProductCard } from "../components/shop";
 import { useStore } from "../state/store";
 import { colors, radius, shadow, space, type } from "../theme";
 
@@ -75,9 +75,9 @@ export default function Search() {
           </View>
         )}
         <FlatList
-          data={results ?? []} numColumns={2} keyExtractor={p => p.id} keyboardShouldPersistTaps="handled"
+          data={fillRow(results ?? [], 2)} numColumns={2} keyExtractor={(p, i) => p?.id ?? `fill${i}`} keyboardShouldPersistTaps="handled"
           columnWrapperStyle={{ gap: space.md, paddingHorizontal: space.lg }} contentContainerStyle={{ gap: space.md, paddingTop: space.lg, paddingBottom: 120 }}
-          renderItem={({ item }) => <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View>}
+          renderItem={({ item }) => item ? <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View> : <View style={{ flex: 1 }} />}
         />
       </Screen>
       <CartBar />

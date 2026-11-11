@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
 import { findCategory, getCategories, getProducts, defaultVariant, type Category, type Product } from "../../api/catalog";
-import { CartBar, ProductCard } from "../../components/shop";
+import { fillRow, CartBar, ProductCard } from "../../components/shop";
 import { Button, Chip, Header, Icon, Press, Screen } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { colors, space, type } from "../../theme";
@@ -106,11 +106,11 @@ export default function CategoryProducts() {
         )}
         {!loading && !error && (
           <FlatList
-            data={shown} numColumns={3} keyExtractor={p => p.id} showsVerticalScrollIndicator={false}
+            data={fillRow(shown, 3)} numColumns={3} keyExtractor={(p, i) => p?.id ?? `fill${i}`} showsVerticalScrollIndicator={false}
             columnWrapperStyle={{ gap: space.sm, paddingHorizontal: space.lg }} contentContainerStyle={{ gap: space.xl, paddingTop: space.md, paddingBottom: 140 }}
             onEndReached={() => void loadMore()} onEndReachedThreshold={0.6}
             ListFooterComponent={more ? <ActivityIndicator color={colors.maroon} /> : undefined}
-            renderItem={({ item }) => <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View>}
+            renderItem={({ item }) => item ? <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View> : <View style={{ flex: 1 }} />}
           />
         )}
       </Screen>
