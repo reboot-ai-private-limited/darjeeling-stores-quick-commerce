@@ -56,7 +56,7 @@ export default function RootLayout() {
             <Stack.Screen name="order/refund-request" />
             <Stack.Screen name="search" options={{ animation: "fade" }} />
             <Stack.Screen name="category/[id]" />
-            <Stack.Screen name="product/[id]" options={{ presentation: "transparentModal", animation: "none", gestureEnabled: false, contentStyle: { backgroundColor: "transparent" } }} />
+            <Stack.Screen name="product/[id]" options={{ animation: "slide_from_right", animationDuration: 300 }} />
           </Stack>
         </CartProvider></StoreProvider>
       </SafeAreaProvider>
