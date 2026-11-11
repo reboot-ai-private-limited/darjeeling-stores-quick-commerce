@@ -59,13 +59,7 @@ export default function ZonesEditor({ session }: Props) {
   const [editing, setEditing] = useState<Zone | "new" | null>(null);
   const [name, setName] = useState("");
   const [cityId, setCityId] = useState("");
-  const [coords, setCoords] = useState<[number, number][]>([
-    [88.26, 27.035],
-    [88.275, 27.035],
-    [88.275, 27.05],
-    [88.26, 27.05],
-    [88.26, 27.035],
-  ]);
+  const [coords, setCoords] = useState<[number, number][]>([]);
   const [isEnabled, setIsEnabled] = useState(true);
   const [pauseActive, setPauseActive] = useState(false);
   const [pauseMessage, setPauseMessage] = useState("");
@@ -125,13 +119,8 @@ export default function ZonesEditor({ session }: Props) {
     if (zone === "new") {
       setCityId(cityFilter || (cities.length > 0 ? cities[0]!.id : ""));
       setName("");
-      setCoords([
-        [88.26, 27.035],
-        [88.275, 27.035],
-        [88.275, 27.05],
-        [88.26, 27.05],
-        [88.26, 27.035],
-      ]);
+      // With a Google map the boundary is drawn by clicking; without one, start from a small editable square.
+      setCoords(GOOGLE_MAPS_KEY ? [] : [[88.26, 27.035], [88.275, 27.035], [88.275, 27.05], [88.26, 27.05], [88.26, 27.035]]);
       setIsEnabled(true);
       setPauseActive(false);
       setPauseMessage("");
@@ -286,6 +275,7 @@ export default function ZonesEditor({ session }: Props) {
 
     try {
       const isNew = editing === "new";
+      if (coords.length < 4) throw new Error("Draw the zone boundary on the map first: click at least 3 points.");
       const path = isNew ? "/api/v1/admin/zones" : `/api/v1/admin/zones/${(editing as Zone).id}`;
       const method = isNew ? "POST" : "PUT";
 
@@ -440,7 +430,10 @@ export default function ZonesEditor({ session }: Props) {
               Interactive Boundary Map (GeoJSON Polygon)
             </h3>
             <div className="admin-map-container">
-              {GOOGLE_MAPS_KEY ? <GoogleZoneMap coords={coords} onChange={setCoords} enabled={isEnabled} disabled={busy} /> : <svg
+              {GOOGLE_MAPS_KEY ? <GoogleZoneMap
+                key={editing === "new" ? `new-${cityId}` : (editing as Zone).id}
+                coords={coords} onChange={setCoords} enabled={isEnabled} disabled={busy}
+              /> : <svg
                 ref={svgRef}
                 className="admin-map-svg"
                 viewBox="0 0 400 300"

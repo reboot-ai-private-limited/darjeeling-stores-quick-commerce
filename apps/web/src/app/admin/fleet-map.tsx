@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GOOGLE_MAPS_KEY, loadGoogleMaps } from "./google-map";
+import { GOOGLE_MAPS_KEY, loadGoogleMaps, mapProblem } from "./google-map";
 
 /* The Maps script is loaded by google-map.tsx; the typings here are minimal on purpose. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -44,7 +44,7 @@ export function FleetMap({ riders, height = 420, focusId, onSelect }: { riders: 
       map.current = new g.Map(host.current, { center: { lat: 27.04, lng: 88.265 }, zoom: 13, mapTypeControl: false, streetViewControl: false, fullscreenControl: true });
       info.current = new g.InfoWindow();
       setReady(true);
-    }).catch(() => setError("Google Maps could not load. Check the API key and that the Maps JavaScript API is enabled."));
+    }).catch((e) => setError(mapProblem(e)));
     return () => { cancelled = true; };
   }, []);
 

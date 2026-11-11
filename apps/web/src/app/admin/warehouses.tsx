@@ -143,8 +143,8 @@ export default function Warehouses({ session }: Props) {
       setZoneId(zones.length > 0 ? zones[0]!.id : "");
       setName("");
       setCode("");
-      setLat("27.0410");
-      setLng("88.2663");
+      setLat(GOOGLE_MAPS_KEY ? "" : "27.0410");
+      setLng(GOOGLE_MAPS_KEY ? "" : "88.2663");
       setAddress("");
       setPriority("1");
       setPackMinutes("5");
