@@ -71,7 +71,7 @@ export default function RefundRequestPage({ params }: { params: Promise<{ id: st
   if (loading) {
     return (
       <main className="page-container" style={{ padding: "40px 16px", maxWidth: 640, margin: "0 auto" }}>
-        <div className="skeleton" style={{ height: 260, borderRadius: 22 }} />
+        <div className="skeleton" style={{ height: 260, borderRadius: 8 }} />
       </main>
     );
   }

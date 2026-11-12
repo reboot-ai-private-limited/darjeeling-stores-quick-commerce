@@ -52,12 +52,12 @@ export const rupees = (paise: number) => {
 
 /** Category tile background tints (same 6 pastel tints as mobile app) */
 export const CATEGORY_TINTS = [
-  "#fff4d1",
-  "#fde8e6",
-  "#e8f3e1",
-  "#e6eefb",
-  "#f6ebdd",
-  "#efe6f7",
+  "#f3f1ed",
+  "#f3f1ed",
+  "#f3f1ed",
+  "#f3f1ed",
+  "#f3f1ed",
+  "#f3f1ed",
 ];
 
 /** Coupon offer card tints [background, accentForeground] */

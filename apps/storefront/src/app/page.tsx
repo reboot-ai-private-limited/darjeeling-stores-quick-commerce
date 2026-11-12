@@ -274,7 +274,7 @@ export default function HomePage() {
                       style={{
                         width: 76,
                         height: 76,
-                        borderRadius: 22,
+                        borderRadius: 8,
                         background: "var(--white)",
                         border: "1px solid var(--line)",
                         display: "flex",

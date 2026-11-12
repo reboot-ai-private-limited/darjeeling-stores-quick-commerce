@@ -83,7 +83,7 @@ export default function CategoryProductsPage({ params }: { params: Promise<{ id:
             onClick={() => setSubCategoryId(undefined)}
             style={{
               padding: "6px 14px",
-              borderRadius: 9999,
+              borderRadius: 8,
               fontSize: 12,
               fontWeight: 700,
               whiteSpace: "nowrap",
@@ -101,7 +101,7 @@ export default function CategoryProductsPage({ params }: { params: Promise<{ id:
               onClick={() => setSubCategoryId(sub.id)}
               style={{
                 padding: "6px 14px",
-                borderRadius: 9999,
+                borderRadius: 8,
                 fontSize: 12,
                 fontWeight: 700,
                 whiteSpace: "nowrap",

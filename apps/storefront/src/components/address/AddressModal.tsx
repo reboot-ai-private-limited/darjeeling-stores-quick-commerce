@@ -227,7 +227,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
                 onClick={() => setLabel(tag)}
                 style={{
                   padding: "6px 16px",
-                  borderRadius: 9999,
+                  borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 700,
                   border: `1.5px solid ${label === tag ? "var(--maroon)" : "var(--line)"}`,

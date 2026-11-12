@@ -89,7 +89,7 @@ function SearchContent() {
           style={{
             width: "100%",
             padding: "14px 16px 14px 46px",
-            borderRadius: 9999,
+            borderRadius: 8,
             border: "1.5px solid var(--maroon)",
             background: "var(--card)",
             fontSize: 15,
@@ -142,7 +142,7 @@ function SearchContent() {
                     }}
                     style={{
                       padding: "6px 14px",
-                      borderRadius: 9999,
+                      borderRadius: 8,
                       background: "var(--cream-deep)",
                       color: "var(--ink)",
                       fontSize: 13,
@@ -174,7 +174,7 @@ function SearchContent() {
                   }}
                   style={{
                     padding: "6px 14px",
-                    borderRadius: 9999,
+                    borderRadius: 8,
                     background: "var(--card)",
                     border: "1px solid var(--line)",
                     color: "var(--maroon)",

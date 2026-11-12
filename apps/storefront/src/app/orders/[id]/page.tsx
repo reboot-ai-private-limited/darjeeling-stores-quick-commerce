@@ -42,7 +42,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
   if (loading) {
     return (
       <main className="page-container" style={{ padding: "40px 16px", maxWidth: 760, margin: "0 auto" }}>
-        <div className="skeleton" style={{ height: 300, borderRadius: 22 }} />
+        <div className="skeleton" style={{ height: 300, borderRadius: 8 }} />
       </main>
     );
   }
@@ -134,7 +134,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
                 color: isDelivered ? "var(--green)" : "var(--maroon)",
                 background: isDelivered ? "var(--green-soft)" : "var(--yellow-soft)",
                 padding: "3px 10px",
-                borderRadius: 9999,
+                borderRadius: 8,
               }}
             >
               {status.replace(/_/g, " ")}

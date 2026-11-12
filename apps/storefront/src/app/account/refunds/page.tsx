@@ -50,7 +50,7 @@ export default function RefundsPage() {
             <div key={r.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ display: "flex", alignItems: "center" }}>
                 <span style={{ flex: 1, fontSize: 19, fontWeight: 800 }}>{rupees(r.amount)}</span>
-                <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 9999, letterSpacing: 0.5 }}>{label.toUpperCase()}</span>
+                <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 8, letterSpacing: 0.5 }}>{label.toUpperCase()}</span>
               </div>
               <span style={{ fontSize: 15, fontWeight: 500 }}>
                 {r.orderNo} · {REFUND_REASON[r.reason] ?? r.reason}

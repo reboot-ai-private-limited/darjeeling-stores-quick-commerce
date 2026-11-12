@@ -15,7 +15,7 @@ export const TrustStrip: React.FC = () => {
         marginBottom: 20,
         padding: "24px 16px",
         background: "var(--card)",
-        borderRadius: 22,
+        borderRadius: 8,
         border: "1px solid var(--line)",
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
