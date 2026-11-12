@@ -65,7 +65,7 @@ export default function AccountPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "linear-gradient(135deg, var(--maroon), var(--maroon-deep))",
+          background: "var(--maroon)",
           color: "var(--white)",
           marginBottom: 24,
         }}
@@ -101,7 +101,7 @@ export default function AccountPage() {
           href="/account/profile"
           style={{
             padding: "8px 14px",
-            borderRadius: 9999,
+            borderRadius: 8,
             background: "rgba(255, 255, 255, 0.15)",
             color: "var(--white)",
             fontSize: 12,
@@ -141,7 +141,7 @@ export default function AccountPage() {
           onClick={handleSignOut}
           style={{
             padding: "12px 24px",
-            borderRadius: 9999,
+            borderRadius: 8,
             border: "1.5px solid var(--red)",
             background: "transparent",
             color: "var(--red)",

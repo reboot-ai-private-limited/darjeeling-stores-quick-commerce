@@ -23,7 +23,7 @@ export const ProductCardSkeleton: React.FC = () => (
 export const HomeSkeleton: React.FC = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 32, padding: "20px 0" }}>
     {/* Banner skeleton */}
-    <div className="skeleton" style={{ width: "100%", height: 200, borderRadius: 22 }} />
+    <div className="skeleton" style={{ width: "100%", height: 200, borderRadius: 8 }} />
 
     {/* Categories skeleton */}
     <div>

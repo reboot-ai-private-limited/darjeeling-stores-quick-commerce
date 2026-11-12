@@ -69,7 +69,7 @@ export default function OrdersHistoryPage() {
           onClick={() => setTab("active")}
           style={{
             padding: "8px 20px",
-            borderRadius: 9999,
+            borderRadius: 8,
             fontSize: 14,
             fontWeight: 800,
             border: "none",
@@ -84,7 +84,7 @@ export default function OrdersHistoryPage() {
           onClick={() => setTab("past")}
           style={{
             padding: "8px 20px",
-            borderRadius: 9999,
+            borderRadius: 8,
             fontSize: 14,
             fontWeight: 800,
             border: "none",

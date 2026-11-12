@@ -262,7 +262,7 @@ export default function CheckoutPage() {
   if (booting) {
     return (
       <main className="page-container" style={{ padding: "24px 16px", maxWidth: 980, margin: "0 auto" }}>
-        <div className="skeleton" style={{ height: 180, borderRadius: 22 }} />
+        <div className="skeleton" style={{ height: 180, borderRadius: 8 }} />
       </main>
     );
   }
@@ -446,7 +446,7 @@ export default function CheckoutPage() {
                     onClick={() => setTipPaise(v)}
                     style={{
                       padding: "8px 16px",
-                      borderRadius: 9999,
+                      borderRadius: 8,
                       fontSize: 13,
                       fontWeight: 700,
                       border: `1.5px solid ${tipPaise === v ? "var(--maroon)" : "var(--line)"}`,

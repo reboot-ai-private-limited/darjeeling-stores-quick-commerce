@@ -217,7 +217,7 @@ export default function TrackingPage({ params }: { params: Promise<{ id: string 
         </button>
       </div>
 
-      {loading && <div className="skeleton" style={{ height: 160, borderRadius: 22 }} />}
+      {loading && <div className="skeleton" style={{ height: 160, borderRadius: 8 }} />}
 
       {!loading && notFound && !tracking && (
         <div style={{ textAlign: "center", padding: "60px 16px" }}>
@@ -243,7 +243,7 @@ export default function TrackingPage({ params }: { params: Promise<{ id: string 
       {tracking && head && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Status + ETA */}
-          <div style={{ background: "var(--maroon)", color: "#fff", borderRadius: 22, padding: "18px 20px", boxShadow: "var(--shadow-card)" }}>
+          <div style={{ background: "var(--maroon)", color: "#fff", borderRadius: 8, padding: "18px 20px", boxShadow: "var(--shadow-card)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: 0.8 }}>
               {active && <span className="live-dot" style={{ background: "var(--yellow)" }} />}
               {active ? "Live" : "Final status"}
@@ -251,7 +251,7 @@ export default function TrackingPage({ params }: { params: Promise<{ id: string 
             <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: -0.5, marginTop: 6 }}>{head.title}</div>
             {head.sub && <div style={{ fontSize: 14, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>{head.sub}</div>}
             {active && etaMin !== null && (
-              <div style={{ display: "inline-block", marginTop: 12, background: "var(--yellow)", color: "var(--maroon)", fontWeight: 900, fontSize: 13, padding: "6px 14px", borderRadius: 9999 }}>
+              <div style={{ display: "inline-block", marginTop: 12, background: "var(--yellow)", color: "var(--maroon)", fontWeight: 900, fontSize: 13, padding: "6px 14px", borderRadius: 8 }}>
                 {etaMin === 0 ? "Arriving any minute" : `Arriving in ${etaMin} min`}
               </div>
             )}
@@ -260,7 +260,7 @@ export default function TrackingPage({ params }: { params: Promise<{ id: string 
 
           {/* Map (needs the delivery address position) */}
           {!door && (
-            <div style={{ height: 160, borderRadius: 22, border: "1px solid var(--line)", background: "var(--cream-deep)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 16, textAlign: "center" }}>
+            <div style={{ height: 160, borderRadius: 8, border: "1px solid var(--line)", background: "var(--cream-deep)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 16, textAlign: "center" }}>
               {orderAddrDone ? (
                 <>
                   <Icon name="map-pin" size={28} color="var(--faint)" />
@@ -273,10 +273,10 @@ export default function TrackingPage({ params }: { params: Promise<{ id: string 
             </div>
           )}
           {door && (
-            <div style={{ position: "relative", width: "100%", height: 320, borderRadius: 22, overflow: "hidden", border: "1px solid var(--line)", boxShadow: "var(--shadow-card)" }}>
+            <div style={{ position: "relative", width: "100%", height: 320, borderRadius: 8, overflow: "hidden", border: "1px solid var(--line)", boxShadow: "var(--shadow-card)" }}>
               <div ref={mapEl} style={{ width: "100%", height: "100%" }} />
               {tracking.rider?.lastLocationAt && (
-                <div style={{ position: "absolute", left: 12, bottom: 12, zIndex: 500, background: "var(--white)", borderRadius: 9999, padding: "5px 12px", fontSize: 12, fontWeight: 700, boxShadow: "var(--shadow-card)" }}>
+                <div style={{ position: "absolute", left: 12, bottom: 12, zIndex: 500, background: "var(--white)", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, boxShadow: "var(--shadow-card)" }}>
                   Updated {ago(tracking.rider.lastLocationAt, now)}
                 </div>
               )}

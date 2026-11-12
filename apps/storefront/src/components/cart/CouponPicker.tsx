@@ -124,7 +124,7 @@ export const CouponPicker: React.FC = () => {
                 </div>
               )}
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--white)", border: "1.5px solid var(--line)", borderRadius: 9999, padding: "0 6px 0 16px", height: 52 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--white)", border: "1.5px solid var(--line)", borderRadius: 8, padding: "0 6px 0 16px", height: 52 }}>
                 <Icon name="tag" size={18} color="var(--muted)" />
                 <input
                   value={code}
@@ -143,7 +143,7 @@ export const CouponPicker: React.FC = () => {
                 <button
                   onClick={() => void apply(code)}
                   disabled={!code.trim() || !!busy}
-                  style={{ height: 40, padding: "0 18px", borderRadius: 9999, background: "var(--maroon)", color: "var(--yellow)", fontWeight: 900, fontSize: 13, letterSpacing: 0.8, opacity: !code.trim() || busy ? 0.4 : 1 }}
+                  style={{ height: 40, padding: "0 18px", borderRadius: 8, background: "var(--maroon)", color: "var(--yellow)", fontWeight: 900, fontSize: 13, letterSpacing: 0.8, opacity: !code.trim() || busy ? 0.4 : 1 }}
                 >
                   {busy === code.trim() ? "…" : "APPLY"}
                 </button>
@@ -177,7 +177,7 @@ export const CouponPicker: React.FC = () => {
                 </div>
               )}
 
-              {signedIn && !sorted && [0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 104, borderRadius: 22 }} />)}
+              {signedIn && !sorted && [0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 104, borderRadius: 8 }} />)}
 
               {signedIn && sorted?.length === 0 && (
                 <div style={{ textAlign: "center", padding: "24px 0" }}>
@@ -193,7 +193,7 @@ export const CouponPicker: React.FC = () => {
                 const isApplied = couponCode === c.code;
                 const reason = why(c);
                 return (
-                  <div key={c.code} style={{ display: "flex", background: "var(--white)", borderRadius: 22, overflow: "hidden", boxShadow: "var(--shadow-card)", opacity: on ? 1 : 0.6 }}>
+                  <div key={c.code} style={{ display: "flex", background: "var(--white)", borderRadius: 8, overflow: "hidden", boxShadow: "var(--shadow-card)", opacity: on ? 1 : 0.6 }}>
                     <div style={{ width: 92, background: on ? "var(--maroon)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 6px", textAlign: "center" }}>
                       <span style={{ color: "var(--yellow)", fontSize: st.top.length > 4 ? 18 : 24, fontWeight: 900, letterSpacing: -0.5 }}>{st.top}</span>
                       <span style={{ color: "#fff", fontSize: 11, fontWeight: 900, letterSpacing: 1.5, marginTop: 2 }}>{st.bottom}</span>
@@ -218,7 +218,7 @@ export const CouponPicker: React.FC = () => {
                           marginTop: 6,
                           height: 34,
                           padding: "0 14px",
-                          borderRadius: 9999,
+                          borderRadius: 8,
                           background: isApplied ? "var(--green-soft)" : on ? "var(--yellow)" : "var(--cream-deep)",
                           color: isApplied ? "var(--green)" : on ? "var(--maroon)" : "var(--muted)",
                           fontWeight: 900,
