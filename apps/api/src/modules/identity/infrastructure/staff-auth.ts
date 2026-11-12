@@ -105,9 +105,12 @@ export function createStaffAuthService(connection: Connection, jwtKey: string, s
     async bootstrap(input: { email: string; name: string; password: string }) {
       const passwordHash = await hashPassword(input.password);
       return transaction(async session => {
-        const owner = await connection.collection("roles").findOneAndUpdate({ name: "super_admin", isSystem: true, permissions: ["*"] }, { $inc: { revision: 1 } }, { session, returnDocument: "after" });
-        if (!owner) failure(409, "CONFLICT", "Initialize the protected owner role first");
-        if (await users.findOne({ roleId: owner._id }, { session })) failure(409, "CONFLICT", "An owner already exists; bootstrap cannot replace it");
+        // The first account gets the `admin` role. It can then add further admins and staff from the Staff page.
+        const roleDocs = connection.collection("roles");
+        const owner = await roleDocs.findOneAndUpdate({ name: "admin", isSystem: true }, { $inc: { revision: 1 } }, { session, returnDocument: "after" });
+        if (!owner) failure(409, "CONFLICT", "Initialize the admin role first");
+        const holders = await roleDocs.find({ name: { $in: ["admin", "super_admin"] } }, { session, projection: { _id: 1 } }).toArray();
+        if (await users.findOne({ roleId: { $in: holders.map(r => r._id) } }, { session })) failure(409, "CONFLICT", "An owner already exists; bootstrap cannot replace it");
         await connection.collection<{ _id: string }>("identity_bootstrap").insertOne({ _id: "owner" }, { session });
         const user: User = { _id: new Types.ObjectId(), kind: "staff", email: input.email, name: input.name, passwordHash, roleId: owner._id,
           status: "active", scope: { all: true, warehouseIds: [] }, mustChangePassword: true, credentialRevision: 0 };

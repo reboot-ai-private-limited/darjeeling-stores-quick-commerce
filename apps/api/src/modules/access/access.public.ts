@@ -16,6 +16,8 @@ export const RIDER_PERMISSIONS = [...sharedAccountPermissions,
   "rider_order:view", "rider_order:navigate", "rider_order:call_customer", "rider_order:pickup", "rider_order:start_ride", "rider_order:arrived", "rider_order:verify_delivery_otp", "rider_order:collect_cash", "rider_order:generate_upi_qr", "rider_order:deliver", "rider_order:report_failed", "rider_order:report_problem",
   "rider_sync:push", "rider_location:update", "rider_cash:view", "rider_history:view", "rider_profile:view", "rider_profile:update_photo", "media:upload",
 ] as const;
+/** What the `staff` role can do out of the box: run orders, dispatch, stock and the catalogue, but not money, settings, people or roles. */
+export const STAFF_PERMISSIONS = ["dashboard:view", "orders:view", "orders:manage", "dispatch:manage", "catalog:view", "warehouse_catalog:view", "warehouse_catalog:manage", "stock:view", "stock:manage", "notify_demand:view", "customers:view", "riders:view", "warehouses:view"] as const satisfies readonly (typeof ADMIN_PERMISSIONS[number])[];
 export const PERMISSION_GROUPS = { admin: ADMIN_PERMISSIONS, customer: CUSTOMER_PERMISSIONS, rider: RIDER_PERMISSIONS };
 export type Permission = typeof ADMIN_PERMISSIONS[number];
 const knownPermissions = new Set<string>(ADMIN_PERMISSIONS);
@@ -31,9 +33,12 @@ export function createAccessStore(connection: Connection) {
   return {
     async initialize() {
       await roles.createIndexes();
+      // `admin` holds every admin permission, may be given to any number of people, and is locked (isSystem) so nobody can weaken it.
+      // `staff` is the everyday operations role. It is seeded once and can then be adjusted on the Roles page.
+      await roles.updateOne({ name: "admin" }, { $set: { permissions: [...ADMIN_PERMISSIONS], isSystem: true } }, { upsert: true, runValidators: true });
       for (const role of [
         { name: "super_admin", permissions: ["*"], isSystem: true },
-        { name: "admin", permissions: ADMIN_PERMISSIONS.filter(p => p !== "staff:manage" && p !== "roles:manage"), isSystem: false },
+        { name: "staff", permissions: [...STAFF_PERMISSIONS], isSystem: false },
         { name: "customer", permissions: [...CUSTOMER_PERMISSIONS], isSystem: true },
         { name: "rider", permissions: [...RIDER_PERMISSIONS], isSystem: true },
       ]) {
