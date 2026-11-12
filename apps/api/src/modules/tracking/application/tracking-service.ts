@@ -1,12 +1,15 @@
 import type { DeliveryOrder, OrdersPort } from "../../../platform/orders.js";
 import { AppError, forbidden, notFound } from "../../catalog/catalog.public.js";
 import type { Rider } from "../../riders/riders.public.js";
-import { RIDER_VISIBLE, type EtaProvider, type TrackingSettings } from "../domain/tracking.js";
+import { haversineMeters } from "../../riders/riders.public.js";
+import { RIDER_VISIBLE, type EtaProvider, type RoutePathProvider, type TrackingSettings } from "../domain/tracking.js";
 import type { StoredPoint, TrackingStore } from "./ports.js";
 import type { TokenSigner } from "./token.js";
 
 export interface TrackingDeps {
   store: TrackingStore; orders: OrdersPort; settings: TrackingSettings; eta: EtaProvider; signer: TokenSigner; now: () => Date;
+  /** The road to draw on the rider's map. Without it the rider gets a straight line. */
+  routePath?: RoutePathProvider;
   riders: { byId(id: string): Promise<Rider | null>; recordLocation(riderId: string, location: { lat: number; lng: number }, at: Date): Promise<boolean> };
   relations: { riderOfOrder(orderId: string): Promise<string | null>; liveOrderIds(riderId: string): Promise<string[]> };
 }
@@ -74,6 +77,18 @@ export function createTrackingService(deps: TrackingDeps) {
         nextPingSeconds: fresh.activeOrderCount > 0 ? settings.pingOnOrderSeconds : settings.pingIdleSeconds,
         serverTime: t.toISOString(),
       };
+    },
+
+    /** The road from where the rider is to the customer's door, for the rider's map. Only the order's own rider may ask. */
+    async routeForRider(rider: Rider, orderId: string, from: { lat: number; lng: number }) {
+      const order = await orders.get(orderId);
+      if (!order || (await relations.riderOfOrder(orderId)) !== rider.id) throw notFound("Order");
+      const to = order.address.location;
+      const road = (await deps.routePath?.path(from, to).catch(() => null)) ?? null;
+      if (road) return { ...road, destination: to };
+      const distanceM = Math.round(haversineMeters(from, to));
+      const minutes = (await eta.minutes(from, to)) ?? Math.max(1, Math.ceil(distanceM / 1000 / 15 * 60));
+      return { distanceM, durationS: minutes * 60, points: [from, to], approximate: true, destination: to };
     },
 
     /** One order of the customer's, with the rider's position once it is on the road. */

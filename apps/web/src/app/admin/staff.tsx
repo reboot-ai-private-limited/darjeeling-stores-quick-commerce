@@ -4,7 +4,7 @@ import { adminFetch } from "./session-client";
 
 type Role = { id: string; name: string; isSystem: boolean };
 type StaffAccount = { id: string; name: string; email: string | null; role: string; roleId: string; status: string;
-  scope: { all: boolean; warehouseIds: string[] }; lastLoginAt: string | null; twoFactorEnabled: boolean };
+  scope: { all: boolean; warehouseIds: string[] }; lastLoginAt: string | null };
 async function api(path: string, init?: RequestInit) {
   const response = await adminFetch(`/api/v1/admin/${path}`, init);
   const body = await response.json();
@@ -83,7 +83,7 @@ export default function Staff({ userId, onSignOut }: { userId: string; onSignOut
     try {
       await api(`staff/${action.account.id}/${action.operation}`, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": "1" },
         body: JSON.stringify(action.operation === "reset-password" ? { newPassword: temporaryPassword } : {}) });
-      if (action.account.id === userId && ["reset-password", "reset-2fa", "force-logout"].includes(action.operation)) { onSignOut(); return; }
+      if (action.account.id === userId && ["reset-password", "force-logout"].includes(action.operation)) { onSignOut(); return; }
       setAction(null); setTemporaryPassword(""); setNotice("Staff account updated."); setAttempt(value => value + 1);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The action could not be confirmed. Reload before retrying."); }
     finally { setBusy(false); }
@@ -93,7 +93,7 @@ export default function Staff({ userId, onSignOut }: { userId: string; onSignOut
     {editor && <StaffEditor key={editor === "new" ? "new" : editor.id} account={editor === "new" ? null : editor} roles={roles} self={editor !== "new" && editor.id === userId} onSaved={() => { setEditor(null); setNotice("Staff account saved."); setAttempt(value => value + 1); }} onCancel={() => setEditor(null)} />}
     {action && <form className="admin-panel admin-role-form admin-staff-confirm" onSubmit={confirmAction} aria-busy={busy}>
       <h2>{action.operation.replaceAll("-", " ")} · {action.account.name}</h2>
-      <p>{action.operation === "reactivate" ? "This restores sign-in access. Previous sessions stay revoked." : action.operation === "deactivate" ? "This blocks sign-in and ends every active session." : action.operation === "reset-password" ? "The staff member must change the new temporary password. Every session will end." : action.operation === "reset-2fa" ? "The current authenticator will be removed. Every session will end and the staff member must enrol again." : "Every active session for this staff member will end."}</p>
+      <p>{action.operation === "reactivate" ? "This restores sign-in access. Previous sessions stay revoked." : action.operation === "deactivate" ? "This blocks sign-in and ends every active session." : action.operation === "reset-password" ? "The staff member must change the new temporary password. Every session will end." : "Every active session for this staff member will end."}</p>
       {action.operation === "reset-password" && <><label htmlFor="staff-reset-password">New temporary password</label><input id="staff-reset-password" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required value={temporaryPassword} onChange={event => setTemporaryPassword(event.target.value)} disabled={busy} /></>}
       <div className="admin-role-actions"><button className="admin-role-button" disabled={busy}>{busy ? "Updating…" : "Confirm action"}</button><button type="button" disabled={busy} onClick={() => { setAction(null); setTemporaryPassword(""); }}>Cancel</button></div>
     </form>}
@@ -101,9 +101,9 @@ export default function Staff({ userId, onSignOut }: { userId: string; onSignOut
       <form className="admin-staff-filters" onSubmit={search}><label>Search staff<input type="search" value={q} onChange={event => setQ(event.target.value)} maxLength={120} /></label><label>Status<select value={status} onChange={event => setStatus(event.target.value)}><option value="">All statuses</option><option value="active">Active</option><option value="deactivated">Deactivated</option></select></label>
         {roles.length > 0 && <label>Role<select value={roleId} onChange={event => setRoleId(event.target.value)}><option value="">All roles</option>{roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>}<button className="admin-role-button" disabled={loading || busy}>Apply filters</button></form>
       {loading ? <p className="admin-roles-message" role="status">Loading staff…</p> : error ? <p className="admin-roles-message">Reload staff to try again.</p> : !accounts.length ? <p className="admin-roles-message">No staff accounts match these filters.</p> : <div className="admin-staff-list">{accounts.map(account => <article key={account.id}>
-        <div className="admin-staff-row"><div><h3>{account.name || "Unnamed staff"}</h3><p>{account.email ?? "Development account"}</p></div><div><strong>{account.role.replaceAll("_", " ")}</strong><span>{account.status} · 2FA {account.twoFactorEnabled ? "enabled" : "not enabled"}</span></div></div>
+        <div className="admin-staff-row"><div><h3>{account.name || "Unnamed staff"}</h3><p>{account.email ?? "Development account"}</p></div><div><strong>{account.role.replaceAll("_", " ")}</strong><span>{account.status}</span></div></div>
         <p className="admin-staff-scope">{account.scope.all ? "All warehouses" : account.scope.warehouseIds.length ? `${account.scope.warehouseIds.length} warehouse(s)` : "No warehouse access"} · Last sign-in: {account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleString() : "Not yet"}</p>
-        {account.role === "super_admin" ? <p className="admin-staff-scope">Protected owner account</p> : <div className="admin-role-actions"><button disabled={busy} onClick={() => { setEditor(account); setAction(null); }}>Edit account</button>{[account.status === "active" ? "deactivate" : "reactivate", "reset-password", "reset-2fa", "force-logout"].map(operation => <button key={operation} disabled={busy || (account.id === userId && operation === "deactivate")} onClick={() => { setAction({ account, operation }); setTemporaryPassword(""); setEditor(null); }}>{operation.replaceAll("-", " ")}</button>)}</div>}
+        {account.role === "super_admin" ? <p className="admin-staff-scope">Protected owner account</p> : <div className="admin-role-actions"><button disabled={busy} onClick={() => { setEditor(account); setAction(null); }}>Edit account</button>{[account.status === "active" ? "deactivate" : "reactivate", "reset-password", "force-logout"].map(operation => <button key={operation} disabled={busy || (account.id === userId && operation === "deactivate")} onClick={() => { setAction({ account, operation }); setTemporaryPassword(""); setEditor(null); }}>{operation.replaceAll("-", " ")}</button>)}</div>}
       </article>)}</div>}
       <div className="admin-staff-pagination"><button disabled={loading || cursors.length <= 1} onClick={() => setCursors(values => values.slice(0, -1))}>Previous</button><span>Page {cursors.length}</span><button disabled={loading || !nextCursor} onClick={() => { if (nextCursor) setCursors(values => [...values, nextCursor]); }}>Next</button></div>
     </section></>;

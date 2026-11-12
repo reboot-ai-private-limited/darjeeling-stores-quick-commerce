@@ -10,6 +10,7 @@ import { ApiError } from "../api/http";
 import { getSlots, slotMessage, type Slot } from "../api/preorder";
 import { checkoutMessage, createQuote, getTipOptions, newKey, placeOrder, type PaymentMethod, type Quote, type TipOptions } from "../api/orders";
 import { Button, Header, Icon, Press, Screen, tap, type IconName } from "../components/ui";
+import { BillSkeleton, Bone, CheckoutSkeleton } from "../components/Skeleton";
 import { useCart } from "../state/cart";
 import { useStore } from "../state/store";
 import { colors, radius, rupees, shadow, space, type } from "../theme";
@@ -19,7 +20,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: 
 /** Screens 21-22: address, delivery time, tip, payment method, the bill from a server quote, and Place order. */
 export default function Checkout() {
   const { zone, signedIn, addressId } = useStore();
-  const { lines, count, savings, clear, applyServer } = useCart();
+  const { lines, count, subtotal, savings, clear, applyServer } = useCart();
   const insets = useSafeAreaInsets();
 
   const [address, setAddress] = useState<Address | null | undefined>(undefined); // undefined = loading
@@ -40,6 +41,9 @@ export default function Checkout() {
   const [banner, setBanner] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const keyRef = useRef<{ quoteId: string; key: string } | null>(null);
+  /** The cart and address last uploaded from this screen: changing the tip or payment method needs a new bill, not a new upload. */
+  const syncedRef = useRef<string | null>(null);
+  const firstRef = useRef(true);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -59,14 +63,20 @@ export default function Checkout() {
     if (needsSlot && !slot) { setQuote(null); setQuoting(false); return; } // choose a delivery time first
     let live = true;
     setQuoting(true); setError(null);
+    const delay = firstRef.current ? 0 : 200;
+    firstRef.current = false;
     const t = setTimeout(async () => {
       try {
-        const cart = await syncCart(lines, address.id);
-        if (!live) return;
-        applyServer(toServerLines(cart.cart), cart.corrections);
-        if (cart.corrections.length) { setBanner("Some items changed, so we updated your cart."); }
-        if (cart.cart.items.length === 0) { setQuote(null); setError("Your items are no longer available."); setQuoting(false); return; }
-        if (cart.corrections.length) return; // the local cart changed; this effect runs again with the new cart
+        const syncKey = `${address.id}|${signature}`;
+        if (syncedRef.current !== syncKey) {
+          const cart = await syncCart(lines, address.id);
+          if (!live) return;
+          applyServer(toServerLines(cart.cart), cart.corrections);
+          if (cart.corrections.length) { setBanner("Some items changed, so we updated your cart."); }
+          if (cart.cart.items.length === 0) { setQuote(null); setError("Your items are no longer available."); setQuoting(false); return; }
+          if (cart.corrections.length) return; // the local cart changed; this effect runs again with the new cart
+          syncedRef.current = syncKey;
+        }
         const q = await createQuote({ addressId: address.id, paymentMethod: method, tipAmount: tip, acceptZoneChange: accept, scheduledWindow: needsSlot && slot ? { start: slot.start, end: slot.end } : null });
         if (!live) return;
         setQuote(q); setZoneChange(null); setQuoting(false);
@@ -76,7 +86,7 @@ export default function Checkout() {
         if (e instanceof ApiError && e.code === "ZONE_CHANGE_UNCONFIRMED") { setZoneChange((e.details?.zoneChange as typeof zoneChange) ?? {}); return; }
         setError(e instanceof ApiError ? checkoutMessage(e.code, e.details, e.message) : "Couldn't get your bill. Please try again.");
       }
-    }, 350);
+    }, delay);
     return () => { live = false; clearTimeout(t); };
   }, [address, tip, method, accept, signature, slot, needsSlot]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -116,7 +126,7 @@ export default function Checkout() {
     <View style={{ flex: 1, backgroundColor: colors.cream }}>
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title="Checkout" /></View>
-        {address === undefined ? <ActivityIndicator color={colors.maroon} style={{ marginTop: 80 }} /> : (
+        {address === undefined ? <CheckoutSkeleton /> : (
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 170 + insets.bottom, gap: space.lg }}>
 
@@ -253,8 +263,14 @@ export default function Checkout() {
               <View>
                 <Section icon="file-text" title="Bill details" />
                 <View style={s.card}>
-                  {quoting && !quote ? <ActivityIndicator color={colors.maroon} /> : quote ? (
+                  {quoting && !quote ? (
                     <>
+                      <Bill label="Items total" value={rupees(subtotal)} />
+                      <View style={{ height: space.md }} />
+                      <BillSkeleton />
+                    </>
+                  ) : quote ? (
+                    <View style={{ opacity: quoting ? 0.45 : 1 }}>
                       <Bill label="Items total" value={rupees(quote.pricing.subtotal)} />
                       {quote.pricing.discount > 0 && <Bill label="Discount" value={`- ${rupees(quote.pricing.discount)}`} tone={colors.green} />}
                       {quote.pricing.charges.map(c => <Bill key={c.type + c.label} label={c.label} value={c.amount === 0 ? "FREE" : rupees(c.amount)} tone={c.amount === 0 ? colors.green : undefined} />)}
@@ -264,7 +280,7 @@ export default function Checkout() {
                       {savings + quote.pricing.discount > 0 && (
                         <View style={s.saved}><Icon name="tag" size={15} color={colors.green} /><Text style={s.savedText}>You're saving {rupees(savings + quote.pricing.discount)} on this order</Text></View>
                       )}
-                    </>
+                    </View>
                   ) : <Text style={type.small}>{zoneChange ? "Accept the changes above to see your bill." : "Your bill will show here."}</Text>}
                 </View>
               </View>
@@ -278,7 +294,7 @@ export default function Checkout() {
       {address && (
         <View style={[s.bar, { paddingBottom: insets.bottom + space.md }]}>
           <View style={{ flex: 1 }}>
-            <Text style={s.barTotal}>{quote ? rupees(total) : "—"}</Text>
+            {quoting && !quote ? <Bone w={80} h={22} style={{ marginBottom: 4 }} /> : <Text style={s.barTotal}>{quote ? rupees(total) : "—"}</Text>}
             <Text style={type.small}>Cash on delivery</Text>
           </View>
           <Button label={placing ? "Placing…" : "Place order"} icon="check" disabled={!canPlace} onPress={() => void place()} style={{ flex: 1.3 }} />

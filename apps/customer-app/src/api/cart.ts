@@ -22,7 +22,11 @@ export type StoreStatus = {
   eta: { minMinutes: number; maxMinutes: number }; minOrder: number; freeDeliveryAbove: number | null; smallOrderFee: number;
   notices: { type: string; label: string }[];
 };
-export const getStoreStatus = (zoneId: string) => api<StoreStatus>("GET", `/store/status?zoneId=${zoneId}`, undefined, { auth: false }).then(r => r.data);
+/** The last store status of each zone, so the cart can draw its free-delivery bar at once and refresh quietly. */
+const statusCache = new Map<string, StoreStatus>();
+export const cachedStoreStatus = (zoneId: string | undefined): StoreStatus | null => (zoneId ? statusCache.get(zoneId) ?? null : null);
+export const getStoreStatus = (zoneId: string) =>
+  api<StoreStatus>("GET", `/store/status?zoneId=${zoneId}`, undefined, { auth: false }).then(r => { statusCache.set(zoneId, r.data); return r.data; });
 
 export const REASONS: Record<string, string> = {
   out_of_stock: "is out of stock and was removed",

@@ -231,7 +231,6 @@ describe("F03-11: Authoritative geography interface and composition", () => {
     const response = await pending;
     expect(response.status).toBe(401);
     expect(await db.collection("cities").countDocuments({ name: `Revoked ${action} city` })).toBe(0);
-    expect(await db.collection("audit_log").countDocuments({ requestId: response.headers["x-request-id"] })).toBe(0);
   });
 
 });

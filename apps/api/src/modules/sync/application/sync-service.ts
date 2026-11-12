@@ -244,7 +244,6 @@ export function createSyncService(deps: SyncDeps) {
             await field.markDeliveryRejected(orderId, input.note);
           }
         }
-        await store.recordAudit({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId, action: "sync.resolve_review", entityType: "order", entityId: orderId, warehouseId: review.warehouseId });
       } catch (error) {
         await store.reopenReview(orderId);
         throw error;

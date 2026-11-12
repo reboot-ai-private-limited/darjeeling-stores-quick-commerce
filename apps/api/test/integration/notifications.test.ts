@@ -22,102 +22,14 @@ const makeDue = () => col("jobs").updateMany({ status: "pending" }, { $set: { ru
 const notify = f2(() => f.mods.notifications.notify);
 function f2<T>(get: () => T): T { return ((...args: unknown[]) => (get() as unknown as (...a: unknown[]) => unknown)(...args)) as unknown as T; }
 
-async function orderTemplates() {
-  const push = await f.send("post", "/admin/notification-templates", { key: "order_confirmed", channel: "push", title: "Order confirmed", body: "Your order {{orderNo}} is confirmed.", category: "utility" });
-  const wa = await f.send("post", "/admin/notification-templates", {
-    key: "order_confirmed", channel: "whatsapp", body: "Hi {{name}}, order {{orderNo}} is confirmed. Total ₹{{total}}", whatsappTemplateName: "order_confirmed_v1", category: "utility",
-  });
-  expect(push.status, JSON.stringify(push.body)).toBe(201);
-  expect(wa.status, JSON.stringify(wa.body)).toBe(201);
-}
+/** A built-in message that goes out on both push and WhatsApp: "refund paid". */
 const confirmed = (userId: string, extra: Record<string, unknown> = {}) => notify({
-  userId, templateKey: "order_confirmed", vars: { name: "Asha", orderNo: "DS-240001-A", total: 399 },
+  userId, templateKey: "customer_refund_done", vars: { orderNo: "DS-240001-A", amount: 399 },
   data: { type: "order_status", orderId: "ord_1", deepLink: "ds://order/ord_1" }, ...extra,
-});
-
-describe("message templates", () => {
-  it("starts with the built-in templates for back-in-stock alerts and login codes", async () => {
-    const res = await f.get("/admin/notification-templates");
-    expect(res.status).toBe(200);
-    // Four are for customers; the rest belong to the rider and dispatch flows.
-    expect(res.body.meta).toEqual({ count: 17 });
-    expect(res.body.data.map((t: { key: string; channel: string }) => `${t.key}/${t.channel}`).filter((k: string) => /^(back_in_stock|otp_login)/.test(k))).toEqual(["back_in_stock/push", "back_in_stock/whatsapp", "otp_login/whatsapp", "otp_login/sms"]);
-    expect(res.body.data.find((t: { key: string; channel: string }) => t.key === "back_in_stock" && t.channel === "whatsapp")).toEqual({
-      id: expect.stringMatching(/^[a-f0-9]{24}$/), key: "back_in_stock", channel: "whatsapp", title: null, body: expect.stringContaining("{{productName}}"),
-      whatsappTemplateName: "back_in_stock_v1", category: "utility", language: "en", isActive: true,
-    });
-  });
-
-  it("keeps an admin's edits when the built-in templates are added again", async () => {
-    const list = (await f.get("/admin/notification-templates")).body.data;
-    const push = list.find((t: { key: string; channel: string }) => t.key === "back_in_stock" && t.channel === "push");
-    expect((await f.send("put", `/admin/notification-templates/${push.id}`, { title: "It's back!" })).status).toBe(200);
-    await f.mods.notifications.ready();
-    await f.mods.notifications.ready();
-    const after = (await f.get("/admin/notification-templates")).body;
-    expect(after.meta.count).toBe(17);
-    expect(after.data.find((t: { id: string }) => t.id === push.id).title).toBe("It's back!");
-  });
-
-  it("creates a template, records who did it, and lists it", async () => {
-    await orderTemplates();
-    expect(await col("audit_log").countDocuments({ action: "notification_template.create", entityType: "notification_template", actorId: "000000000000000000000001" })).toBe(2);
-    const created = (await f.get("/admin/notification-templates")).body.data.filter((t: { key: string }) => t.key === "order_confirmed");
-    expect(created).toHaveLength(2);
-    expect(created.find((t: { channel: string }) => t.channel === "push")).toMatchObject({ title: "Order confirmed", whatsappTemplateName: null, language: "en", isActive: true });
-  });
-
-  it("rejects templates that could not be sent", async () => {
-    const base = { key: "promo_x", channel: "push", title: "Hi", body: "Hello {{name}}", category: "utility" };
-    const bad = async (over: Record<string, unknown>) => (await f.send("post", "/admin/notification-templates", { ...base, ...over })).status;
-    expect(await bad({ body: "Hello {{nickname}}" })).toBe(400);
-    expect(await bad({ channel: "whatsapp", title: null })).toBe(400);
-    expect(await bad({ whatsappTemplateName: "x_v1" })).toBe(400);
-    expect(await bad({ channel: "sms", title: "no", category: "marketing" })).toBe(400);
-    expect(await bad({ key: "Bad Key" })).toBe(400);
-    expect(await bad({ channel: "fax" })).toBe(400);
-    expect(await bad({ category: "spam" })).toBe(400);
-    expect(await bad({ body: "" })).toBe(400);
-    expect(await bad({ language: "english" })).toBe(400);
-    expect(await bad({ extra: true })).toBe(400);
-    const unknown = await f.send("post", "/admin/notification-templates", { ...base, body: "Hello {{nickname}}" });
-    expect(unknown.body.error.details).toEqual({ field: "body", variable: "nickname" });
-    expect(await bad({})).toBe(201);
-  });
-
-  it("refuses a second template for the same key and channel, on create or on rename", async () => {
-    await orderTemplates();
-    const dup = await f.send("post", "/admin/notification-templates", { key: "order_confirmed", channel: "push", title: "x", body: "y", category: "utility" });
-    expect(dup.status).toBe(409);
-    expect(dup.body.error.code).toBe("CONFLICT");
-    const other = await f.send("post", "/admin/notification-templates", { key: "order_packed", channel: "push", title: "x", body: "y", category: "utility" });
-    const clash = await f.send("put", `/admin/notification-templates/${other.body.data.id}`, { key: "order_confirmed" });
-    expect(clash.status).toBe(409);
-  });
-
-  it("edits a template, records it, and 404s for an unknown one", async () => {
-    await orderTemplates();
-    const push = (await f.get("/admin/notification-templates")).body.data.find((t: { key: string; channel: string }) => t.key === "order_confirmed" && t.channel === "push");
-    const res = await f.send("put", `/admin/notification-templates/${push.id}`, { body: "Order {{orderNo}} confirmed!", isActive: false });
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ id: push.id, body: "Order {{orderNo}} confirmed!", isActive: false, title: "Order confirmed" });
-    expect(await col("audit_log").countDocuments({ action: "notification_template.update", entityId: push.id })).toBe(1);
-    expect((await f.send("put", `/admin/notification-templates/${push.id}`, { body: "{{nope}}" })).status).toBe(400);
-    expect((await f.send("put", `/admin/notification-templates/${"9".repeat(24)}`, { body: "x" })).status).toBe(404);
-    expect((await f.send("put", `/admin/notification-templates/${push.id}`, { channel: "whatsapp" })).status).toBe(400);
-  });
-
-  it("needs the notifications permission", async () => {
-    expect((await f.get("/admin/notification-templates", viewer)).status).toBe(403);
-    expect((await f.send("post", "/admin/notification-templates", {}, viewer)).status).toBe(403);
-    expect((await f.get("/admin/notification-templates", {})).status).toBe(401);
-    expect((await f.get("/admin/notification-templates", customer(A))).status).toBe(401);
-  });
 });
 
 describe("queuing and sending", () => {
   it("fills in the templates, saves one log row per channel, and sends them when the worker runs", async () => {
-    await orderTemplates();
     f.msg.person(A, PHONE_A, ["tok-1"]);
     const result = await confirmed(A, { orderId: "e1".repeat(12), imageUrl: "https://cdn/x.webp" });
     expect(result.queued.map(q => q.channel).sort()).toEqual(["push", "whatsapp"]);
@@ -131,45 +43,41 @@ describe("queuing and sending", () => {
 
     expect(await f.runJobs()).toBe(2);
     expect(f.msg.pushed).toEqual([{
-      token: "tok-1", title: "Order confirmed", body: "Your order DS-240001-A is confirmed.", imageUrl: "https://cdn/x.webp", priority: "high",
+      token: "tok-1", title: "Refund paid", body: "Your refund of ₹399 for order DS-240001-A has been paid.", imageUrl: "https://cdn/x.webp", priority: "high",
       data: { type: "order_status", orderId: "ord_1", deepLink: "ds://order/ord_1", notificationId: result.queued.find(q => q.channel === "push")!.id },
     }]);
-    expect(f.msg.whatsapped).toEqual([{ to: PHONE_A, templateName: "order_confirmed_v1", language: "en", params: ["Asha", "DS-240001-A", "399"], buttonParams: [] }]);
+    expect(f.msg.whatsapped).toEqual([{ to: PHONE_A, templateName: "refund_done_v1", language: "en", params: ["399", "DS-240001-A"], buttonParams: [] }]);
     for (const row of await allNotes()) expect(row).toMatchObject({ status: "sent", attempts: 1, error: null, sentAt: expect.any(Date), lockedUntil: null });
     expect((await allNotes()).map(r => r.providerMessageId).sort()).toEqual(["fcm-1", "wamid.1"]);
     expect(await col("jobs").countDocuments({ status: "done" })).toBe(2);
   });
 
   it("sends only the channels asked for, and SMS only when asked", async () => {
-    await orderTemplates();
     f.msg.person(A, PHONE_A, ["tok-1"]);
     const only = await confirmed(A, { channels: ["whatsapp"] });
     expect(only.queued.map(q => q.channel)).toEqual(["whatsapp"]);
     const sms = await confirmed(A, { channels: ["sms"], dedupeKey: "x" });
     expect(sms.skipped).toEqual([{ channel: "sms", reason: "no_template" }]);
-    await f.send("post", "/admin/notification-templates", { key: "order_confirmed", channel: "sms", body: "Order {{orderNo}} confirmed, ₹{{total}}", category: "utility" });
-    const texted = await confirmed(A, { channels: ["sms"], dedupeKey: "y" });
+    const texted = await notify({ userId: A, templateKey: "otp_login", channels: ["sms"], vars: { code: "482913" }, dedupeKey: "y" });
     expect(texted.queued.map(q => q.channel)).toEqual(["sms"]);
     await f.runJobs();
-    expect(f.msg.texted).toEqual([{ to: PHONE_A, text: "Order DS-240001-A confirmed, ₹399" }]);
+    expect(f.msg.texted).toEqual([{ to: PHONE_A, text: "Your Darjeeling Stores login code is 482913. Valid for 5 minutes." }]);
     expect(f.msg.pushed).toHaveLength(0);
   });
 
-  it("skips channels with no active template, and refuses to send with a value missing", async () => {
-    await orderTemplates();
+  it("skips channels a message has no wording for, and refuses to send with a value missing", async () => {
     const none = await notify({ userId: A, templateKey: "no_such_template" });
     expect(none).toEqual({ queued: [], skipped: [{ channel: "push", reason: "no_template" }, { channel: "whatsapp", reason: "no_template" }] });
-    const missing = notify({ userId: A, templateKey: "order_confirmed", vars: { name: "Asha" } });
-    await expect(missing).rejects.toMatchObject({ code: "VALIDATION_ERROR", details: { field: "vars", variable: "orderNo" } });
+    const missing = notify({ userId: A, templateKey: "customer_refund_done", vars: { orderNo: "DS-1" } });
+    await expect(missing).rejects.toMatchObject({ code: "VALIDATION_ERROR", details: { field: "vars", variable: "amount" } });
     expect(await col("notifications").countDocuments({})).toBe(0);
-    const list = (await f.get("/admin/notification-templates")).body.data;
-    const wa = list.find((t: { key: string; channel: string }) => t.key === "order_confirmed" && t.channel === "whatsapp");
-    await f.send("put", `/admin/notification-templates/${wa.id}`, { isActive: false });
-    expect((await confirmed(A)).queued.map(q => q.channel)).toEqual(["push"]);
+    // "order placed" has push wording only, so WhatsApp is skipped.
+    const placed = await notify({ userId: A, templateKey: "customer_order_placed", vars: { orderNo: "DS-1" } });
+    expect(placed.queued.map(q => q.channel)).toEqual(["push"]);
+    expect(placed.skipped).toEqual([{ channel: "whatsapp", reason: "no_template" }]);
   });
 
   it("queues a message once however many times the same event is reported", async () => {
-    await orderTemplates();
     f.msg.person(A, PHONE_A, ["tok-1"]);
     const first = await confirmed(A, { dedupeKey: "order:ord_1:confirmed" });
     const again = await confirmed(A, { dedupeKey: "order:ord_1:confirmed" });
@@ -184,9 +92,8 @@ describe("queuing and sending", () => {
   });
 
   it("respects promo preferences but never holds back order updates", async () => {
-    await f.send("post", "/admin/notification-templates", { key: "weekend_offer", channel: "push", title: "Weekend offer", body: "Free delivery today", category: "marketing" });
-    await f.send("post", "/admin/notification-templates", { key: "weekend_offer", channel: "whatsapp", body: "Free delivery today", whatsappTemplateName: "weekend_offer_v1", category: "marketing" });
-    const promo = (userId: string) => notify({ userId, templateKey: "weekend_offer", purpose: "promo" });
+    const offer = { title: "Weekend offer", body: "Free delivery today" };
+    const promo = (userId: string) => notify({ userId, templateKey: "promo_broadcast", vars: offer, purpose: "promo" });
     expect((await promo(A)).queued.map(q => q.channel)).toEqual(["push"]);
     await f.mods.notifications.delivery.setPrefs(B, { promoPush: false, promoWhatsApp: true });
     const b = await promo(B);
@@ -195,19 +102,17 @@ describe("queuing and sending", () => {
     await f.mods.notifications.delivery.setPrefs(C, { promoPush: false });
     expect((await promo(C)).queued).toEqual([]);
     // The same customer still gets an order update.
-    await orderTemplates();
     expect((await confirmed(C)).queued).toHaveLength(2);
     // Cart reminders need their own opt-in.
-    expect((await notify({ userId: A, templateKey: "weekend_offer", purpose: "cart_reminder", dedupeKey: "c1" })).queued).toEqual([]);
+    expect((await notify({ userId: A, templateKey: "promo_broadcast", vars: offer, purpose: "cart_reminder", dedupeKey: "c1" })).queued).toEqual([]);
     await f.mods.notifications.delivery.setPrefs(A, { cartReminders: true });
-    expect((await notify({ userId: A, templateKey: "weekend_offer", purpose: "cart_reminder", dedupeKey: "c2" })).queued.length).toBe(2);
+    expect((await notify({ userId: A, templateKey: "promo_broadcast", vars: offer, purpose: "cart_reminder", dedupeKey: "c2" })).queued.length).toBe(2);
   });
 });
 
 describe("when sending goes wrong", () => {
   const status = async (id: string) => (await note(id))!;
   async function one(channel: "push" | "whatsapp") {
-    await orderTemplates();
     const { queued } = await confirmed(A, { channels: [channel] });
     return queued[0]!.id;
   }
@@ -283,8 +188,7 @@ describe("when sending goes wrong", () => {
     const bare = await import("../../src/composition/dev2.js").then(m => m.createDev2Modules({ connection: f.h.connection, auth: () => undefined, contacts: f.msg.contacts, devices: f.msg.devices }));
     await bare.notifications.ready();
     f.msg.person(A, PHONE_A, ["t"]);
-    await f.send("post", "/admin/notification-templates", { key: "kk", channel: "whatsapp", body: "x", whatsappTemplateName: "kk_v1", category: "utility" });
-    const { queued } = await bare.notifications.notify({ userId: A, templateKey: "kk", channels: ["whatsapp"] });
+    const { queued } = await bare.notifications.notify({ userId: A, templateKey: "customer_refund_done", vars: { orderNo: "DS-1", amount: 10 }, channels: ["whatsapp"] });
     for (let i = 0; i < 5; i++) await bare.jobs.service.runOnce();
     expect(await status(queued[0]!.id)).toMatchObject({ status: "failed", error: "WhatsApp is not configured on this server" });
   });
@@ -311,7 +215,6 @@ describe("when sending goes wrong", () => {
 
 describe("the delivery log and retrying", () => {
   async function seedLog() {
-    await orderTemplates();
     f.msg.person(A, PHONE_A, ["tok-a"]);
     f.msg.person(B, null, []);
     await confirmed(A, { orderId: "e1".repeat(12) });
@@ -328,7 +231,7 @@ describe("the delivery log and retrying", () => {
     const ids = all.body.data.map((n: { id: string }) => n.id);
     expect(ids).toEqual([...ids].sort().reverse());
     expect(all.body.data.find((n: { userId: string; channel: string }) => n.userId === A && n.channel === "push")).toEqual({
-      id: expect.any(String), userId: A, templateKey: "order_confirmed", channel: "push", status: "sent", error: null, attempts: 1,
+      id: expect.any(String), userId: A, templateKey: "customer_refund_done", channel: "push", status: "sent", error: null, attempts: 1,
       orderId: "e1".repeat(12), createdAt: expect.stringMatching(/Z$/), sentAt: expect.stringMatching(/Z$/),
     });
     const names = async (q: string) => (await f.get(`/admin/notifications?${q}`)).body.data.length;
@@ -357,7 +260,7 @@ describe("the delivery log and retrying", () => {
     expect((await f.get("/admin/notifications?status=lost")).status).toBe(400);
   });
 
-  it("retries a failed message once the cause is fixed, and records who asked", async () => {
+  it("retries a failed message once the cause is fixed", async () => {
     await seedLog();
     const failed = (await f.get(`/admin/notifications?userId=${B}&channel=whatsapp`)).body.data[0];
     expect(failed.status).toBe("failed");
@@ -369,7 +272,6 @@ describe("the delivery log and retrying", () => {
     await f.runJobs();
     expect(await note(failed.id)).toMatchObject({ status: "sent", attempts: 1 });
     expect(f.msg.whatsapped.at(-1)).toMatchObject({ to: PHONE_B });
-    expect(await col("audit_log").countDocuments({ action: "notification.retry", entityId: failed.id })).toBe(1);
   });
 
   it("refuses to retry a message that has not failed, and 404s for an unknown one", async () => {
@@ -423,7 +325,6 @@ describe("WhatsApp webhook", () => {
   const report = (id: string, status: string, errors?: unknown[]) => ({ entry: [{ changes: [{ value: { statuses: [{ id, status, ...(errors && { errors }) }] } }] }] });
 
   async function sentMessage() {
-    await orderTemplates();
     f.msg.person(A, PHONE_A);
     const { queued } = await confirmed(A, { channels: ["whatsapp"] });
     await f.runJobs();
@@ -479,7 +380,6 @@ describe("WhatsApp webhook", () => {
   });
 
   it("can handle several updates in one call", async () => {
-    await orderTemplates();
     f.msg.person(A, PHONE_A);
     f.msg.person(B, PHONE_B);
     const a = (await confirmed(A, { channels: ["whatsapp"] })).queued[0]!.id;
@@ -502,11 +402,6 @@ describe("promo broadcasts", () => {
     await f.mods.notifications.delivery.setPrefs(U[1]!, { promoPush: false });
     await f.mods.notifications.delivery.setPrefs(U[3]!, { promoWhatsApp: true });
   }
-  async function marketingTemplate() {
-    const res = await f.send("post", "/admin/notification-templates", { key: "promo_broadcast", channel: "whatsapp", body: "{{title}}: {{body}}", whatsappTemplateName: "promo_broadcast_v1", category: "marketing" });
-    expect(res.status, JSON.stringify(res.body)).toBe(201);
-  }
-
   it("answers at once with the number of opted-in customers, then sends to exactly those", async () => {
     await audience();
     const res = await f.send("post", "/admin/broadcast", body);
@@ -516,7 +411,6 @@ describe("promo broadcasts", () => {
     await f.runJobs();
     expect(f.msg.pushed.map(p => p.token).sort()).toEqual([U[0], U[2], U[3]].map(id => `tok-${id}`).sort());
     expect(f.msg.pushed[0]).toMatchObject({ title: "Fresh mountain veggies", body: "Free delivery above ₹399 today", priority: "normal", data: { type: "promo", deepLink: "ds://category/cat_1" } });
-    expect(await col("audit_log").countDocuments({ action: "notification.broadcast", entityType: "broadcast" })).toBe(1);
   });
 
   it("does not send twice when the job is repeated", async () => {
@@ -530,18 +424,14 @@ describe("promo broadcasts", () => {
     expect(f.msg.pushed).toHaveLength(3);
   });
 
-  it("needs an approved marketing template for WhatsApp and sends it only to customers who opted in", async () => {
+  it("sends WhatsApp broadcasts, with the built-in wording, only to customers who opted in", async () => {
     await audience();
-    const refused = await f.send("post", "/admin/broadcast", { ...body, channels: ["push", "whatsapp"] });
-    expect(refused.status).toBe(400);
-    expect(refused.body.error.details).toEqual({ field: "channels" });
-    await marketingTemplate();
     const res = await f.send("post", "/admin/broadcast", { ...body, channels: ["push", "whatsapp"] });
     expect(res.status).toBe(202);
     expect(res.body.data.recipients).toBe(3);
     await f.runJobs();
     expect(f.msg.pushed).toHaveLength(3);
-    expect(f.msg.whatsapped).toEqual([{ to: expect.stringMatching(/^\+91/), templateName: "promo_broadcast_v1", language: "en", params: ["Fresh mountain veggies", "Free delivery above ₹399 today"], buttonParams: [] }]);
+    expect(f.msg.whatsapped).toEqual([{ to: expect.stringMatching(/^\+91/), templateName: "promo_broadcast", language: "en", params: ["Fresh mountain veggies", "Free delivery above ₹399 today"], buttonParams: [] }]);
   });
 
   it("only reaches the zones asked for", async () => {
@@ -593,19 +483,6 @@ describe("login codes", () => {
     expect(rows.map(r => [r.channel, r.status])).toEqual([["whatsapp", "failed"], ["sms", "sent"]]);
     expect(rows[0]!.error).toBe("Template not approved");
     expect(JSON.stringify(rows)).not.toContain(CODE);
-  });
-
-  it("uses the admin's edited SMS text and WhatsApp template name", async () => {
-    const list = (await f.get("/admin/notification-templates")).body.data;
-    const sms = list.find((t: { key: string; channel: string }) => t.key === "otp_login" && t.channel === "sms");
-    const wa = list.find((t: { key: string; channel: string }) => t.key === "otp_login" && t.channel === "whatsapp");
-    await f.send("put", `/admin/notification-templates/${sms.id}`, { body: "{{code}} is your DS code" });
-    await f.send("put", `/admin/notification-templates/${wa.id}`, { whatsappTemplateName: "login_otp_v2", language: "en_US" });
-    await otp().send(PHONE_A, CODE);
-    expect(f.msg.whatsapped[0]).toMatchObject({ templateName: "login_otp_v2", language: "en_US" });
-    f.msg.behavior.whatsappAlways = new ProviderError("down", false);
-    await otp().send(PHONE_B, "111111");
-    expect(f.msg.texted[0]).toEqual({ to: PHONE_B, text: "111111 is your DS code" });
   });
 
   it("fails with OTP_DELIVERY_FAILED when neither channel works", async () => {
@@ -663,25 +540,6 @@ describe("back in stock alerts, from restock to message", () => {
     await f.runJobs();
     expect(await col("notifications").countDocuments({ templateKey: "back_in_stock" })).toBe(2);
     expect(f.msg.pushed).toHaveLength(1);
-  });
-
-  it("holds the alert until a template is active, then sends it", async () => {
-    const p = await waitingProduct();
-    f.msg.person(A, PHONE_A, ["tok-a"]);
-    const templates = (await f.get("/admin/notification-templates")).body.data.filter((t: { key: string }) => t.key === "back_in_stock");
-    for (const t of templates) await f.send("put", `/admin/notification-templates/${t.id}`, { isActive: false });
-    await subscribe(p.id, p.v500, A);
-    await restock(p.id);
-    expect(await col("notifications").countDocuments({})).toBe(0);
-    const waiting = await f.mods.availability.notify.pendingMessages();
-    expect(waiting).toHaveLength(1);
-    expect(waiting[0]).toMatchObject({ status: "pending", attempts: 1, lastError: expect.stringContaining("No active back_in_stock template") });
-
-    for (const t of templates) await f.send("put", `/admin/notification-templates/${t.id}`, { isActive: true });
-    expect(await f.mods.notifications.campaigns.drainBackInStock()).toEqual({ handedOver: 1, failed: 0 });
-    await f.runJobs();
-    expect(f.msg.pushed).toHaveLength(1);
-    expect(await f.mods.availability.notify.pendingMessages()).toEqual([]);
   });
 
   it("uses a customer's channel choice from Notify Me", async () => {

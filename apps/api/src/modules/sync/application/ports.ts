@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Review } from "../domain/sync.js";
 
 export interface EventClaim { riderId: string; clientEventId: string; seq: number; type: string; orderId: string | null; deviceTime: Date; receivedAt: Date }
@@ -18,5 +17,4 @@ export interface SyncStore {
   openCount(warehouseIds?: readonly string[]): Promise<number>;
   closeReview(orderId: string, patch: { outcome: "accepted" | "rejected"; note: string | null; by: string; at: Date }): Promise<boolean>;
   reopenReview(orderId: string): Promise<void>;
-  recordAudit(entry: AuditEvent): Promise<void>;
 }

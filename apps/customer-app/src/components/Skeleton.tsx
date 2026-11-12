@@ -83,3 +83,79 @@ export function GridSkeleton({ cols = 2 }: { cols?: number }) {
     </View>
   );
 }
+
+/** Stand-in for the Categories tab: a grid of round-cornered tiles with a name line under each, four to a row. */
+export function CategoryGridSkeleton({ count = 16 }: { count?: number }) {
+  const { width } = useWindowDimensions();
+  const tile = (width - space.sm * 2) / 4 - 10;
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading categories" style={{ flexDirection: "row", flexWrap: "wrap", padding: space.sm }}>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={{ width: "25%", padding: 5, alignItems: "center" }}>
+          <Bone h={tile} r={radius.lg} />
+          <Bone w="70%" h={11} style={{ marginTop: 8 }} />
+          <Bone w="45%" h={11} style={{ marginTop: 5 }} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Stand-in for a category's shelves on Home: two product rows. */
+export function RailsSkeleton() {
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading products">
+      <RailBone title={150} />
+      <RailBone title={120} />
+    </View>
+  );
+}
+
+const cardBox = { backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: space.lg, gap: space.md } as const;
+
+/** The rows of a bill while the server is still pricing the order. */
+export function BillSkeleton() {
+  return (
+    <View style={{ gap: space.md }}>
+      {[110, 90, 130].map((w, i) => (
+        <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Bone w={w} h={14} />
+          <Bone w={56} h={14} />
+        </View>
+      ))}
+      <View style={{ height: 1, backgroundColor: colors.line, marginTop: space.xs }} />
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Bone w={100} h={20} />
+        <Bone w={72} h={22} />
+      </View>
+    </View>
+  );
+}
+
+/** Checkout while the address, tip options and the first bill load: the same blocks, as grey shapes. */
+export function CheckoutSkeleton() {
+  return (
+    <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
+      <Bone h={150} r={radius.xl} />
+      <View style={cardBox}>
+        <Bone w={120} h={16} />
+        {[0, 1].map(i => (
+          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+            <Bone w={56} h={56} r={radius.md} />
+            <View style={{ flex: 1, gap: 8 }}><Bone w="75%" h={14} /><Bone w="40%" h={12} /></View>
+            <Bone w={46} h={16} />
+          </View>
+        ))}
+      </View>
+      <Bone h={60} r={radius.md} />
+      <View style={{ gap: space.sm }}>
+        <Bone h={64} r={radius.md} />
+        <Bone h={64} r={radius.md} />
+      </View>
+      <View style={cardBox}>
+        <Bone w={110} h={16} />
+        <BillSkeleton />
+      </View>
+    </View>
+  );
+}

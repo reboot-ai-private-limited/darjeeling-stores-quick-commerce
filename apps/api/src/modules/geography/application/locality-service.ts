@@ -8,7 +8,7 @@ import {
   type Locality,
   type LocalityDTO,
 } from "../domain/locality.js";
-import type { CityStore, GeographyActor, LocalityStore, LockActorFn, WriteAuditFn, ZoneStore } from "./ports.js";
+import type { CityStore, GeographyActor, LocalityStore, LockActorFn, ZoneStore } from "./ports.js";
 
 export interface CreateLocalityInput {
   cityId: string;
@@ -33,7 +33,6 @@ export interface LocalityServiceDependencies {
   localityStore: LocalityStore;
   cityStore: CityStore;
   zoneStore: ZoneStore;
-  writeAudit: WriteAuditFn;
   withTransaction: <T>(fn: (session: ClientSession) => Promise<T>) => Promise<T>;
   newId: () => string;
   lockActor?: LockActorFn | undefined;
@@ -152,23 +151,6 @@ export function createLocalityService(deps: LocalityServiceDependencies) {
         const created = await deps.localityStore.create(record, session);
         const dto = toLocalityDTO(created);
 
-        // 5. Write audit log
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "locality.create",
-            entityType: "locality",
-            entityId: id,
-            requestId,
-            localityChange: {
-              before: null,
-              after: dto,
-            },
-          },
-          session
-        );
-
         return dto;
       });
     },
@@ -275,22 +257,6 @@ export function createLocalityService(deps: LocalityServiceDependencies) {
 
         const beforeDTO = toLocalityDTO(current);
         const afterDTO = toLocalityDTO(updated);
-
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "locality.update",
-            entityType: "locality",
-            entityId: id,
-            requestId,
-            localityChange: {
-              before: beforeDTO,
-              after: afterDTO,
-            },
-          },
-          session
-        );
 
         return afterDTO;
       });

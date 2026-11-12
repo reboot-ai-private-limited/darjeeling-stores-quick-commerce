@@ -284,7 +284,6 @@ describe("committing an import", () => {
     expect(await count("stock_movements", { reason: "import", warehouseId: W3 })).toBe(3);
     expect(await one("stock_movements", { reason: "import", productId: tomato.id })).toMatchObject({ delta: 24000, balanceAfter: 24000, mode: "grams", by: "000000000000000000000001" });
     expect(await count("price_history", { warehouseId: W3, productId: { $in: [tomato.id, salt.id] }, oldPrice: 0 })).toBe(4);
-    expect(await count("audit_log", { action: "offering.import" })).toBe(2);
     expect(f.events.filter(e => e.type === "stock.zone_availability_changed")).toHaveLength(4);
 
     const source = (await f.get(`/admin/warehouse-products/${sourceTomato.id}`)).body.data;

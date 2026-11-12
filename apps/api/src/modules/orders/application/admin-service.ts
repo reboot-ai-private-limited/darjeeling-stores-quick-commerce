@@ -10,8 +10,6 @@ export interface AdminOrderQuery {
 }
 
 const actorOf = (ctx: Ctx) => ({ userId: ctx.actor.userId, role: ctx.actor.role });
-const audit = (ctx: Ctx, action: string, orderId: string, warehouseId: string) =>
-  ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId, action, entityType: "order", entityId: orderId, warehouseId });
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[c]!);
 const rupees = (paise: number) => `₹${(paise / 100).toFixed(2)}`;
 const EDITABLE: readonly OrderStatus[] = ["PLACED", "CONFIRMED", "PACKING", "READY"];
@@ -75,7 +73,7 @@ export function createAdminOrderService(deps: OrderDeps, core: OrderCore) {
       items, itemsSubtotal: order.itemsSubtotal - removedValue, allocatedDiscount: order.allocatedDiscount - discountShare,
       amountDue: prepaid ? 0 : Math.max(0, order.amountDue - customerDelta), paidAmount: prepaid ? Math.max(0, order.paidAmount - customerDelta) : order.paidAmount,
     };
-    const updated = await store.patch(order.id, next, core.eventOf(order, "item_unavailable", actorOf(ctx), { meta: { index, name: item.name, removedQty, newQty, reason, refund: prepaid ? customerDelta : 0 } }), { rev: order.rev }, audit(ctx, "orders.item_unavailable", order.id, order.warehouseId));
+    const updated = await store.patch(order.id, next, core.eventOf(order, "item_unavailable", actorOf(ctx), { meta: { index, name: item.name, removedQty, newQty, reason, refund: prepaid ? customerDelta : 0 } }), { rev: order.rev });
     if (!updated) throw core.conflictStale();
     await stock.restore({ key: group.id, restoreKey: `item:${order.id}:${index}:${order.rev}`, reason: "cancel", lines: [{ warehouseId: order.warehouseId, productId: item.productId, variantId: item.variantId, qty: removedQty }] }).catch(() => undefined);
     await store.updateGroup(group.id, { pricing: { ...group.pricing, subtotal: group.pricing.subtotal - removedValue, discount: group.pricing.discount - discountShare, total: group.pricing.total - customerDelta } });
@@ -94,10 +92,9 @@ export function createAdminOrderService(deps: OrderDeps, core: OrderCore) {
     return { order: await view((await store.getOrder(order.id))!, group), refund: refund && { id: refund.id, amount: refund.amount, status: "requested" as const }, notifiedCustomer: true };
   }
 
-  async function step(ctx: Ctx, id: string, to: OrderStatus, audited = false) {
-    const { order, group } = await load(ctx, id);
+  async function step(ctx: Ctx, id: string, to: OrderStatus) {
+    const { group } = await load(ctx, id);
     const result = await core.move(id, to, actorOf(ctx));
-    if (audited) await store.recordAudit(audit(ctx, `orders.${to.toLowerCase()}`, id, order.warehouseId));
     return view(core.orThrow(result, to), group);
   }
 
@@ -164,14 +161,12 @@ export function createAdminOrderService(deps: OrderDeps, core: OrderCore) {
       const { order, group } = await load(ctx, id);
       if (!CANCELLABLE.includes(order.status)) throw new AppError("ORDER_NOT_CANCELLABLE", "The order has been picked up. Use failed delivery or a hand-over instead.", { status: order.status });
       const result = await core.move(id, "CANCELLED", actorOf(ctx), { reason });
-      await store.recordAudit(audit(ctx, "orders.cancel", id, order.warehouseId));
       return view(core.orThrow(result, "CANCELLED"), group);
     },
 
     async forceStatus(ctx: Ctx, id: string, to: OrderStatus, reason: string) {
-      const { order, group } = await load(ctx, id);
+      const { group } = await load(ctx, id);
       const result = await core.move(id, to, actorOf(ctx), { reason, forced: true }, { force: true });
-      await store.recordAudit(audit(ctx, "orders.force_status", id, order.warehouseId));
       return view(core.orThrow(result, to), group);
     },
 

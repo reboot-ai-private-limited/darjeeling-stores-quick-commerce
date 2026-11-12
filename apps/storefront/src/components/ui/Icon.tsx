@@ -1,0 +1,97 @@
+import React from "react";
+import {
+  AlertTriangle,
+  WifiOff,
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Edit2,
+  Feather,
+  Grid,
+  Heart,
+  HelpCircle,
+  Home,
+  Info,
+  MapPin,
+  MessageCircle,
+  Mic,
+  Minus,
+  Navigation,
+  Package,
+  Percent,
+  Phone,
+  Plus,
+  Repeat,
+  Search,
+  Share2,
+  ShoppingBag,
+  Store,
+  Tag,
+  Trash2,
+  User,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  "alert-triangle": AlertTriangle,
+  "arrow-left": ArrowLeft,
+  "arrow-right": ArrowRight,
+  bell: Bell,
+  check: Check,
+  "check-circle": CheckCircle,
+  "chevron-down": ChevronDown,
+  "chevron-right": ChevronRight,
+  "chevron-up": ChevronUp,
+  clock: Clock,
+  "credit-card": CreditCard,
+  "dollar-sign": DollarSign,
+  "edit-2": Edit2,
+  feather: Feather,
+  grid: Grid,
+  heart: Heart,
+  "help-circle": HelpCircle,
+  home: Home,
+  info: Info,
+  "map-pin": MapPin,
+  "message-circle": MessageCircle,
+  mic: Mic,
+  minus: Minus,
+  navigation: Navigation,
+  package: Package,
+  percent: Percent,
+  phone: Phone,
+  plus: Plus,
+  repeat: Repeat,
+  search: Search,
+  "share-2": Share2,
+  "shopping-bag": ShoppingBag,
+  store: Store,
+  tag: Tag,
+  "trash-2": Trash2,
+  user: User,
+  x: X,
+  zap: Zap,
+  "wifi-off": WifiOff,
+};
+
+interface IconProps {
+  name: string;
+  size?: number;
+  color?: string;
+  className?: string;
+}
+
+export const Icon: React.FC<IconProps> = ({ name, size = 18, color = "currentColor", className = "" }) => {
+  const Component = ICON_MAP[name] ?? HelpCircle;
+  return <Component size={size} color={color} className={className} />;
+};

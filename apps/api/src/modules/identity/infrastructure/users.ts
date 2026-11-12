@@ -29,13 +29,6 @@ const userSchema = new Schema({
     promoPush: { type: Boolean, default: false }, promoWhatsApp: { type: Boolean, default: false }, cartReminders: { type: Boolean, default: false },
   },
   deletionRequest: { reason: { type: String, maxlength: 1000 }, requestedAt: { type: Date } },
-  twoFactor: {
-    enabled: { type: Boolean, default: false },
-    requiresEnrollment: { type: Boolean, default: false },
-    secretEncrypted: { type: String, select: false },
-    recoveryCodeHashes: { type: [String], select: false },
-    lastUsedStep: { type: Number },
-  },
   status: { type: String, enum: ["active", "blocked", "deactivated", "deletion_requested", "deleted"], default: "active", required: true },
   scope: {
     all: { type: Boolean, default: false },

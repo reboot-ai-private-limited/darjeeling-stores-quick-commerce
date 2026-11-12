@@ -1,5 +1,4 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter, type AuditEvent } from "../../audit/audit.public.js";
 import type { Payment, PaymentEvent, Reconciliation } from "../domain/payment.js";
 import { DuplicateEventError, type PaymentStore } from "../application/ports.js";
 
@@ -13,7 +12,6 @@ export function createMongoPaymentStore(connection: Connection): PaymentStore {
   const payments = () => connection.collection<PaymentDoc>("payments");
   const events = () => connection.collection<EventDoc>("payment_events");
   const recons = () => connection.collection<ReconDoc>("payment_reconciliations");
-  const writeAudit = createAuditWriter(connection);
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
     try { let result!: T; await session.withTransaction(async () => { result = await fn(session); }); return result; }
@@ -46,17 +44,15 @@ export function createMongoPaymentStore(connection: Connection): PaymentStore {
       if (filter.from || filter.to) query.createdAt = { ...(filter.from && { $gte: filter.from }), ...(filter.to && { $lte: filter.to }) };
       return (await payments().find(query).sort({ _id: -1 }).limit(limit).toArray()).map(toPayment);
     },
-    async update(id, patch, audit) {
+    async update(id, patch) {
       await inTransaction(async session => {
         await payments().updateOne({ _id: id }, { $set: { ...strip(patch), updatedAt: new Date() } as never }, { session });
-        if (audit) await writeAudit(audit, session);
       });
     },
-    async capture(id, patch, audit) {
+    async capture(id, patch) {
       return inTransaction(async session => {
         const done = await payments().updateOne({ _id: id, status: { $ne: "captured" } }, { $set: { ...strip(patch), status: "captured", updatedAt: new Date() } as never }, { session });
         if (done.modifiedCount !== 1) return false;
-        if (audit) await writeAudit(audit, session);
         return true;
       });
     },

@@ -83,14 +83,8 @@ export function createSettingsService({ store, now }: SettingsDeps) {
       }
       const rules = dependencyProblems(after);
       if (rules.length > 0) throw validation("Invalid settings", rules);
-      const snapshot = (key: string, value: unknown) => (value === null ? null : { group, key, scope: input.scope, value });
       await store.apply({
           group, scope: input.scope, changes, by: ctx.actor.userId, at: now(),
-          audit: change => ({
-            actorId: ctx.actor.userId, actorRole: ctx.actor.role, action: "settings.update", entityType: "setting", entityId: `${group}.${change.key}`, requestId: ctx.requestId,
-            ...(input.scope.type === "warehouse" && { warehouseId: input.scope.id! }),
-            settingChange: { before: snapshot(change.key, change.before), after: snapshot(change.key, change.after) },
-          }),
       });
       await changed();
       return effective(group, input.scope);

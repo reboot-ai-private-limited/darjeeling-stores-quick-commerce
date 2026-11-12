@@ -1,5 +1,4 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import { conflict } from "../../catalog/catalog.public.js";
 import {
   DuplicateRestoreError, type ImportPreview, type MovementQuery, type OfferingListQuery, type OfferingsReads, type OfferingsStore, type OfferingsTx,
@@ -36,7 +35,6 @@ export function createMongoOfferingsStore(connection: Connection): OfferingsStor
   // Revision counters and per zone/product locks share one small collection.
   const previews = () => connection.collection<PreviewDoc>("import_previews");
   const revisions = () => connection.collection<RevisionDoc>("catalog_revisions");
-  const writeAudit = createAuditWriter(connection);
 
   function reads(session?: ClientSession): OfferingsReads {
     const opts = session ? { session } : {};
@@ -104,12 +102,6 @@ export function createMongoOfferingsStore(connection: Connection): OfferingsStor
         catch (error) { if (isDuplicate(error)) throw conflict("A reservation with this key already exists", { reason: "reservation_exists" }); throw error; }
       },
       async saveReservation(reservation) { await reservations().replaceOne({ _id: reservation.id }, toReservationDoc(reservation), { session }); },
-      async audit(ctx, entry) {
-        await writeAudit({
-          actorId: ctx.actor.userId, actorRole: ctx.actor.role, action: entry.action, entityType: entry.entityType, entityId: entry.entityId,
-          requestId: ctx.requestId, ...(entry.warehouseId !== undefined && { warehouseId: entry.warehouseId }),
-        }, session);
-      },
     };
   }
 

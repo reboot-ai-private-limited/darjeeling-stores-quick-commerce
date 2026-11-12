@@ -24,6 +24,10 @@ export const DEFAULT_TRACKING_SETTINGS: TrackingSettings = {
 /** Minutes from one place to another. A routes service can replace the baseline later; it answers null when it cannot. */
 export interface EtaProvider { minutes(from: { lat: number; lng: number }, to: { lat: number; lng: number }): Promise<number | null> }
 
+/** The road from one place to another, as points to draw. `approximate` is true for a straight line used when no road answer exists. */
+export interface RoutePath { distanceM: number; durationS: number; points: { lat: number; lng: number }[]; approximate: boolean }
+export interface RoutePathProvider { path(from: { lat: number; lng: number }, to: { lat: number; lng: number }): Promise<RoutePath | null> }
+
 export function baselineEta(settings: TrackingSettings): EtaProvider {
   return {
     async minutes(from, to) {

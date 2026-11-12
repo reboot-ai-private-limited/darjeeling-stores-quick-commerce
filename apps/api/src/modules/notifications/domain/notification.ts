@@ -5,15 +5,15 @@ export type Category = "utility" | "marketing" | "authentication";
 export type Purpose = "transactional" | "promo" | "cart_reminder";
 export type NotificationStatus = "queued" | "sent" | "delivered" | "failed";
 
-/** Variables a template may use. The server fills them in; anything else is rejected when the template is saved. */
+/** Variables a template may use. The server fills them in; a unit test checks every built-in template uses only these. */
 export const KNOWN_VARS = [
   "name", "orderNo", "total", "otp", "trackingUrl", "riderName", "riderPhone", "productName", "variantLabel", "itemName", "amount",
   "refundStatus", "status", "code", "minVersion", "link", "reason", "eta", "title", "body",
 ] as const;
 
 export interface Template {
-  id: string; key: string; channel: Channel; title: string | null; body: string; whatsappTemplateName: string | null;
-  category: Category; language: string; isActive: boolean; createdAt: Date; updatedAt: Date;
+  key: string; channel: Channel; title: string | null; body: string; whatsappTemplateName: string | null;
+  category: Category; language: string;
 }
 
 export interface Notification {

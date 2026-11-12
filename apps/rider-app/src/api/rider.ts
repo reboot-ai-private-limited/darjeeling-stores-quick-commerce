@@ -140,6 +140,10 @@ export type LocationPoint = { location: LatLng; accuracyM: number | null; speedK
 /** Sends the rider's position. The server answers with how many seconds to wait before the next one. */
 export const sendLocation = (points: LocationPoint[]) =>
   api<{ accepted: number; nextPingSeconds: number }>("POST", "/rider/location", { points }).then(r => r.data);
+/** The road from `from` to the customer's door: points to draw, the distance and the time. `approximate` means a straight line (no road answer). */
+export type RoutePath = { distanceM: number; durationS: number; points: LatLng[]; approximate: boolean; destination: LatLng };
+export const getRoute = (orderId: string, from: LatLng) =>
+  api<RoutePath>("GET", `/rider/orders/${orderId}/route?lat=${from.lat}&lng=${from.lng}`).then(r => r.data);
 export const switchWarehouse = (warehouseId: string) => api("POST", "/rider/shift/switch-warehouse", { warehouseId });
 
 export type Tips = { from: string; to: string; totals: { count: number; total: number; owed: number; paid: number }; items: { orderId: string; orderNo: string; amount: number; deliveredAt: string; status: string; paidAt: string | null }[] };

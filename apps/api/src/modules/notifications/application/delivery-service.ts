@@ -1,3 +1,4 @@
+import { templatesFor } from "../domain/templates.js";
 import { conflict, notFound, validation } from "../../catalog/catalog.public.js";
 import type { JobQueue } from "../../jobs/jobs.public.js";
 import {
@@ -6,7 +7,7 @@ import {
 } from "../domain/notification.js";
 import {
   DuplicateNotificationError, ProviderError,
-  type AuditEntry, type DeviceRegistry, type LogFilters, type NotificationStore, type PushProvider, type SmsProvider, type UserContacts, type WhatsAppProvider,
+  type DeviceRegistry, type LogFilters, type NotificationStore, type PushProvider, type SmsProvider, type UserContacts, type WhatsAppProvider,
 } from "./ports.js";
 
 export const SEND_JOB = "notification.send";
@@ -95,7 +96,7 @@ export function createDeliveryService(deps: DeliveryDeps) {
     async notify(input: NotifyInput): Promise<NotifyResult> {
       const purpose = input.purpose ?? "transactional";
       const wanted = [...new Set(input.channels ?? (["push", "whatsapp"] as const))];
-      const templates = (await store.templatesFor(input.templateKey)).filter(t => t.isActive);
+      const templates = templatesFor(input.templateKey);
       const prefs = purpose === "transactional" ? DEFAULT_PREFS : (await store.getPrefs(input.userId)) ?? DEFAULT_PREFS;
       const result: NotifyResult = { queued: [], skipped: [] };
       const vars = input.vars ?? {};
@@ -155,12 +156,12 @@ export function createDeliveryService(deps: DeliveryDeps) {
       return { items: page.map(view), nextCursor: rows.length > limit ? page[page.length - 1]!.id : null, failedCount: await store.failedCount(filters) };
     },
 
-    async retry(id: string, audit: Omit<AuditEntry, "action" | "entityId" | "entityType">) {
+    async retry(id: string) {
       const n = await store.get(id);
       if (!n) throw notFound("Notification");
       if (n.status !== "failed") throw conflict("Only a failed message can be retried", { reason: "not_failed" });
       const at = now();
-      if (!(await store.requeue(id, at, { ...audit, action: "notification.retry", entityType: "notification", entityId: id }))) throw conflict("Only a failed message can be retried", { reason: "not_failed" });
+      if (!(await store.requeue(id, at))) throw conflict("Only a failed message can be retried", { reason: "not_failed" });
       await enqueueSend(id, `send:${id}:retry:${at.getTime()}`);
       return { id, status: "queued" as const };
     },

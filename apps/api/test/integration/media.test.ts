@@ -213,7 +213,6 @@ describe("product images through the catalog", () => {
     expect(await file(img.id)).toMatchObject({ status: "deleted", deleteReason: "product_image_removed", variants: [] });
     expect(f.storage.removed).toEqual([img.key]);
     expect((await f.get(`/media/${img.id}`, boss)).status).toBe(404);
-    expect(await col("audit_log").countDocuments({ action: "catalog.product.image_remove", entityId: productId })).toBe(1);
   });
 
   it("claims an upload that had no owner yet, and refuses to give one file to two products", async () => {
@@ -314,14 +313,13 @@ describe("reading files", () => {
 });
 
 describe("deleting a file", () => {
-  it("lets a customer delete their own address voice note, removing the stored file and writing an audit entry", async () => {
+  it("lets a customer delete their own address voice note, removing the stored file", async () => {
     const voice = await ready("address_voice", anna);
     const res = await f.send("delete", `/media/${voice.id}`, undefined, anna);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ data: { ok: true } });
     expect(await file(voice.id)).toMatchObject({ status: "deleted", deleteReason: "deleted_by_user", deletedAt: expect.any(Date), deleteError: null });
     expect(f.storage.removed).toEqual([voice.key]);
-    expect(await col("audit_log").findOne({ action: "media.delete", entityId: voice.id })).toMatchObject({ actorId: ANNA, entityType: "media_file", actorRole: "customer" });
     expect((await f.get(`/media/${voice.id}`, anna)).status).toBe(404);
     expect((await f.send("delete", `/media/${voice.id}`, undefined, anna)).status).toBe(404);
   });
@@ -390,7 +388,6 @@ describe("failed deletions", () => {
     expect(fixed.body.data).toEqual({ status: "deleted" });
     expect((await f.get("/admin/media/failed", boss)).body.data).toEqual([]);
     expect(f.storage.removed).toEqual([voice.key]);
-    expect(await col("audit_log").countDocuments({ action: "media.retry_delete", entityId: voice.id })).toBe(2);
   });
 
   it("retries by itself with a growing wait, through the sweeper", async () => {
@@ -501,7 +498,6 @@ describe("order copies and retention", () => {
     expect(await f.mods.media.service.removeForOwner({ type: "address", id: address }, "address_deleted")).toBe(2);
     for (const id of [voice.id, photo.id]) expect(await file(id)).toMatchObject({ status: "deleted", deleteReason: "address_deleted" });
     expect((await file(other.id))?.status).toBe("ready");
-    expect(await col("audit_log").countDocuments({ action: "media.delete", actorId: "system" })).toBe(2);
   });
 });
 

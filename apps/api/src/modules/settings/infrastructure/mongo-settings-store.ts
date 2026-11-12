@@ -1,5 +1,4 @@
 import { Types, type ClientSession, type Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import { conflict } from "../../catalog/catalog.public.js";
 import type { HistoryRow, SettingsStore, StoredSetting } from "../application/ports.js";
 import type { ScopeRef, ScopeType } from "../domain/registry.js";
@@ -14,7 +13,6 @@ const isObjectId = (value: string) => /^[a-f0-9]{24}$/.test(value);
 export function createMongoSettingsStore(connection: Connection): SettingsStore {
   const settings = () => connection.collection<SettingDoc>("settings");
   const history = () => connection.collection<HistoryDoc>("settings_history");
-  const writeAudit = createAuditWriter(connection);
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
     try { let result!: T; await session.withTransaction(async () => { result = await fn(session); }); return result; }
@@ -34,7 +32,7 @@ export function createMongoSettingsStore(connection: Connection): SettingsStore 
       return docs.map((d): StoredSetting => ({ key: d.key, scope: d.scopeType, value: d.value, version: d.version }));
     },
 
-    async apply({ group, scope, changes, by, at, audit }) {
+    async apply({ group, scope, changes, by, at }) {
       await inTransaction(async session => {
         for (const change of changes) {
           const id = docId(group, change.key, scope);
@@ -55,7 +53,6 @@ export function createMongoSettingsStore(connection: Connection): SettingsStore 
             if (current && result.matchedCount === 0) throw clash();
           }
           await history().insertOne({ group, key: change.key, scopeType: scope.type, scopeId: scope.id, oldValue: before, newValue: change.value, version, by, at }, { session });
-          await writeAudit(audit({ key: change.key, before: before === null ? null : before, after: change.value }), session);
         }
       });
     },

@@ -8,6 +8,7 @@ The admin or store manager assigns orders; **riders cannot reject**. A rider ack
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/admin/dispatch/ready` | Admin `dispatch:manage` | Every ready order waiting for a rider, with its ranked riders |
 | `GET` | `/admin/dispatch/suggestions` | Admin `dispatch:manage` | Ranked eligible riders for an order |
 | `POST` | `/admin/orders/:id/assign` | Admin `dispatch:manage` | Assign an order to a rider 🔒 |
 | `POST` | `/admin/orders/:id/unassign` | Admin `dispatch:manage` | Take it back (before pickup) 🔒 |
@@ -16,14 +17,29 @@ The admin or store manager assigns orders; **riders cannot reject**. A rider ack
 | `GET` | `/admin/batches` | Admin `dispatch:manage` | List batches |
 | `PUT` | `/admin/batches/:id` | Admin `dispatch:manage` | Reorder stops or add/remove orders |
 | `POST` | `/admin/batches/:id/cancel` | Admin `dispatch:manage` | Cancel a batch that has not started |
+| `POST` | `/admin/orders/:id/reassign` | Admin `dispatch:manage` | Give an assigned (not yet picked-up) order to another rider |
 | `POST` | `/admin/orders/:id/handover` | Admin `dispatch:manage` | Hand a picked-up order to another rider 🔒 |
 | `POST` | `/admin/orders/:id/failed/resolve` | Admin `orders:manage` | Resolve a failed delivery 🔒 |
 | `GET` | `/admin/assignments` | Admin `dispatch:manage` | Assignments with acknowledgement status |
 | `GET` | `/admin/dispatch/alerts` | Admin `dispatch:manage` | Unacknowledged, delayed, offline, rider-reported problems |
 | `GET` | `/admin/riders/live` | Admin `dispatch:manage` | Rider positions and loads for the map |
 
+## GET /admin/dispatch/ready
+Every child order in `READY` that has no live assignment, inside the caller's warehouse scope, oldest first. Each row carries what an admin needs to assign it in one click. 200:
+```json
+{
+  "data": [{
+    "orderId": "ord_1", "orderNo": "DS-240004", "warehouseId": "wh_1", "locality": "Chowrasta", "landmark": "Opposite the clock tower", "customerName": "Asha Rai",
+    "itemCount": 4, "paymentMethod": "cod", "alreadyPaid": false, "amountDue": 45000, "readyAt": "2026-11-11T10:06:03Z", "minutesWaiting": 3,
+    "suggested": [{ "riderId": "rider_1", "name": "Pema Sherpa", "activeOrders": 0, "distanceMeters": 450, "score": 1 }],
+    "ineligible": [{ "riderId": "rider_3", "name": "Karma Bhutia", "reasons": ["offline"] }]
+  }]
+}
+```
+`suggested` and `ineligible` follow the same rules as the suggestions call below.
+
 ## GET /admin/dispatch/suggestions
-Query: `orderId` (a child order in `READY`). Eligible = active, in the order's zone, allowed at its warehouse, on shift, not on break, under `maxActiveOrders`, with a recent ping. 200:
+Query: `orderId` (a child order in `READY`, or one that already has a rider: then `currentRiderId` names them and they are left out of the list; after pickup the warehouse no longer matters). Eligible = active, in the order's zone, allowed at its warehouse, on shift, not on break, under `maxActiveOrders`, with a recent ping. 200:
 ```json
 {
   "data": {
@@ -91,6 +107,9 @@ One group OTP completes the delivery for the same-rider case; separate riders ea
 - `GET /admin/batches?status=&riderId=` → `{ "data": [<batch>] }`.
 - `PUT /admin/batches/:id` body `{ "stops": [ … reordered … ] }` or `{ "addOrderIds": [], "removeOrderIds": [] }`; only while `planned`.
 - `POST /admin/batches/:id/cancel` → 200 `{ "data": { "ok": true } }`.
+
+## POST /admin/orders/:id/reassign
+Before pickup (`ASSIGNED`). Body: `{ "toRiderId": "rider_2", "reason": "Closer to the customer" }` (`reason` is optional). The first rider's alarm is cancelled and the new rider's rings; the order stays `ASSIGNED`. 200 has the same shape as the handover below. Errors: `409` (the order is not assigned, or already picked up: use a hand-over), `400` (the same rider), `409` with the reasons from the suggestions call when the new rider cannot take it.
 
 ## POST /admin/orders/:id/handover
 For a breakdown or road block **after pickup**. Body: `{ "toRiderId": "rider_2", "reason": "Scooter breakdown at Hill Cart Road" }`. 200:

@@ -1,5 +1,4 @@
 import { Types, type ClientSession, type Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import { ADMIN_PERMISSIONS, canGrantPermissions } from "../access.public.js";
 import { createRoleInput, updateRoleInput, RoleError, type RoleAuthority } from "../domain/role-policy.js";
 
@@ -12,8 +11,7 @@ type RoleDoc = { _id: Types.ObjectId; name: string; permissions: string[]; isSys
 
 export function createRoleMutations(connection: Connection) {
   const roles = connection.collection<RoleDoc>("roles");
-  const audit = createAuditWriter(connection);
-  return async (operation: "create" | "update" | "delete", id: string | undefined, input: unknown, requestId: string, deps: Dependencies) => {
+  return async (operation: "create" | "update" | "delete", id: string | undefined, input: unknown, deps: Dependencies) => {
     const parsed = operation === "create" ? createRoleInput.safeParse(input) : operation === "update" ? updateRoleInput.safeParse(input) : null;
     if (parsed && !parsed.success) throw new RoleError(400, "VALIDATION_ERROR", "Invalid role fields");
     if (operation !== "create" && (!id || !/^[a-fA-F0-9]{24}$/.test(id))) throw new RoleError(404, "NOT_FOUND", "Role not found");
@@ -49,7 +47,6 @@ export function createRoleMutations(connection: Connection) {
           await roles.deleteOne({ _id: targetId }, { session });
           result = { ok: true };
         }
-        await audit({ actorId: actor.id, actorRole: actor.roleName, action: `role.${operation}`, entityType: "role", entityId: String(targetId), requestId, roleChange: { before: target ? view(target) : null, after: "id" in result ? result : null } }, session);
         return result;
       });
     } catch (error) {

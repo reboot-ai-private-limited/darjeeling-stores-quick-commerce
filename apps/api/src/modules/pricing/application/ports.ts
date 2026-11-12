@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Banner, Coupon, FeeRule, Rule } from "../domain/pricing.js";
 
 export class DuplicateCodeError extends Error {}
@@ -6,22 +5,21 @@ export class ActiveRuleExistsError extends Error { constructor(readonly ruleId: 
 export class CouponLimitError extends Error { constructor(readonly reason: "limit_reached" | "user_limit_reached") { super(reason); } }
 
 export interface Usage { id: string; couponId: string; userId: string; groupId: string; discountAmount: number; at: Date }
-export interface Audited { audit?: AuditEvent }
 
 export interface PricingStore {
   ensureIndexes(): Promise<void>;
-  insertRule(rule: Rule, options?: Audited): Promise<void>;
+  insertRule(rule: Rule): Promise<void>;
   getRule(id: string): Promise<Rule | null>;
-  updateRule(id: string, patch: Partial<Rule>, options?: Audited): Promise<boolean>;
+  updateRule(id: string, patch: Partial<Rule>): Promise<boolean>;
   listRules(filter: { zoneId?: string; type?: string; isActive?: boolean }): Promise<Rule[]>;
   /** Every active rule (there are few), for pricing a bill. */
   activeRules(): Promise<Rule[]>;
   activeFeeRuleOnZones(zoneIds: readonly string[], exceptId?: string): Promise<FeeRule | null>;
 
-  insertCoupon(coupon: Coupon, options?: Audited): Promise<void>;
+  insertCoupon(coupon: Coupon): Promise<void>;
   getCoupon(id: string): Promise<Coupon | null>;
   getCouponByCode(code: string): Promise<Coupon | null>;
-  updateCoupon(id: string, patch: Partial<Coupon>, options?: Audited): Promise<boolean>;
+  updateCoupon(id: string, patch: Partial<Coupon>): Promise<boolean>;
   listCoupons(filter: { isActive?: boolean }, limit: number, beforeId?: string): Promise<Coupon[]>;
   /** Coupons that are active and in date, for the list a customer sees. */
   availableCoupons(now: Date): Promise<Coupon[]>;
@@ -32,13 +30,12 @@ export interface PricingStore {
   releaseCoupon(groupId: string): Promise<boolean>;
   listUsage(couponId: string, limit: number, beforeId?: string): Promise<{ rows: Usage[]; totalDiscount: number }>;
 
-  insertBanner(banner: Banner, options?: Audited): Promise<void>;
+  insertBanner(banner: Banner): Promise<void>;
   getBanner(id: string): Promise<Banner | null>;
-  updateBanner(id: string, patch: Partial<Banner>, options?: Audited): Promise<boolean>;
-  deleteBanner(id: string, options?: Audited): Promise<boolean>;
+  updateBanner(id: string, patch: Partial<Banner>): Promise<boolean>;
+  deleteBanner(id: string): Promise<boolean>;
   listBanners(): Promise<Banner[]>;
   activeBannersForZone(zoneId: string, now: Date): Promise<Banner[]>;
-  recordAudit(entry: AuditEvent): Promise<void>;
 }
 
 export interface BannerMedia {

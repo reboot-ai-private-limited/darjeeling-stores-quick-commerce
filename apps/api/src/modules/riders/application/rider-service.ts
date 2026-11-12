@@ -2,7 +2,7 @@ import type { Geography } from "../../../platform/geography.js";
 import type { RiderIdentity } from "../../../platform/identity.js";
 import { AppError, assertWarehouseScope, conflict, notFound, validation, type Ctx } from "../../catalog/catalog.public.js";
 import { haversineMeters, hoursWorked, riderView, shiftView, type Rider, type RiderSettings, type RiderStatus, type Shift } from "../domain/rider.js";
-import { DuplicateRiderError, type AuditEntry, type RiderLoads, type RiderMedia, type RiderStore } from "./ports.js";
+import { DuplicateRiderError, type RiderLoads, type RiderMedia, type RiderStore } from "./ports.js";
 
 export interface RiderInput { name: string; phone: string; zoneId: string; warehouseIds: string[]; vehicle: string | null }
 export interface RiderPatch {
@@ -21,7 +21,6 @@ export function createRiderService(deps: {
 }) {
   const { store, geography, identity, media, loads, settings, now, newId } = deps;
 
-  const auditBase = (ctx: Ctx) => ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId });
   const canSee = (ctx: Ctx, rider: Rider) => ctx.actor.scope.all || rider.warehouseIds.some(w => ctx.actor.scope.warehouseIds.includes(w));
   const scopeOf = (ctx: Ctx) => (ctx.actor.scope.all ? null : ctx.actor.scope.warehouseIds);
 
@@ -79,7 +78,7 @@ export function createRiderService(deps: {
         currentWarehouseId: null, vehicle: input.vehicle, photoMediaId: null, status: "offline", isActive: true, activeOrderCount: 0, lastLocation: null,
         lastLocationAt: null, lastAssignedAt: null, currentShiftId: null, autoOffline: false, appVersion: null, pendingSyncCount: 0, createdAt: at, updatedAt: at,
       };
-      try { await store.insert(rider, { ...auditBase(ctx), action: "rider.create", entityType: "rider", entityId: rider.id }); }
+      try { await store.insert(rider); }
       catch (error) {
         if (error instanceof DuplicateRiderError) throw conflict("A rider with this phone number already exists", { field: error.field === "phone" ? "phone" : "userId" });
         throw error;
@@ -107,7 +106,7 @@ export function createRiderService(deps: {
         next.photoMediaId = patch.photoMediaId;
         replaced = rider.photoMediaId;
       }
-      try { await store.update(id, next, undefined, { ...auditBase(ctx), action: "rider.update", entityType: "rider", entityId: id }); }
+      try { await store.update(id, next); }
       catch (error) { if (claimed) await media.release(claimed, "rider_not_saved").catch(() => undefined); throw error; }
       if (patch.name !== undefined && patch.name !== rider.name) await identity.rename(rider.userId, patch.name);
       if (replaced) await media.release(replaced, "rider_photo_replaced").catch(() => undefined);
@@ -119,14 +118,14 @@ export function createRiderService(deps: {
       await identity.setActive(rider.userId, false);
       const at = now();
       await closeShift(rider, "admin", at);
-      await store.update(id, { isActive: false, status: "offline", updatedAt: at }, undefined, { ...auditBase(ctx), action: "rider.deactivate", entityType: "rider", entityId: id });
+      await store.update(id, { isActive: false, status: "offline", updatedAt: at });
       return riderView((await store.get(id))!);
     },
 
     async reactivate(ctx: Ctx, id: string) {
       const rider = await mine(ctx, id);
       await identity.setActive(rider.userId, true);
-      await store.update(id, { isActive: true, updatedAt: now() }, undefined, { ...auditBase(ctx), action: "rider.reactivate", entityType: "rider", entityId: id });
+      await store.update(id, { isActive: true, updatedAt: now() });
       return riderView((await store.get(id))!);
     },
 
@@ -135,7 +134,6 @@ export function createRiderService(deps: {
       const rider = await mine(ctx, id);
       if (!force && (await loads.pickedUpCount(id)) > 0) throw conflict("The rider is carrying orders; hand them over first, or force it", { reason: "picked_up_orders" });
       await closeShift(rider, "admin", now());
-      await store.recordAudit({ ...auditBase(ctx), action: "rider.force_offline", entityType: "rider", entityId: id });
       return riderView((await store.get(id))!);
     },
 

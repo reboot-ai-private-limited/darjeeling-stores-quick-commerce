@@ -211,9 +211,6 @@ describe("what riders earn and what the owner owes", () => {
     expect((await f.send("post", "/admin/rider-tips/pay", { riderId: rider.id, upTo: today })).body.data).toEqual({ riderId: rider.id, paidCount: 1, paidAmount: 1000 });
     expect((await f.get("/admin/rider-tips")).body.data.totals.owed).toBe(0);
     expect(b.id).toBeTruthy();
-    const audit = await col("audit_log").find({ action: "tips.pay" }).toArray();
-    expect(audit).toHaveLength(2);
-    expect(audit[0]).toMatchObject({ entityType: "rider", entityId: rider.id });
   });
 
   it("will not pay another rider's tips, and needs one of orderIds or upTo", async () => {

@@ -59,7 +59,6 @@ beforeEach(async () => {
   await db.collection("cities").deleteMany({});
   await db.collection("zones").deleteMany({});
   await db.collection("warehouses").deleteMany({});
-  await db.collection("audit_log").deleteMany({});
 
   // Seed City 1 and City 2
   const c1 = await geoModule.cityService.createCity(

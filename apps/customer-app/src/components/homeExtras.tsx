@@ -1,8 +1,9 @@
+import { Image } from "expo-image";
 import { useFocusEffect, router } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { defaultVariant, type Product } from "../api/catalog";
+import { cachedBrands, defaultVariant, getBrands, type BrandInfo, type Product } from "../api/catalog";
 import { kv } from "../api/kv";
 import { liftIn } from "../motion";
 import { colors, radius, rupees, shadow, space, type } from "../theme";
@@ -100,13 +101,17 @@ export function BudgetRail({ products, eta }: { products: Product[]; eta?: strin
   );
 }
 
-/** Brand bubbles built from the products on the shelves. Tapping one searches for it. */
-export function BrandRow({ products }: { products: Product[] }) {
+/** Brand bubbles with each brand's logo (its first letter when it has none). Tapping one opens the brand's products. */
+export function BrandRow({ products, zoneId }: { products: Product[]; zoneId?: string | undefined }) {
+  const [listed, setListed] = useState<BrandInfo[]>(() => cachedBrands(zoneId));
+  useEffect(() => { if (zoneId) void getBrands(zoneId).then(setListed).catch(() => undefined); }, [zoneId]);
   const brands = useMemo(() => {
+    // The zone's own brand list (with logos) when we have it; otherwise the brands found on the shelves.
+    if (listed.length > 0) return [...listed].sort((a, b) => b.productCount - a.productCount).slice(0, 12).map((b): [string, { name: string; logoUrl: string | null }] => [b.id, { name: b.name, logoUrl: b.logoUrl }]);
     const m = new Map<string, { name: string; count: number }>();
     for (const p of products) if (p.brand) { const e = m.get(p.brand.id) ?? { name: p.brand.name, count: 0 }; e.count++; m.set(p.brand.id, e); }
-    return [...m.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 12);
-  }, [products]);
+    return [...m.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 12).map(([id, e]): [string, { name: string; logoUrl: string | null }] => [id, { name: e.name, logoUrl: null }]);
+  }, [products, listed]);
   if (brands.length < 2) return null;
   return (
     <View style={{ marginTop: space.xl }}>
@@ -115,7 +120,7 @@ export function BrandRow({ products }: { products: Product[] }) {
         {brands.map(([id, b], i) => (
           <Animated.View key={id} entering={liftIn(i * 40)}>
             <Press haptic onPress={() => router.push({ pathname: "/brand/[id]", params: { id, name: b.name } })} style={{ alignItems: "center", width: 76, gap: 6 }}>
-              <View style={s.brand}><Text style={s.brandLetter}>{b.name.slice(0, 1).toUpperCase()}</Text></View>
+              <View style={s.brand}>{b.logoUrl ? <Image source={{ uri: b.logoUrl }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={150} /> : <Text style={s.brandLetter}>{b.name.slice(0, 1).toUpperCase()}</Text>}</View>
               <Text style={s.brandName} numberOfLines={1}>{b.name}</Text>
             </Press>
           </Animated.View>
@@ -181,7 +186,7 @@ const s = StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, height: 36, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   chipOn: { backgroundColor: colors.maroon, borderColor: colors.maroon },
   chipText: { fontSize: 13, fontWeight: "800", color: colors.ink },
-  brand: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.yellowSoft, borderWidth: 1.5, borderColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  brand: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.yellowSoft, borderWidth: 1.5, borderColor: colors.yellow, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   brandLetter: { fontSize: 24, fontWeight: "900", color: colors.maroon },
   brandName: { fontSize: 12, fontWeight: "700", color: colors.ink },
 });

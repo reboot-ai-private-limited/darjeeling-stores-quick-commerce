@@ -26,6 +26,14 @@ const categoryCache = new Map<string, Category[]>();
 export const cachedCategories = (zoneId: string | undefined): Category[] => (zoneId ? categoryCache.get(zoneId) ?? [] : []);
 
 export const getHome = (zoneId: string) => api<Home>("GET", `/catalog/home?zoneId=${zoneId}`, undefined, { auth: false }).then(r => { categoryCache.set(zoneId, r.data.categories); return r.data; });
+/** A brand that has something to sell in the zone, with its logo (null when the admin has not added one). */
+export type BrandInfo = { id: string; name: string; logoUrl: string | null; productCount: number };
+const brandCache = new Map<string, BrandInfo[]>();
+/** The last brands list for a zone, so a screen can draw logos at once. */
+export const cachedBrands = (zoneId: string | undefined): BrandInfo[] => (zoneId ? brandCache.get(zoneId) ?? [] : []);
+export const getBrands = (zoneId: string) =>
+  api<BrandInfo[]>("GET", `/catalog/brands?zoneId=${zoneId}`, undefined, { auth: false }).then(r => { brandCache.set(zoneId, r.data); return r.data; });
+
 export const getCategories = (zoneId: string) => api<Category[]>("GET", `/catalog/categories?zoneId=${zoneId}`, undefined, { auth: false }).then(r => { categoryCache.set(zoneId, r.data); return r.data; });
 export const searchProducts = (zoneId: string, q: string) =>
   api<Product[]>("GET", `/catalog/search?zoneId=${zoneId}&q=${encodeURIComponent(q)}&limit=30`, undefined, { auth: false }).then(r => r.data);

@@ -1,7 +1,6 @@
 import type { Request } from "express";
 import type { Connection } from "mongoose";
 import type { Route } from "../platform/routes.js";
-import { createAuditAdminModule } from "../modules/audit/audit-admin.public.js";
 import type { Actor, AuthResolver } from "../modules/catalog/catalog.public.js";
 import { createCustomersModule } from "../modules/customers/customers.public.js";
 import { createMediaModule, storageFromEnv } from "../modules/media/media.public.js";
@@ -22,7 +21,7 @@ export interface AdminOptions {
 }
 
 /**
- * Settings, dashboard and reports, customers and the audit search (F25).
+ * Settings, dashboard and reports, and customers (F25).
  * A cookie session may only change data from a trusted origin with the CSRF header; a bearer token is not sent by browsers on their own, so it is exempt.
  */
 export function createAdminModules({ connection, resolveStaff, trustedOrigins, env = process.env }: AdminOptions): { routes: Route[]; ensureIndexes: () => Promise<void>; auth: AuthResolver; providers: SettingsProviders; settings: SettingsService } {
@@ -47,8 +46,7 @@ export function createAdminModules({ connection, resolveStaff, trustedOrigins, e
   const customers = createCustomersModule({
     connection, auth, media: { removeAddressMedia: (addressId, reason) => media.service.removeForOwner({ type: "address", id: addressId }, reason) },
   });
-  const audit = createAuditAdminModule({ connection, auth });
 
   const providers = createSettingsProviders(settings.service);
-  return { routes: [...settings.routes, ...reports.routes, ...customers.routes, ...audit.routes], ensureIndexes: async () => { await settings.store.ensureIndexes(); await audit.ensureIndexes(); }, auth, providers, settings: settings.service };
+  return { routes: [...settings.routes, ...reports.routes, ...customers.routes], ensureIndexes: async () => { await settings.store.ensureIndexes(); }, auth, providers, settings: settings.service };
 }

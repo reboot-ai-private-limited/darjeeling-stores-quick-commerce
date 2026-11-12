@@ -12,10 +12,14 @@ export type IconName = React.ComponentProps<typeof Feather>["name"];
 export const Icon = ({ name, size = 20, color = colors.ink }: { name: IconName; size?: number; color?: string }) => <Feather name={name} size={size} color={color} />;
 
 export const tap = (style: "light" | "medium" | "success" = "light") => {
+  // Haptics are a nicety. The native part can be missing (web, some emulators, an Expo Go that does not match the SDK), and then the
+  // call fails inside a promise, which try/catch alone does not catch, so the promise's own failure is swallowed too.
   try {
-    if (style === "success") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    else void Haptics.impactAsync(style === "medium" ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
-  } catch { /* haptics are optional (web, simulators) */ }
+    const done = style === "success"
+      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      : Haptics.impactAsync(style === "medium" ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+    done.catch(() => undefined);
+  } catch { /* haptics are optional */ }
 };
 
 /** Fades and lifts its children in, one after another. `i` is the position in the sequence. */
@@ -31,12 +35,17 @@ export function Screen({ children, scroll = false, pad = true, bottomPad = 24, s
   return <View style={[base, style]}><View style={[{ flex: 1 }, inner]}>{children}</View></View>;
 }
 
+/** Goes back if there is a screen to return to, otherwise to home (e.g. after the stack was reset on delivery). */
+export function goBack() {
+  if (router.canGoBack()) router.back(); else router.replace("/home");
+}
+
 export function Header({ title, subtitle, back = true, right, light = false }: { title?: string; subtitle?: string; back?: boolean; right?: ReactNode; light?: boolean }) {
   const fg = light ? colors.white : colors.ink;
   return (
     <View style={s.header}>
       {back ? (
-        <Press onPress={() => router.back()} style={[s.iconBtn, light && { backgroundColor: "rgba(255,255,255,0.14)" }]} haptic>
+        <Press onPress={goBack} style={[s.iconBtn, light && { backgroundColor: "rgba(255,255,255,0.14)" }]} haptic>
           <Icon name="arrow-left" color={fg} />
         </Press>
       ) : <View style={{ width: 44 }} />}

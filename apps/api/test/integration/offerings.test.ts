@@ -9,7 +9,7 @@ beforeEach(async () => { await f.reset(); });
 const count = (collection: string, filter: Record<string, unknown> = {}) => f.h.connection.collection(collection).countDocuments(filter);
 
 describe("creating an offering", () => {
-  it("creates a pooled offering with product details, an initial-stock movement, price history, an audit entry and a revision", async () => {
+  it("creates a pooled offering with product details, an initial-stock movement, price history and a revision", async () => {
     const p = await f.pooledProduct("Fresh Tomato (Local)");
     const { body } = await f.offer(W1, p.id, {
       stockGrams: 24000,
@@ -26,7 +26,6 @@ describe("creating an offering", () => {
     ]);
     expect(await count("stock_movements", { reason: "correction", delta: 24000, balanceAfter: 24000, mode: "grams" })).toBe(1);
     expect(await count("price_history")).toBe(2);
-    expect(await count("audit_log", { action: "offering.create", entityId: body.id })).toBe(1);
     expect(f.events.filter(e => e.type === "stock.zone_availability_changed")).toHaveLength(2);
   });
 
@@ -110,7 +109,7 @@ describe("same-zone price rule", () => {
 });
 
 describe("updating an offering", () => {
-  it("changes a price, bumps the revision and records price history and an audit entry", async () => {
+  it("changes a price, bumps the revision and records price history", async () => {
     const p = await f.pooledProduct();
     const o = await f.pooledOffer(W3, p, 10000);
     const res = await f.send("put", `/admin/warehouse-products/${o.id}`, { rev: o.rev, variants: [{ variantId: p.v500, price: 3300 }] });
@@ -118,7 +117,6 @@ describe("updating an offering", () => {
     expect(res.body.data.variants[1].price).toBe(3300);
     expect(res.body.data.rev).toBeGreaterThan(o.rev);
     expect(await count("price_history", { variantId: p.v500, oldPrice: 3200, newPrice: 3300 })).toBe(1);
-    expect(await count("audit_log", { action: "offering.update", entityId: o.id })).toBe(1);
   });
 
   it("refuses a stale revision with VERSION_CONFLICT", async () => {
@@ -258,7 +256,7 @@ describe("listing and bulk edits", () => {
 });
 
 describe("stock adjustments and stock-takes", () => {
-  it("adds and removes stock with movements, an audit entry, the new revision and a back-in-stock event", async () => {
+  it("adds and removes stock with movements, the new revision and a back-in-stock event", async () => {
     const p = await f.pooledProduct();
     const o = await f.pooledOffer(W1, p, 0);
     f.events.length = 0;
@@ -269,7 +267,6 @@ describe("stock adjustments and stock-takes", () => {
     expect(f.events.filter(e => e.type === "stock.zone_availability_changed")).toHaveLength(2);
     const waste = await f.send("post", "/admin/stock/adjust", { warehouseId: W1, productId: p.id, delta: -1500, reason: "wastage" });
     expect(waste.body.data.balanceAfter).toBe(3500);
-    expect(await count("audit_log", { action: "stock.adjust" })).toBe(2);
     const moves = await f.get(`/admin/stock/movements?warehouseId=${W1}&reason=wastage`);
     expect(moves.body.data).toEqual([expect.objectContaining({ delta: -1500, balanceAfter: 3500, reason: "wastage", note: null, by: expect.any(String) })]);
   });

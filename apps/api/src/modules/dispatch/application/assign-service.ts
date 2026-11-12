@@ -5,7 +5,7 @@ import {
   assignmentView, batchLimit, batchView, buildStops, ineligibleReasons, rankCandidates, type Assignment, type Batch, type IneligibleReason,
 } from "../domain/dispatch.js";
 import type { BatchService } from "./batch-service.js";
-import { auditFor, orderActorOf, type Decider, type DispatchDeps } from "./context.js";
+import { orderActorOf, type Decider, type DispatchDeps } from "./context.js";
 import { eligibilityError, invalidTransition, transitionError } from "./errors.js";
 
 export type GroupDispatch =
@@ -31,10 +31,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
     const rider = await riders.get(riderId);
     if (!rider) throw notFound("Rider");
     return rider;
-  }
-  async function audit(who: Decider, action: string, order: DeliveryOrder) {
-    const entry = auditFor(who, action, "order", order.id, order.warehouseId);
-    if (entry) await store.recordAudit(entry);
   }
 
   /** Ends a live assignment and gives the rider the capacity back. False if someone else already ended it. */
@@ -85,12 +81,14 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
   }
 
   /** The best rider who can take the order now, if any. */
-  async function candidates(order: DeliveryOrder) {
+  async function candidates(order: DeliveryOrder, opts: { excludeRiderId?: string; ignoreWarehouse?: boolean } = {}) {
     const warehouse = await geography.warehouse(order.warehouseId);
     const eligible: { rider: Rider; distanceMeters: number | null }[] = [];
     const ineligible: { rider: Rider; reasons: IneligibleReason[] }[] = [];
     for (const rider of await riders.listActive()) {
-      const reasons = ineligibleReasons(rider, order, settings, now());
+      if (rider.id === opts.excludeRiderId) continue;
+      // Goods already picked up are out of the warehouse, so which warehouses a rider serves no longer matters.
+      const reasons = ineligibleReasons(rider, order, settings, now()).filter(r => !(opts.ignoreWarehouse && r === "wrong_warehouse"));
       if (reasons.length > 0) { ineligible.push({ rider, reasons }); continue; }
       eligible.push({ rider, distanceMeters: rider.lastLocation && warehouse ? haversineMeters(rider.lastLocation, warehouse.location) : null });
     }
@@ -100,16 +98,41 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
   return {
     async suggestions(ctx: Ctx, orderId: string) {
       const order = await orderFor(ctx, orderId);
-      if (order.status !== "READY") throw invalidTransition(order, "Only a ready order can be assigned");
-      const { ranked, ineligible } = await candidates(order);
+      const changing = order.status === "ASSIGNED" || POST_PICKUP.includes(order.status);
+      if (order.status !== "READY" && !changing) throw invalidTransition(order, "Only a ready or assigned order can be given to a rider");
+      // For an order that already has a rider, suggest the others (the current rider is left out).
+      const current = changing ? await store.liveForOrder(orderId) : null;
+      const { ranked, ineligible } = await candidates(order, { ...(current && { excludeRiderId: current.riderId }), ignoreWarehouse: POST_PICKUP.includes(order.status) });
       return {
-        orderId,
+        orderId, currentRiderId: current?.riderId ?? null,
         suggested: ranked.map((c, i) => ({
           riderId: c.rider.id, name: c.rider.name, activeOrders: c.rider.activeOrderCount, distanceMeters: c.distanceMeters,
           lastAssignedAt: c.rider.lastAssignedAt?.toISOString() ?? null, score: i + 1,
         })),
         ineligible: ineligible.map(i => ({ riderId: i.rider.id, name: i.rider.name, reasons: i.reasons })),
       };
+    },
+
+    /** Every ready order still waiting for a rider, each with the riders who can take it (best first) and why the others cannot. One screen to assign from. */
+    async readyOrders(ctx: Ctx) {
+      const ready = await orders.listByStatus("READY", 100);
+      const taken = new Set((await store.liveForOrders(ready.map(o => o.id))).map(a => a.orderId));
+      const mine = ready.filter(o => !taken.has(o.id) && (ctx.actor.scope.all || ctx.actor.scope.warehouseIds.includes(o.warehouseId)));
+      const at = now();
+      const rows = [];
+      for (const order of mine) {
+        const { ranked, ineligible } = await candidates(order);
+        rows.push({
+          orderId: order.id, orderNo: order.orderNo, warehouseId: order.warehouseId,
+          locality: order.address.locality, landmark: order.address.landmark, customerName: order.customer.name,
+          itemCount: order.itemCount, paymentMethod: order.paymentMethod, alreadyPaid: order.alreadyPaid, amountDue: order.amountDue,
+          readyAt: order.readyAt?.toISOString() ?? null,
+          minutesWaiting: order.readyAt ? Math.max(0, Math.floor((at.getTime() - order.readyAt.getTime()) / 60_000)) : 0,
+          suggested: ranked.map((c, i) => ({ riderId: c.rider.id, name: c.rider.name, activeOrders: c.rider.activeOrderCount, distanceMeters: c.distanceMeters, score: i + 1 })),
+          ineligible: ineligible.map(i => ({ riderId: i.rider.id, name: i.rider.name, reasons: i.reasons })),
+        });
+      }
+      return rows;
     },
 
     async assign(ctx: Ctx, orderId: string, input: { riderId: string; batchId: string | null }) {
@@ -119,7 +142,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const batch = input.batchId ? await store.getBatch(input.batchId) : null;
       if (input.batchId && !batch) throw notFound("Batch");
       const done = await assignOrder(order, rider, { who: { kind: "admin", ctx }, mode: "manual", batch });
-      await audit({ kind: "admin", ctx }, "dispatch.assign", order);
       return { assignment: assignmentView(done.assignment), order: { id: order.id, status: done.order.status } };
     },
 
@@ -130,7 +152,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const moved = await orders.transition(orderId, "READY", { kind: "admin", id: ctx.actor.userId }, { reason });
       if (!moved.ok) throw transitionError(moved, "READY");
       if (live) await takeBack(live, reason ?? "unassigned", order);
-      await audit({ kind: "admin", ctx }, "dispatch.unassign", order);
       return { order: { id: orderId, status: moved.order.status } };
     },
 
@@ -166,7 +187,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
         await store.insertBatch(batch);
         try { for (const child of children) done.push((await assignOrder(child, rider, { who, mode: "manual", batch })).assignment); }
         catch (error) { await undo(batch); throw error; }
-        await store.recordAudit({ ...auditFor(who, "dispatch.dispatch_group", "order_group", groupId)! });
         return { batch: batchView(batch), assignments: done.map(assignmentView) };
       }
 
@@ -177,8 +197,45 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       try {
         for (const child of children.filter(c => wanted.has(c.id))) done.push((await assignOrder(child, await riderFor(wanted.get(child.id)!), { who, mode: "manual", batch: null })).assignment);
       } catch (error) { await undo(null); throw error; }
-      await store.recordAudit({ ...auditFor(who, "dispatch.dispatch_group", "order_group", groupId)! });
       return { batch: null, assignments: done.map(assignmentView) };
+    },
+
+    /** Before pickup: gives an assigned order to a different rider in one step. The first rider's alarm is cancelled, the new rider's rings. */
+    async reassign(ctx: Ctx, orderId: string, input: { toRiderId: string; reason?: string | null | undefined }) {
+      const order = await orderFor(ctx, orderId);
+      if (order.status !== "ASSIGNED") throw invalidTransition(order, POST_PICKUP.includes(order.status) ? "The order was already picked up: use a hand-over" : "Only an assigned order can be given to another rider");
+      const old = await store.liveForOrder(orderId);
+      if (!old) throw notFound("Assignment");
+      if (old.riderId === input.toRiderId) throw validation("The order is already with that rider", { field: "toRiderId" });
+      const rider = await riderFor(input.toRiderId);
+      const reasons = ineligibleReasons(rider, order, settings, now());
+      if (reasons.length > 0) throw eligibilityError(reasons);
+      if (!(await riders.reserveCapacity(rider.id, settings.maxActiveOrders))) throw eligibilityError(["at_capacity"]);
+
+      const at = now();
+      const next: Assignment = {
+        ...old, id: newId(), riderId: rider.id, batchId: null, status: "assigned", live: true, mode: "manual", assignedBy: ctx.actor.userId, assignedAt: at,
+        ackDeadlineAt: new Date(at.getTime() + settings.ackTimeoutSeconds * 1000), ackAt: null, escalatedAt: null, whatsappSentAt: null,
+        handoverFromId: null, createdAt: at, updatedAt: at,
+      };
+      const why = input.reason?.trim() || "reassigned";
+      if (!(await endAssignment(old, "reassigned", why))) { await riders.releaseCapacity(rider.id); throw conflict("The order was just reassigned", { reason: "changed" }); }
+      try { await store.insertAssignment(next); }
+      catch (error) {
+        await store.updateAssignment(old.id, { status: old.status, live: true, endedAt: null, endReason: null }, { live: false });
+        await riders.reserveCapacity(old.riderId, settings.maxActiveOrders + 1);
+        await riders.releaseCapacity(rider.id);
+        throw error;
+      }
+      await batches.detach(orderId);
+      await riders.markAssigned(rider.id, at);
+      await orders.recordEvent(orderId, "reassigned", { kind: "admin", id: ctx.actor.userId }, { fromRiderId: old.riderId, toRiderId: rider.id, reason: why });
+      await store.appendFeed({ riderId: old.riderId, assignmentId: old.id, orderId, event: "reassigned_away", at });
+      await store.appendFeed({ riderId: rider.id, assignmentId: next.id, orderId, event: "assigned", at });
+      const from = await riders.get(old.riderId);
+      if (from) await quietly(notifier.cancelled(from, { assignmentId: old.id, orderId, orderNo: order.orderNo }));
+      await quietly(notifier.assigned(rider, { assignmentId: next.id, orderNo: order.orderNo, ackDeadlineAt: next.ackDeadlineAt }));
+      return { assignment: assignmentView(next), order: { id: orderId, status: order.status } };
     },
 
     /** The rider cannot go on (breakdown, road block): the order, already picked up, goes to another rider. */
@@ -217,7 +274,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const from = await riders.get(old.riderId);
       if (from) await quietly(notifier.cancelled(from, { assignmentId: old.id, orderId, orderNo: order.orderNo }));
       await quietly(notifier.handover(rider, { assignmentId: next.id, orderId, orderNo: order.orderNo, ackDeadlineAt: next.ackDeadlineAt }));
-      await audit({ kind: "admin", ctx }, "dispatch.handover", order);
       return { assignment: assignmentView(next), order: { id: orderId, status: order.status } };
     },
 
@@ -240,7 +296,6 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       }
       const at = now();
       for (const a of await store.failedForOrder(orderId)) await store.updateAssignment(a.id, { failedResolvedAt: at, updatedAt: at });
-      await audit({ kind: "admin", ctx }, "dispatch.resolve_failed", order);
       return { order: { id: orderId, status }, refund };
     },
 

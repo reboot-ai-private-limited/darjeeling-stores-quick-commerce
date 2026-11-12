@@ -47,13 +47,12 @@ export function createCatalogService(deps: CatalogDeps) {
   }
 
   /** Re-read the saved product, apply a change, bump delta-sync revisions afterwards. */
-  async function changeProduct(id: string, change: (product: Product, tx: CatalogTx) => Promise<void> | void, ctx?: Ctx, audit?: { action: string }): Promise<Product> {
+  async function changeProduct(id: string, change: (product: Product, tx: CatalogTx) => Promise<void> | void): Promise<Product> {
     const updated = await store.transaction(async tx => {
       const product = requireProduct(await tx.getProduct(id));
       await change(product, tx);
       product.updatedAt = now();
       await tx.saveProduct(product);
-      if (ctx && audit) await tx.audit(ctx, { action: audit.action, entityType: "product", entityId: id });
       return product;
     });
     await usage.touchOfferings(id);
@@ -107,7 +106,6 @@ export function createCatalogService(deps: CatalogDeps) {
         if ((await tx.countChildren(id)) > 0) throw conflict("The category still has sub-categories", { reason: "has_children" });
         if ((await tx.countProductsInCategory(id)) > 0) throw conflict("The category still has products", { reason: "has_products" });
         await tx.deleteCategory(id);
-        await tx.audit(ctx, { action: "catalog.category.delete", entityType: "category", entityId: id });
       });
     },
 
@@ -168,7 +166,6 @@ export function createCatalogService(deps: CatalogDeps) {
         if ((await tx.countProductsOfBrand(id)) > 0) throw conflict("Products still use this brand; switch it off instead", { reason: "has_products" });
         logo = brand.logoMediaId;
         await tx.deleteBrand(id);
-        await tx.audit(ctx, { action: "catalog.brand.delete", entityType: "brand", entityId: id });
       });
       if (logo) await media.remove(logo, "brand_deleted");
     },
@@ -260,7 +257,7 @@ export function createCatalogService(deps: CatalogDeps) {
     },
 
     async archiveProduct(ctx: Ctx, id: string): Promise<ProductView> {
-      return view(await changeProduct(id, product => { product.status = "archived"; }, ctx, { action: "catalog.product.archive" }));
+      return view(await changeProduct(id, product => { product.status = "archived"; }));
     },
 
     async restoreProduct(id: string): Promise<ProductView> {
@@ -277,7 +274,6 @@ export function createCatalogService(deps: CatalogDeps) {
       await store.transaction(async tx => {
         removed = requireProduct(await tx.getProduct(id));
         await tx.deleteProduct(id);
-        await tx.audit(ctx, { action: "catalog.product.delete", entityType: "product", entityId: id });
       });
       await Promise.all(removed!.images.map(image => media.remove(image.mediaId, "product_deleted")));
     },
@@ -352,7 +348,7 @@ export function createCatalogService(deps: CatalogDeps) {
       await changeProduct(id, product => {
         if (!product.images.some(i => i.mediaId === mediaId)) throw notFound("Image");
         product.images = product.images.filter(i => i.mediaId !== mediaId).map((i, sortOrder) => ({ ...i, sortOrder }));
-      }, ctx, { action: "catalog.product.image_remove" });
+      });
       await media.remove(mediaId, "product_image_removed");
     },
 
@@ -370,7 +366,6 @@ export function createCatalogService(deps: CatalogDeps) {
 
     async exportCsv(ctx: Ctx): Promise<string> {
       const [categories, products] = await Promise.all([store.listCategories(), store.listAllProducts()]);
-      await store.transaction(tx => tx.audit(ctx, { action: "catalog.export", entityType: "catalog", entityId: "catalog" }));
       return toCsv(categories, products);
     },
 

@@ -68,7 +68,8 @@ export function createQuoteService(deps: CartDeps) {
     if (bad.length > 0) throw new AppError("ITEM_UNAVAILABLE", "Some items are not available", { lines: bad });
 
     const travelMinutes = new Map<string, number>();
-    for (const w of open) travelMinutes.set(w.id, (await travel.minutes(w.location, address.location)) ?? Math.ceil(haversineMeters(w.location, address.location) / 1000 / 15 * 60));
+    // Road times come from an outside service, so ask about every store at once.
+    await Promise.all(open.map(async w => { travelMinutes.set(w.id, (await travel.minutes(w.location, address.location)) ?? Math.ceil(haversineMeters(w.location, address.location) / 1000 / 15 * 60)); }));
     const openIds = new Set(open.map(w => w.id));
     const allocation = allocate(
       items.map((item, i) => ({ qty: item.qty, available: new Map(resolved[i]!.warehouses.filter(w => openIds.has(w.warehouseId)).map(w => [w.warehouseId, w.availableUnits])) })),

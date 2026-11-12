@@ -1,6 +1,5 @@
 import { Types, type Connection } from "mongoose";
 import type { Route } from "../../platform/routes.js";
-import { createAuditWriter } from "../audit/audit.public.js";
 import { createCityService, type CityService } from "./application/city-service.js";
 import { createLocalityService, type LocalityService } from "./application/locality-service.js";
 import {
@@ -22,7 +21,6 @@ import type {
   LockActorFn,
   WarehouseDependencyPort,
   WarehouseStore,
-  WriteAuditFn,
   ZoneStore,
 } from "./application/ports.js";
 import type { City, CityDTO } from "./domain/city.js";
@@ -147,7 +145,6 @@ export function createGeographyModule({
   const zoneStore = createMongoZoneStore(connection);
   const localityStore = createMongoLocalityStore(connection);
   const warehouseStore = createMongoWarehouseStore(connection);
-  const audit = createAuditWriter(connection);
 
   const defaultLockActor: LockActorFn = async (actor, session) => {
     if (!actor) {
@@ -213,18 +210,14 @@ export function createGeographyModule({
   };
 
   const cityService = createCityService({
-    store: cityStore,
-    writeAudit: audit as WriteAuditFn,
-    withTransaction,
+    store: cityStore,    withTransaction,
     newId: () => new Types.ObjectId().toHexString(),
     lockActor: actualLockActor,
   });
 
   const zoneService = createZoneService({
     zoneStore,
-    cityStore,
-    writeAudit: audit as WriteAuditFn,
-    withTransaction,
+    cityStore,    withTransaction,
     newId: () => new Types.ObjectId().toHexString(),
     lockActor: actualLockActor,
   });
@@ -232,9 +225,7 @@ export function createGeographyModule({
   const localityService = createLocalityService({
     localityStore,
     cityStore,
-    zoneStore,
-    writeAudit: audit as WriteAuditFn,
-    withTransaction,
+    zoneStore,    withTransaction,
     newId: () => new Types.ObjectId().toHexString(),
     lockActor: actualLockActor,
   });
@@ -248,9 +239,7 @@ export function createGeographyModule({
   const warehouseService = createWarehouseService({
     warehouseStore,
     zoneStore,
-    dependencyPort,
-    writeAudit: audit as WriteAuditFn,
-    withTransaction,
+    dependencyPort,    withTransaction,
     newId: () => new Types.ObjectId().toHexString(),
     lockActor: actualLockActor,
   });

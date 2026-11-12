@@ -11,7 +11,9 @@ export const pingBody = z.object({
   }).strict()).min(1).max(200),
 }).strict();
 
-/** The 3 endpoints of docs/api/F20-eta-and-live-tracking.md. Paths are relative to the API prefix. */
+export const routeQuery = z.object({ lat: z.coerce.number().min(-90).max(90), lng: z.coerce.number().min(-180).max(180) });
+
+/** The 4 endpoints of docs/api/F20-eta-and-live-tracking.md. Paths are relative to the API prefix. */
 export function trackingRoutes(service: TrackingService, riders: Pick<RiderService, "forUser">, rider: RiderResolver, customer: CustomerResolver): Route[] {
   return [
     { method: "get", path: "/orders/:id/tracking", handler: customerGuarded(customer, async (who, req, res) => sendData(res, await service.forCustomer(who.userId, pathId(req, "id", "Order")))) },
@@ -20,6 +22,11 @@ export function trackingRoutes(service: TrackingService, riders: Pick<RiderServi
       const token = req.params.token;
       if (typeof token !== "string") throw notFound("Tracking link");
       sendData(res, await service.forToken(token));
+    }) },
+    // The road to the customer for the rider's in-app map. Only the order's own rider gets it.
+    { method: "get", path: "/rider/orders/:id/route", handler: riderGuarded(rider, riders.forUser, async (r, req, res) => {
+      const q = parse(routeQuery, req.query);
+      sendData(res, await service.routeForRider(r, pathId(req, "id", "Order"), { lat: q.lat, lng: q.lng }));
     }) },
     { method: "post", path: "/rider/location", handler: riderGuarded(rider, riders.forUser, async (r, req, res) => {
       const body = parse(pingBody, req.body);

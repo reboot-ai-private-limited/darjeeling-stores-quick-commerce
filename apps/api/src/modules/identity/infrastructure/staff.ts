@@ -1,7 +1,6 @@
 import { hashPassword } from "./credentials.js";
 import { Types, type ClientSession, type Connection } from "mongoose";
 import { createAccessStore, ADMIN_PERMISSIONS } from "../../access/access.public.js";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import { sessionSettings } from "../../../config/env.js";
 import { containsStaffScope, StaffError, type StaffScope, type StaffOperation, type createStaffInput, type updateStaffInput, type staffListInput } from "../domain/staff-policy.js";
 import type { z } from "zod";
@@ -11,23 +10,20 @@ import { createSessionStore } from "./sessions.js";
 type StaffDoc = {
   _id: Types.ObjectId; kind: string; name: string; email?: string; roleId: Types.ObjectId; status: string;
   scope?: { all: boolean; warehouseIds: Types.ObjectId[] }; lastLoginAt?: Date;
-  twoFactor?: { enabled: boolean; requiresEnrollment?: boolean; secretEncrypted?: string; recoveryCodeHashes?: string[] };
   passwordHash?: string; mustChangePassword?: boolean; createdAt?: Date; updatedAt?: Date;
   devMockAccount?: boolean;
 };
 type Role = { _id: Types.ObjectId; name: string; permissions: string[]; isSystem: boolean };
 type Actor = { id: Types.ObjectId; role: Role; scope: StaffScope };
 const scopeOf = (user: StaffDoc): StaffScope => ({ all: user.scope?.all === true, warehouseIds: (user.scope?.warehouseIds ?? []).map(String) });
-const snapshot = (user: StaffDoc) => ({ id: String(user._id), roleId: String(user.roleId), status: user.status, scope: scopeOf(user) });
 const view = (user: StaffDoc, role: Role | null) => ({ id: String(user._id), name: user.name, email: user.email ?? null,
-  role: role?.name ?? null, roleId: String(user.roleId), status: user.status, scope: scopeOf(user), lastLoginAt: user.lastLoginAt ?? null, twoFactorEnabled: user.twoFactor?.enabled === true });
+  role: role?.name ?? null, roleId: String(user.roleId), status: user.status, scope: scopeOf(user), lastLoginAt: user.lastLoginAt ?? null });
 
 export function createStaffService(connection: Connection, jwtSecret: string, settings = sessionSettings.parse({}), allowDevelopmentAccounts = false) {
   const users = connection.collection<StaffDoc>("users");
   const access = createAccessStore(connection);
   const identities = createIdentityStore(connection);
   const sessions = createSessionStore(connection, jwtSecret, settings);
-  const audit = createAuditWriter(connection);
   const roleFor = async (id: Types.ObjectId, session?: ClientSession) => session ? access.lockRole(id, session) : access.getRole(String(id));
   async function actor(token: string, session?: ClientSession): Promise<Actor> {
     const id = await sessions.authenticate(token, session);
@@ -52,7 +48,7 @@ export function createStaffService(connection: Connection, jwtSecret: string, se
       const filter = { kind: "staff", ...scopeFilter(current), ...(input.status && { status: input.status }),
         ...(input.roleId && { roleId: new Types.ObjectId(input.roleId) }), ...(input.cursor && { _id: { $gt: new Types.ObjectId(input.cursor) } }),
         ...(input.q && { $or: ["name", "email"].map(field => ({ [field]: { $regex: input.q!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } })) }) };
-      const rows = await users.find(filter, { projection: { name: 1, email: 1, roleId: 1, status: 1, scope: 1, lastLoginAt: 1, "twoFactor.enabled": 1 } }).sort({ _id: 1 }).limit(input.limit + 1).toArray();
+      const rows = await users.find(filter, { projection: { name: 1, email: 1, roleId: 1, status: 1, scope: 1, lastLoginAt: 1 } }).sort({ _id: 1 }).limit(input.limit + 1).toArray();
       const more = rows.length > input.limit;
       const page = rows.slice(0, input.limit);
       const roles = new Map((await access.getRoles(page.map(user => user.roleId))).map(role => [String(role._id), role]));
@@ -61,11 +57,11 @@ export function createStaffService(connection: Connection, jwtSecret: string, se
     },
     async detail(current: Actor, id: string) {
       const user = await users.findOne({ _id: new Types.ObjectId(id), kind: "staff", ...scopeFilter(current) },
-        { projection: { name: 1, email: 1, roleId: 1, status: 1, scope: 1, lastLoginAt: 1, "twoFactor.enabled": 1 } });
+        { projection: { name: 1, email: 1, roleId: 1, status: 1, scope: 1, lastLoginAt: 1 } });
       if (!user) throw new StaffError(404, "NOT_FOUND", "Staff account not found");
       return view(user, await roleFor(user.roleId));
     },
-    async mutate(token: string, operation: StaffOperation, id: string | undefined, input: z.infer<typeof createStaffInput> | z.infer<typeof updateStaffInput> | { newPassword: string }, requestId: string) {
+    async mutate(token: string, operation: StaffOperation, id: string | undefined, input: z.infer<typeof createStaffInput> | z.infer<typeof updateStaffInput> | { newPassword: string }) {
       const password = "password" in input ? input.password : "newPassword" in input ? input.newPassword : undefined;
       const passwordHash = password !== undefined ? await hashPassword(password) : undefined;
       const session = await connection.startSession();
@@ -94,7 +90,7 @@ export function createStaffService(connection: Connection, jwtSecret: string, se
           if (operation === "create" && "email" in input) {
             after = { _id: targetId, kind: "staff", name: input.name, email: input.email, roleId: role._id, status: "active",
               scope: { all: scope.all, warehouseIds: scope.warehouseIds.map(value => new Types.ObjectId(value)) }, passwordHash: passwordHash!, mustChangePassword: true,
-              twoFactor: { enabled: false }, createdAt: now, updatedAt: now };
+              createdAt: now, updatedAt: now };
             await users.insertOne(after, { session });
           } else {
             if (!target) throw new StaffError(404, "NOT_FOUND", "Staff account not found");
@@ -106,17 +102,14 @@ export function createStaffService(connection: Connection, jwtSecret: string, se
             }
             if (operation === "deactivate" || operation === "reactivate") changes.status = operation === "deactivate" ? "deactivated" : "active";
             if (operation === "reset-password") { changes.passwordHash = passwordHash!; changes.mustChangePassword = true; }
-            if (operation === "reset-2fa") changes.twoFactor = { enabled: false, requiresEnrollment: true };
             await users.updateOne({ _id: targetId }, { $set: changes }, { session });
-            if (["deactivate", "reset-password", "reset-2fa", "force-logout"].includes(operation) || (operation === "update" && ("roleId" in input || "scope" in input))) {
+            if (["deactivate", "reset-password", "force-logout"].includes(operation) || (operation === "update" && ("roleId" in input || "scope" in input))) {
               await users.updateOne({ _id: targetId }, { $inc: { credentialRevision: 1 } }, { session });
               await connection.collection("staff_auth_challenges").deleteMany({ userId: targetId }, { session });
             }
             after = { ...target, ...changes };
-            if (["deactivate", "force-logout", "reset-password", "reset-2fa"].includes(operation)) await sessions.revokeUser(targetId, session);
+            if (["deactivate", "force-logout", "reset-password"].includes(operation)) await sessions.revokeUser(targetId, session);
           }
-          await audit({ actorId: String(current.id), actorRole: current.role.name, action: `staff.${operation.replaceAll("-", "_")}`,
-            entityType: "staff", entityId: String(targetId), requestId, staffChange: { before: target ? snapshot(target) : null, after: snapshot(after) } }, session);
           return operation === "create" || operation === "update" ? view(after, role) : { ok: true };
         });
       } catch (error) {

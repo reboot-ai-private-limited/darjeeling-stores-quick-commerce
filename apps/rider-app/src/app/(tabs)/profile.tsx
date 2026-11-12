@@ -9,6 +9,7 @@ import { SwipeButton } from "../../components/SwipeButton";
 import { Card, Icon, Pill, Press, Screen, Stagger, type IconName } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { colors, radius, rupees, type } from "../../theme";
+import { prettyPhone } from "../../phone";
 
 function Item({ icon, label, hint, onPress, tone }: { icon: IconName; label: string; hint?: string; onPress: () => void; tone?: string }) {
   return (
@@ -20,8 +21,6 @@ function Item({ icon, label, hint, onPress, tone }: { icon: IconName; label: str
   );
 }
 
-/** "+919800000010" -> "+91 98000 00010" */
-const prettyPhone = (p: string) => p.replace(/^\+91(\d{5})(\d{5})$/, "+91 $1 $2");
 
 export default function Profile() {
   const { me, shift, deliveredToday, cashInHand, pendingSync, orders, endShift, signOut, refresh } = useStore();

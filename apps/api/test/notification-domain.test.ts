@@ -4,7 +4,7 @@ import {
   DEFAULT_PREFS, KNOWN_VARS, MissingVariableError, allowedByPrefs, mapWhatsAppStatus, maskPhone, moveForward, render, variablesIn, whatsappParams,
 } from "../src/modules/notifications/domain/notification.js";
 import { deliveryReportsIn, verifyMetaSignature } from "../src/modules/notifications/domain/webhook.js";
-import { checkTemplate, type TemplateInput } from "../src/modules/notifications/application/template-service.js";
+import { TEMPLATES, templatesFor } from "../src/modules/notifications/domain/templates.js";
 
 describe("template variables", () => {
   it("finds every placeholder in order, repeats included, tolerating spaces", () => {
@@ -110,21 +110,37 @@ describe("reading WhatsApp status updates", () => {
   });
 });
 
-describe("checking a template", () => {
-  const ok: TemplateInput = { key: "order_confirmed", channel: "push", title: "Order confirmed", body: "Order {{orderNo}} is confirmed.", whatsappTemplateName: null, category: "utility", language: "en", isActive: true };
-  it("accepts a sound template", () => { expect(() => checkTemplate(ok)).not.toThrow(); });
-  it("rejects variables the server cannot fill, in the body or the title", () => {
-    expect(() => checkTemplate({ ...ok, body: "Hi {{nickname}}" })).toThrow(/nickname/);
-    expect(() => checkTemplate({ ...ok, title: "{{secret}}" })).toThrow(/secret/);
+describe("the built-in messages", () => {
+  it("has exactly one message per key and channel", () => {
+    const ids = TEMPLATES.map(t => `${t.key}:${t.channel}`);
+    expect(new Set(ids).size).toBe(ids.length);
   });
-  it("needs the provider's template name on WhatsApp and nowhere else", () => {
-    expect(() => checkTemplate({ ...ok, channel: "whatsapp", title: null })).toThrow(/approved/);
-    expect(() => checkTemplate({ ...ok, channel: "whatsapp", title: null, whatsappTemplateName: "order_confirmed_v1" })).not.toThrow();
-    expect(() => checkTemplate({ ...ok, whatsappTemplateName: "x" })).toThrow(/WhatsApp templates only/);
+  it("uses only variables the server can fill in", () => {
+    for (const t of TEMPLATES) for (const name of [...variablesIn(t.body), ...variablesIn(t.title ?? "")]) {
+      expect(KNOWN_VARS as readonly string[], `${t.key}/${t.channel} uses {{${name}}}`).toContain(name);
+    }
+  });
+  it("gives WhatsApp the provider's template name and nothing else", () => {
+    for (const t of TEMPLATES) {
+      if (t.channel === "whatsapp") expect(t.whatsappTemplateName, `${t.key} needs the approved WhatsApp name`).toMatch(/^[a-z0-9_]+$/);
+      else expect(t.whatsappTemplateName, `${t.key}/${t.channel}`).toBeNull();
+    }
   });
   it("gives only push a title, and keeps marketing off SMS", () => {
-    expect(() => checkTemplate({ ...ok, channel: "sms" })).toThrow(/title/);
-    expect(() => checkTemplate({ ...ok, channel: "sms", title: null, category: "marketing" })).toThrow(/marketing/);
-    expect(() => checkTemplate({ ...ok, channel: "sms", title: null, category: "authentication" })).not.toThrow();
+    for (const t of TEMPLATES) {
+      if (t.channel === "push") expect(t.title, `${t.key} push title`).toBeTruthy();
+      else expect(t.title, `${t.key}/${t.channel}`).toBeNull();
+      if (t.channel === "sms") expect(t.category).not.toBe("marketing");
+    }
+  });
+  it("covers every order step, refund, rider alert, back-in-stock, login code and the promo", () => {
+    const has = (key: string, channel: string) => templatesFor(key).some(t => t.channel === channel);
+    for (const key of ["customer_order_placed", "customer_order_confirmed", "customer_item_unavailable", "customer_order_cancelled", "customer_refund_approved", "customer_refund_rejected", "customer_refund_done", "back_in_stock", "assignment_assigned", "handover_assigned", "assignment_cancelled", "payment_paid", "promo_broadcast"]) {
+      expect(has(key, "push"), `${key} push`).toBe(true);
+    }
+    expect(has("assignment_unacknowledged", "whatsapp")).toBe(true);
+    expect(has("otp_login", "whatsapp") && has("otp_login", "sms")).toBe(true);
+    expect(has("promo_broadcast", "whatsapp")).toBe(true);
+    expect(templatesFor("nope")).toEqual([]);
   });
 });

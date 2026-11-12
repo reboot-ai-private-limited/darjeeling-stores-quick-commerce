@@ -4,9 +4,8 @@ export interface Actor {
   userId: string; role: string; permissions: readonly string[];
   scope: { all: boolean; warehouseIds: readonly string[] };
 }
-/** Who is acting and for which request. `requestId` must be a UUID because the audit log requires it. */
+/** Who is acting and for which request. */
 export interface Ctx { actor: Actor; requestId: string }
-export interface AuditEntry { action: string; entityType: string; entityId: string; warehouseId?: string }
 
 export interface ProductQuery { q?: string; categoryId?: string; brandId?: string; foodType?: FoodType; status?: ProductStatus; type?: ProductType; afterId?: string; limit: number }
 
@@ -27,7 +26,7 @@ export interface CatalogReads {
   findSkuOwners(skus: readonly string[], excludeProductId?: string): Promise<{ sku: string; productId: string }[]>;
 }
 
-/** Writes run inside one MongoDB transaction together with their audit record. A duplicate slug or SKU surfaces as a CONFLICT AppError. */
+/** Writes run inside one MongoDB transaction. A duplicate slug or SKU surfaces as a CONFLICT AppError. */
 export interface CatalogTx extends CatalogReads {
   insertCategory(category: Category): Promise<void>;
   saveCategory(category: Category): Promise<void>;
@@ -39,7 +38,6 @@ export interface CatalogTx extends CatalogReads {
   insertProduct(product: Product): Promise<void>;
   saveProduct(product: Product): Promise<void>;
   deleteProduct(id: string): Promise<void>;
-  audit(ctx: Ctx, entry: AuditEntry): Promise<void>;
 }
 
 export interface CatalogStore extends CatalogReads {

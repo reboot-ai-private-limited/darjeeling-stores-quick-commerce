@@ -23,7 +23,6 @@ describe("registering riders", () => {
       pendingSyncCount: 0, isActive: true,
     });
     expect([...f.accounts.accounts.values()]).toEqual([expect.objectContaining({ userId: res.body.data.userId, name: "Pema Sherpa", phone: "+919800000010", active: true })]);
-    expect(await col("audit_log").countDocuments({ action: "rider.create", entityId: res.body.data.id, actorId: "000000000000000000000001" })).toBe(1);
   });
 
   it("refuses a phone that already has an account, and a rider whose warehouses are outside the zone", async () => {
@@ -99,7 +98,6 @@ describe("changing riders", () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ name: "Pema Sherpa", vehicle: "Bike", warehouseIds: [W2] });
     expect(f.accounts.accounts.get(r.userId)!.name).toBe("Pema Sherpa");
-    expect(await col("audit_log").countDocuments({ action: "rider.update", entityId: r.id })).toBe(1);
     expect((await f.send("put", `/admin/riders/${r.id}`, { vehicle: null })).body.data.vehicle).toBeNull();
   });
 
@@ -159,7 +157,6 @@ describe("changing riders", () => {
     expect(on.body.data).toMatchObject({ status: "offline", isActive: true });
     expect(f.accounts.accounts.get(r.userId)!.active).toBe(true);
     expect((await f.get("/rider/me", r.headers)).status).toBe(200);
-    expect(await col("audit_log").countDocuments({ action: { $in: ["rider.deactivate", "rider.reactivate"] } })).toBe(2);
     expect((await f.send("post", `/admin/riders/${r.id}/deactivate`, undefined, viewer)).status).toBe(403);
   });
 

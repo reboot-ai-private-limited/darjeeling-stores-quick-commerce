@@ -10,6 +10,7 @@ ETA is **pack time + rider-arrival time + travel time + extra minutes (rain, nig
 |---|---|---|---|
 | `GET` | `/orders/:id/tracking` | Customer | Status, ETA and rider position for one child order |
 | `GET` | `/track/:token` | Token link | Public tracking page data (no login) |
+| `GET` | `/rider/orders/:id/route` | Rider | The road from the rider to the customer's door, for the map |
 | `POST` | `/rider/location` | Rider | Send location pings |
 
 The admin map uses `GET /admin/riders/live` ([F18](F18-dispatch-and-assignment.md)). The promised-vs-actual report is in [F25](F25-admin-panel-settings-and-reports.md).
@@ -74,6 +75,13 @@ The WhatsApp message carries a link with an **expiring token** so the page works
 }
 ```
 Errors: `404 NOT_FOUND` (bad or revoked token) · `410` is not used: an expired token returns `404` so tokens cannot be probed.
+
+## GET /rider/orders/:id/route
+Query: `lat` and `lng` (where the rider is now). Only the rider the order is assigned to may ask; anyone else gets `404`. The road comes from Google Routes for a two-wheeler and is cached for 30 seconds per pair of places. 200:
+```json
+{ "data": { "distanceM": 2300, "durationS": 540, "approximate": false, "points": [{ "lat": 27.0405, "lng": 88.2663 }, { "lat": 27.0398, "lng": 88.2660 }], "destination": { "lat": 27.0360, "lng": 88.2627 } } }
+```
+When Google has no answer (no key, a timeout, no road) the server returns a straight line between the two points with `"approximate": true` and the estimated time, so the map is never empty.
 
 ## POST /rider/location
 The rider app sends one point or a buffered batch. Interval: about every 10 s while it has an order, about every 60 s when idle but online (the server returns the interval to use). Body:

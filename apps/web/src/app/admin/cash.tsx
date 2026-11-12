@@ -125,14 +125,14 @@ function CashInHandTab({
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 20 }}>
-        <div className="admin-panel" style={{ padding: "16px 20px" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Total Cash with Fleet</span>
-          <h2 style={{ fontSize: 26, margin: "6px 0 0", color: "var(--admin-accent)" }}>{fmtCurrency(totalInHand)}</h2>
+      <div className="admin-stat-grid">
+        <div className="admin-stat is-accent">
+          <span>Total cash with fleet</span>
+          <strong>{fmtCurrency(totalInHand)}</strong>
         </div>
-        <div className="admin-panel" style={{ padding: "16px 20px" }}>
-          <span style={{ fontSize: 11, color: "var(--admin-muted)", textTransform: "uppercase", fontWeight: 600 }}>Riders Holding Cash</span>
-          <h2 style={{ fontSize: 26, margin: "6px 0 0" }}>{data.filter((r) => r.cashInHand > 0).length}</h2>
+        <div className="admin-stat">
+          <span>Riders holding cash</span>
+          <strong>{data.filter((r) => r.cashInHand > 0).length}</strong>
         </div>
       </div>
 
@@ -170,12 +170,12 @@ function CashInHandTab({
         ) : data.length === 0 ? (
           <p className="admin-roles-message">No riders currently hold cash for this criteria.</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="admin-table-wrap">
             <table className="admin-product-table">
               <thead>
                 <tr>
                   <th>Rider</th>
-                  <th>Cash Held</th>
+                  <th className="num">Cash Held</th>
                   <th>Store Breakdown</th>
                   <th>Last Deposit</th>
                   <th>Action</th>
@@ -190,23 +190,23 @@ function CashInHandTab({
                       <td>
                         <strong>{r.name || `Rider ${r.riderId.slice(-6)}`}</strong>
                         {isHigh && (
-                          <span className="admin-badge admin-badge-paused" style={{ marginLeft: 8, fontSize: 10 }}>
+                          <span className="admin-badge admin-badge-paused" style={{ marginLeft: 8, fontSize: 12 }}>
                             HIGH BALANCE
                           </span>
                         )}
                       </td>
-                      <td style={{ fontSize: 14, fontWeight: 600 }}>{fmtCurrency(r.cashInHand)}</td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+                      <td className="num" style={{ fontSize: 17, fontWeight: 700 }}>{fmtCurrency(r.cashInHand)}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>
                         {r.byWarehouse.map((w) => {
                           const whCode = warehouses.find((item) => item.id === w.warehouseId)?.code ?? w.warehouseId.slice(-4);
                           return `${whCode}: ${fmtCurrency(w.amount)}`;
                         }).join(" | ") || "—"}
                       </td>
-                      <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{fmtDate(r.lastDepositAt)}</td>
+                      <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{fmtDate(r.lastDepositAt)}</td>
                       <td>
                         <button
                           className="admin-role-button"
-                          style={{ padding: "4px 10px", fontSize: 11 }}
+                          style={{ padding: "4px 10px", fontSize: 13 }}
                           onClick={() => onOpenDeposit(r.riderId, primaryWh)}
                         >
                           Collect Deposit
@@ -312,14 +312,14 @@ function LedgerTab({
       ) : entries.length === 0 ? (
         <p className="admin-roles-message">No ledger records found.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <div className="admin-table-wrap">
           <table className="admin-product-table">
             <thead>
               <tr>
                 <th>Date &amp; Time</th>
                 <th>Rider</th>
                 <th>Type</th>
-                <th>Amount</th>
+                <th className="num">Amount</th>
                 <th>Order / Ref</th>
                 <th>Store</th>
                 <th>Notes</th>
@@ -333,19 +333,19 @@ function LedgerTab({
                 const isCollected = e.type === "collected";
                 return (
                   <tr key={e.id}>
-                    <td style={{ fontSize: 12 }}>{fmtDate(e.at)}</td>
+                    <td className="nowrap" style={{ fontSize: 14 }}>{fmtDate(e.at)}</td>
                     <td><strong>{rName}</strong></td>
                     <td>
                       <span className={`admin-badge ${isDeposit ? "admin-badge-active" : isCollected ? "admin-badge-paused" : ""}`}>
                         {e.type}
                       </span>
                     </td>
-                    <td style={{ fontWeight: 600, color: isDeposit ? "#137333" : isCollected ? "#b06000" : undefined }}>
+                    <td className="num" style={{ fontWeight: 700, color: isDeposit ? "#137333" : isCollected ? "#b06000" : undefined }}>
                       {isDeposit ? "-" : "+"}{fmtCurrency(Math.abs(e.amount))}
                     </td>
-                    <td style={{ fontSize: 12, fontFamily: "monospace" }}>{e.orderNo || (e.orderId ? `#${e.orderId.slice(-6)}` : "—")}</td>
-                    <td style={{ fontSize: 12 }}>{whCode}</td>
-                    <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{e.note || "—"}</td>
+                    <td style={{ fontSize: 14, fontFamily: "monospace" }}>{e.orderNo || (e.orderId ? `#${e.orderId.slice(-6)}` : "—")}</td>
+                    <td style={{ fontSize: 14 }}>{whCode}</td>
+                    <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{e.note || "—"}</td>
                   </tr>
                 );
               })}
@@ -446,44 +446,14 @@ function DepositFormTab({
   }
 
   return (
-    <form className="admin-panel admin-role-form" onSubmit={submit} style={{ maxWidth: 520 }}>
-      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <button
-          type="button"
-          onClick={() => setMode("deposit")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "1px solid #cbc5ba",
-            borderRadius: 6,
-            background: mode === "deposit" ? "#f3f1ee" : "#fff",
-            color: mode === "deposit" ? "var(--admin-accent)" : "inherit",
-            fontWeight: mode === "deposit" ? 600 : 400,
-            cursor: "pointer",
-          }}
-        >
-          Record Rider Deposit (Hand-in)
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("adjust")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "1px solid #cbc5ba",
-            borderRadius: 6,
-            background: mode === "adjust" ? "#f3f1ee" : "#fff",
-            color: mode === "adjust" ? "var(--admin-accent)" : "inherit",
-            fontWeight: mode === "adjust" ? 600 : 400,
-            cursor: "pointer",
-          }}
-        >
-          Dispute / Adjustment Slip
-        </button>
+    <form className="admin-panel admin-role-form is-wide" onSubmit={submit}>
+      <div className="admin-segment" role="group" aria-label="Entry type">
+        <button type="button" className={mode === "deposit" ? "is-on" : ""} onClick={() => setMode("deposit")}>Rider deposit (hand-in)</button>
+        <button type="button" className={mode === "adjust" ? "is-on" : ""} onClick={() => setMode("adjust")}>Adjustment / dispute</button>
       </div>
 
       <h2>{mode === "deposit" ? "Record Cash Hand-in" : "Record Ledger Adjustment"}</h2>
-      <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+      <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
         {mode === "deposit"
           ? "Confirm cashier receipt of physical cash deposited by a delivery partner."
           : "Debit or credit a rider's cash liability to settle discrepancies or manual cash corrections."}
@@ -492,15 +462,14 @@ function DepositFormTab({
       {notice && <p role="status" style={{ color: "#137333", margin: "8px 0" }}>{notice}</p>}
       {error && <p role="alert" className="admin-role-error" style={{ margin: "8px 0" }}>{error}</p>}
 
-      <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-        <label style={{ fontSize: 12 }}>
+      <div className="admin-form-grid">
+        <label className="admin-field">
           Delivery Partner *
           <select
             required
             value={riderId}
             onChange={(e) => setRiderId(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           >
             <option value="">— Select Rider —</option>
             {riders.map((r) => (
@@ -509,14 +478,13 @@ function DepositFormTab({
           </select>
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label className="admin-field">
           Fulfillment Store / Warehouse *
           <select
             required
             value={warehouseId}
             onChange={(e) => setWarehouseId(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           >
             <option value="">— Select Warehouse —</option>
             {warehouses.map((w) => (
@@ -525,7 +493,7 @@ function DepositFormTab({
           </select>
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label className="admin-field">
           Amount in Rupees (₹) *
           <input
             type="number"
@@ -535,14 +503,13 @@ function DepositFormTab({
             value={amountRs}
             onChange={(e) => setAmountRs(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           />
           {mode === "adjust" && (
             <small style={{ color: "var(--admin-muted)" }}>Negative number reduces rider liability; positive increases liability.</small>
           )}
         </label>
 
-        <label style={{ fontSize: 12 }}>
+        <label className="admin-field">
           {mode === "deposit" ? "Receipt Note / Reference" : "Adjustment Reason *"}
           <textarea
             required={mode === "adjust"}
@@ -551,7 +518,6 @@ function DepositFormTab({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             disabled={busy}
-            style={{ display: "block", marginTop: 4, width: "100%", minHeight: 70, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
           />
         </label>
       </div>
@@ -686,39 +652,9 @@ function ReconciliationTab() {
 
   return (
     <>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button
-          type="button"
-          onClick={() => setReconSubTab("upi")}
-          style={{
-            padding: "8px 14px",
-            border: "1px solid #cbc5ba",
-            borderRadius: 6,
-            background: reconSubTab === "upi" ? "#f3f1ee" : "#fff",
-            color: reconSubTab === "upi" ? "var(--admin-accent)" : "inherit",
-            fontWeight: reconSubTab === "upi" ? 600 : 400,
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          Doorstep UPI &amp; Discrepancies ({openReconCount} open)
-        </button>
-        <button
-          type="button"
-          onClick={() => setReconSubTab("offline")}
-          style={{
-            padding: "8px 14px",
-            border: "1px solid #cbc5ba",
-            borderRadius: 6,
-            background: reconSubTab === "offline" ? "#f3f1ee" : "#fff",
-            color: reconSubTab === "offline" ? "var(--admin-accent)" : "inherit",
-            fontWeight: reconSubTab === "offline" ? 600 : 400,
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          Offline Delivery Reviews ({openReviewCount} open)
-        </button>
+      <div className="admin-segment" role="group" aria-label="Reconciliation sections">
+        <button type="button" className={reconSubTab === "upi" ? "is-on" : ""} onClick={() => setReconSubTab("upi")}>Doorstep UPI &amp; discrepancies ({openReconCount} open)</button>
+        <button type="button" className={reconSubTab === "offline" ? "is-on" : ""} onClick={() => setReconSubTab("offline")}>Offline delivery reviews ({openReviewCount} open)</button>
       </div>
 
       {notice && <p role="status" style={{ color: "#137333", marginBottom: 12 }}>{notice}</p>}
@@ -728,17 +664,16 @@ function ReconciliationTab() {
       {resolvingRecon && (
         <form className="admin-panel admin-role-form" onSubmit={submitResolveRecon} style={{ marginBottom: 20 }}>
           <h2>Resolve #{resolvingRecon.orderNo} ({resolvingRecon.type})</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
             Rider: <strong>{resolvingRecon.riderName}</strong> · Discrepancy Amount: <strong>{fmtCurrency(resolvingRecon.amount)}</strong>
           </p>
           <div style={{ display: "grid", gap: 12, maxWidth: 500 }}>
-            <label style={{ fontSize: 12 }}>
+            <label className="admin-field">
               Outcome Decision *
               <select
                 value={reconOutcome}
                 onChange={(e) => setReconOutcome(e.target.value as typeof reconOutcome)}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="verified">Verified (Bank statement matched)</option>
                 <option value="not_received">Not Received (Rider owes as cash)</option>
@@ -748,25 +683,23 @@ function ReconciliationTab() {
               </select>
             </label>
             {reconOutcome === "verified" && (
-              <label style={{ fontSize: 12 }}>
+              <label className="admin-field">
                 Bank Reference / UTR Number
                 <input
                   value={bankRef}
                   onChange={(e) => setBankRef(e.target.value)}
                   placeholder="e.g. 329019283019"
                   disabled={busy}
-                  style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
                 />
               </label>
             )}
-            <label style={{ fontSize: 12 }}>
+            <label className="admin-field">
               Audit Note
               <input
                 value={reconNote}
                 onChange={(e) => setReconNote(e.target.value)}
                 placeholder="Optional explanation"
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
           </div>
@@ -785,30 +718,28 @@ function ReconciliationTab() {
       {resolvingReview && (
         <form className="admin-panel admin-role-form" onSubmit={submitResolveReview} style={{ marginBottom: 20 }}>
           <h2>Audit Offline Delivery #{resolvingReview.orderNo}</h2>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)" }}>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)" }}>
             Delivered while rider was offline: {fmtDate(resolvingReview.deliveredAt)}. Distance: {resolvingReview.distanceFromAddressM ?? "—"}m.
           </p>
           <div style={{ display: "grid", gap: 12, maxWidth: 500 }}>
-            <label style={{ fontSize: 12 }}>
+            <label className="admin-field">
               Audit Outcome *
               <select
                 value={reviewOutcome}
                 onChange={(e) => setReviewOutcome(e.target.value as "accepted" | "rejected")}
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", padding: "8px 10px", border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               >
                 <option value="accepted">Accept Delivery (Mark Order Completed)</option>
                 <option value="rejected">Reject Delivery (Send Order to Failed)</option>
               </select>
             </label>
-            <label style={{ fontSize: 12 }}>
+            <label className="admin-field">
               Reason / Review Note
               <textarea
                 value={reviewNote}
                 onChange={(e) => setReviewNote(e.target.value)}
                 placeholder="Document your check (e.g. verified with customer over call)"
                 disabled={busy}
-                style={{ display: "block", marginTop: 4, width: "100%", minHeight: 70, padding: 8, border: "1px solid #cbc5ba", borderRadius: 6, font: "inherit" }}
               />
             </label>
           </div>
@@ -834,14 +765,14 @@ function ReconciliationTab() {
           ) : recons.length === 0 ? (
             <p className="admin-roles-message">No reconciliation items pending.</p>
           ) : (
-            <div style={{ overflowX: "auto" }}>
+            <div className="admin-table-wrap">
               <table className="admin-product-table">
                 <thead>
                   <tr>
                     <th>Order</th>
                     <th>Rider</th>
                     <th>Type</th>
-                    <th>Amount</th>
+                    <th className="num">Amount</th>
                     <th>Status</th>
                     <th>Timestamp</th>
                     <th>Action</th>
@@ -855,24 +786,24 @@ function ReconciliationTab() {
                         <td><strong>#{r.orderNo}</strong></td>
                         <td>{r.riderName}</td>
                         <td><span className="admin-badge admin-badge-paused">{r.type.replace("_", " ")}</span></td>
-                        <td style={{ fontWeight: 600 }}>{fmtCurrency(r.amount)}</td>
+                        <td className="num" style={{ fontWeight: 700 }}>{fmtCurrency(r.amount)}</td>
                         <td>
                           <span className={`admin-badge ${isOpen ? "admin-badge-inactive" : "admin-badge-active"}`}>
                             {r.status}
                           </span>
                         </td>
-                        <td style={{ fontSize: 12, color: "var(--admin-muted)" }}>{fmtDate(r.at)}</td>
+                        <td style={{ fontSize: 14, color: "var(--admin-muted)" }}>{fmtDate(r.at)}</td>
                         <td>
                           {isOpen ? (
                             <button
                               className="admin-role-button"
-                              style={{ padding: "4px 8px", fontSize: 11 }}
+                              style={{ padding: "4px 8px", fontSize: 13 }}
                               onClick={() => setResolvingRecon(r)}
                             >
                               Resolve
                             </button>
                           ) : (
-                            <span style={{ fontSize: 11, color: "var(--admin-muted)" }}>
+                            <span style={{ fontSize: 13, color: "var(--admin-muted)" }}>
                               {r.resolution?.outcome ?? "Resolved"}
                             </span>
                           )}
@@ -896,7 +827,7 @@ function ReconciliationTab() {
           ) : reviews.length === 0 ? (
             <p className="admin-roles-message">No offline deliveries pending review.</p>
           ) : (
-            <div style={{ overflowX: "auto" }}>
+            <div className="admin-table-wrap">
               <table className="admin-product-table">
                 <thead>
                   <tr>
@@ -916,7 +847,7 @@ function ReconciliationTab() {
                       <tr key={rev.orderId}>
                         <td><strong>#{rev.orderNo}</strong></td>
                         <td>{rev.riderName}</td>
-                        <td style={{ fontSize: 12 }}>{fmtDate(rev.deliveredAt)}</td>
+                        <td style={{ fontSize: 14 }}>{fmtDate(rev.deliveredAt)}</td>
                         <td>
                           {rev.flags.map((f) => (
                             <span key={f} className="admin-badge admin-badge-paused" style={{ marginRight: 4 }}>
@@ -924,15 +855,15 @@ function ReconciliationTab() {
                             </span>
                           ))}
                         </td>
-                        <td style={{ fontSize: 12 }}>{rev.distanceFromAddressM !== null ? `${rev.distanceFromAddressM}m` : "—"}</td>
-                        <td style={{ fontSize: 12 }}>
+                        <td style={{ fontSize: 14 }}>{rev.distanceFromAddressM !== null ? `${rev.distanceFromAddressM}m` : "—"}</td>
+                        <td style={{ fontSize: 14 }}>
                           {rev.collection ? `${rev.collection.method}: ${fmtCurrency(rev.collection.amount)}` : "—"}
                         </td>
                         <td>
                           {isOpen ? (
                             <button
                               className="admin-role-button"
-                              style={{ padding: "4px 8px", fontSize: 11 }}
+                              style={{ padding: "4px 8px", fontSize: 13 }}
                               onClick={() => setResolvingReview(rev)}
                             >
                               Audit Proof
@@ -1002,7 +933,7 @@ export default function CashDesk({ session }: { session: AdminSession }) {
 
   return (
     <>
-      <div className="admin-heading" style={{ marginBottom: 12 }}>
+      <div className="admin-heading" style={{ marginBottom: 20 }}>
         <div>
           <h1>Cash Desk &amp; Settlement</h1>
           <p>Cash collection monitoring, daily rider deposits, and delivery reconciliations.</p>

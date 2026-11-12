@@ -4,7 +4,7 @@ import type { loadConfig } from "../config/env.js";
 import { liveSettings } from "../platform/settings.js";
 import { createPeopleDirectories, createRiderIdentity, createUserResolvers } from "../modules/identity/accounts.public.js";
 import { createGeographyPort, warehouseDirectoryFrom, type createGeographyModule } from "../modules/geography/geography.public.js";
-import { baselineEta, createGoogleRoutesEta, DEFAULT_TRACKING_SETTINGS, withFallbackEta, type EtaProvider } from "../modules/tracking/tracking.public.js";
+import { baselineEta, createGoogleRoutePath, createGoogleRoutesEta, DEFAULT_TRACKING_SETTINGS, withFallbackEta, type EtaProvider } from "../modules/tracking/tracking.public.js";
 import type { createAdminModules } from "./admin.js";
 import { createDev2Modules } from "./dev2.js";
 import { createLiveSettings } from "./live-settings.js";
@@ -52,7 +52,8 @@ export function createProduction({ connection, config, geography, admin, fetch: 
     priceConflictMode: admin.providers.priceConflictMode, hoursSettings: admin.providers.hours,
     orderSettings: live.orders, paymentSettings: live.payments, refundSettings: live.refunds, deliverySettings: live.delivery,
     trackingSettings: live.tracking, syncSettings: live.sync, mediaSettings: live.media, discoverySettings: live.discovery,
-    eta, trackingTokenSecret: config.TRACKING_TOKEN_SECRET ?? deriveKey(config.JWT_SECRET, "tracking-links"),
+    eta, ...(config.GOOGLE_MAPS_API_KEY && { routePath: createGoogleRoutePath({ apiKey: config.GOOGLE_MAPS_API_KEY, ...(http && { fetch: http }) }) }),
+    trackingTokenSecret: config.TRACKING_TOKEN_SECRET ?? deriveKey(config.JWT_SECRET, "tracking-links"),
   });
 
   return {

@@ -165,22 +165,6 @@ describe("customer and rider F01 endpoints", () => {
     expect((await request(app).post("/api/v1/me/phone/verify").set("Authorization", `Bearer ${b.accessToken}`).send({ phone: "9800000083", otp: "000000" })).status).toBe(401);
     expect((await request(app).post("/api/v1/me/phone/verify").set("Authorization", `Bearer ${a.accessToken}`).send({ phone: "9800000083", otp: "000000" })).status).toBe(200);
   });
-  it("rolls back login, OTP consumption and account mutations when the audit write fails", async () => {
-    const account = (await login("9800000084")).body.data;
-    const auth = `Bearer ${account.accessToken}`;
-    await request(app).post("/api/v1/auth/request-otp").send({ phone: "9800000085" });
-    await db.db!.command({ collMod: "audit_log", validator: { required_audit_field: { $exists: true } }, validationLevel: "strict" });
-    try {
-      expect((await request(app).post("/api/v1/auth/verify-otp").set("X-Client", "customer-app").send({ phone: "9800000085", otp: "000000" })).status).toBe(500);
-      expect(await db.collection("users").countDocuments({ phone: "+919800000085" })).toBe(0);
-      expect((await db.collection("otps").findOne({ phone: "+919800000085" }))?.consumedAt).toBeNull();
-      expect((await request(app).put("/api/v1/me").set("Authorization", auth).send({ name: "Uncommitted" })).status).toBe(500);
-      expect((await request(app).post("/api/v1/me/delete-request").set("Authorization", auth).send({})).status).toBe(500);
-      const profile = await request(app).get("/api/v1/me").set("Authorization", auth);
-      expect(profile.status).toBe(200); expect(profile.body.data.name).toBe(""); expect(profile.body.data.status).toBe("active");
-    } finally { await db.db!.command({ collMod: "audit_log", validator: {} }); }
-    expect((await request(app).post("/api/v1/auth/verify-otp").set("X-Client", "customer-app").send({ phone: "9800000085", otp: "000000" })).status).toBe(200);
-  });
   it("supports an injected real transport with WhatsApp-to-SMS fallback without accepting the mock code", async () => {
     const sent: { code: string; channel: string }[] = [];
     const routes = await createConsumerRoutes(db, "a".repeat(64), { mode: "production", mockOTP: false, transport: { async send(input) { sent.push({ code: input.code, channel: input.channel }); if (input.channel === "whatsapp") throw new Error("Provider failure"); } } });

@@ -32,7 +32,7 @@ async function main() {
     : await createAdministrationRoutes(mongoose.connection, config.JWT_SECRET, config.CORS_ORIGINS, config); }
   catch { console.error(JSON.stringify({ event: "identity_initialization_failed" })); await disconnectDatabase(); process.exitCode = 1; return; }
   try {
-    if (config.JWT_SECRET && config.STAFF_TOTP_KEY) additionalRoutes.push(...await createStaffAuthRoutes(mongoose.connection, config.JWT_SECRET, config.STAFF_TOTP_KEY, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
+    if (config.JWT_SECRET) additionalRoutes.push(...await createStaffAuthRoutes(mongoose.connection, config.JWT_SECRET, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
     if (config.JWT_SECRET && !config.mockOTP) additionalRoutes.push(...createSessionRoutes(mongoose.connection, config.JWT_SECRET, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
     if (config.JWT_SECRET && !config.mockOTP) additionalRoutes.push(...await createConsumerRoutes(mongoose.connection, config.JWT_SECRET, { mode: config.NODE_ENV, mockOTP: false }, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
   } catch { console.error(JSON.stringify({ event: "staff_auth_initialization_failed" })); await disconnectDatabase(); process.exitCode = 1; return; }

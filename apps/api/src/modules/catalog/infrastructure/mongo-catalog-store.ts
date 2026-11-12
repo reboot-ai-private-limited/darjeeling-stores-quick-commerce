@@ -1,5 +1,4 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter } from "../../audit/audit.public.js";
 import type { CatalogReads, CatalogStore, CatalogTx, ProductQuery } from "../application/ports.js";
 import { conflict } from "../domain/errors.js";
 import { nameKey, type Brand, type Category, type Product } from "../domain/product.js";
@@ -44,7 +43,6 @@ export function createMongoCatalogStore(connection: Connection): CatalogStore {
   const categories = () => connection.collection<CategoryDoc>("categories");
   const products = () => connection.collection<ProductDoc>("products");
   const brands = () => connection.collection<BrandDoc & { nameKey: string }>("brands");
-  const writeAudit = createAuditWriter(connection);
 
   function reads(session?: ClientSession): CatalogReads {
     const opts = session ? { session } : {};
@@ -107,12 +105,6 @@ export function createMongoCatalogStore(connection: Connection): CatalogStore {
       async insertProduct(product) { try { await products().insertOne(toProductDoc(product), { session }); } catch (e) { mapDuplicate(e); } },
       async saveProduct(product) { try { await products().replaceOne({ _id: product.id }, toProductDoc(product), { session }); } catch (e) { mapDuplicate(e); } },
       async deleteProduct(id) { await products().deleteOne({ _id: id }, { session }); },
-      async audit(ctx, entry) {
-        await writeAudit({
-          actorId: ctx.actor.userId, actorRole: ctx.actor.role, action: entry.action, entityType: entry.entityType,
-          entityId: entry.entityId, requestId: ctx.requestId, ...(entry.warehouseId !== undefined && { warehouseId: entry.warehouseId }),
-        }, session);
-      },
     };
   }
 

@@ -1,7 +1,6 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter, type AuditEvent } from "../../audit/audit.public.js";
 import type { Banner, Coupon, FeeRule, Rule } from "../domain/pricing.js";
-import { ActiveRuleExistsError, CouponLimitError, DuplicateCodeError, type Audited, type PricingStore, type Usage } from "../application/ports.js";
+import { ActiveRuleExistsError, CouponLimitError, DuplicateCodeError, type PricingStore, type Usage } from "../application/ports.js";
 
 type Doc<T extends { id: string }> = Omit<T, "id"> & { _id: string };
 const wrap = <T extends { id: string }>({ id, ...rest }: T): Doc<T> => ({ _id: id, ...rest } as Doc<T>);
@@ -15,15 +14,12 @@ export function createMongoPricingStore(connection: Connection): PricingStore {
   const usages = () => connection.collection<Doc<Usage>>("coupon_usage");
   const userCounts = () => connection.collection<{ _id: string; count: number }>("coupon_user_counts");
   const banners = () => connection.collection<Doc<Banner>>("banners");
-  const writeAudit = createAuditWriter(connection);
 
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
     try { let result!: T; await session.withTransaction(async () => { result = await fn(session); }); return result; }
     finally { await session.endSession(); }
   }
-  const audited = async <T>(options: Audited | undefined, fn: (session: ClientSession | undefined) => Promise<T>): Promise<T> =>
-    options?.audit ? inTransaction(async session => { const result = await fn(session); await writeAudit(options.audit!, session); return result; }) : fn(undefined);
 
   const store: PricingStore = {
     async ensureIndexes() {
@@ -36,13 +32,13 @@ export function createMongoPricingStore(connection: Connection): PricingStore {
       await banners().createIndex({ isActive: 1, sortOrder: 1 });
     },
 
-    async insertRule(rule, options) {
-      try { await audited(options, session => rules().insertOne(wrap(rule) as never, { ...(session && { session }) })); }
+    async insertRule(rule) {
+      try { await rules().insertOne(wrap(rule) as never); }
       catch (error) { if (isDuplicate(error)) throw new ActiveRuleExistsError((await store.activeFeeRuleOnZones((rule as FeeRule).zoneIds))?.id ?? ""); throw error; }
     },
     async getRule(id) { const doc = await rules().findOne({ _id: id }); return doc ? unwrap<Rule>(doc) : null; },
-    async updateRule(id, patch, options) {
-      try { return await audited(options, async session => (await rules().updateOne({ _id: id }, { $set: strip(patch) as never }, { ...(session && { session }) })).matchedCount === 1); }
+    async updateRule(id, patch) {
+      try { return (await rules().updateOne({ _id: id }, { $set: strip(patch) as never })).matchedCount === 1; }
       catch (error) { if (isDuplicate(error)) throw new ActiveRuleExistsError((await store.activeFeeRuleOnZones((patch as Partial<FeeRule>).zoneIds ?? [], id))?.id ?? ""); throw error; }
     },
     async listRules(filter) {
@@ -58,14 +54,14 @@ export function createMongoPricingStore(connection: Connection): PricingStore {
       return doc ? unwrap<FeeRule>(doc as never) : null;
     },
 
-    async insertCoupon(coupon, options) {
-      try { await audited(options, session => coupons().insertOne(wrap(coupon) as never, { ...(session && { session }) })); }
+    async insertCoupon(coupon) {
+      try { await coupons().insertOne(wrap(coupon) as never); }
       catch (error) { if (isDuplicate(error)) throw new DuplicateCodeError(); throw error; }
     },
     async getCoupon(id) { const doc = await coupons().findOne({ _id: id }); return doc ? unwrap<Coupon>(doc as never) : null; },
     async getCouponByCode(code) { const doc = await coupons().findOne({ code }); return doc ? unwrap<Coupon>(doc as never) : null; },
-    async updateCoupon(id, patch, options) {
-      try { return await audited(options, async session => (await coupons().updateOne({ _id: id }, { $set: strip(patch) as never }, { ...(session && { session }) })).matchedCount === 1); }
+    async updateCoupon(id, patch) {
+      try { return (await coupons().updateOne({ _id: id }, { $set: strip(patch) as never })).matchedCount === 1; }
       catch (error) { if (isDuplicate(error)) throw new DuplicateCodeError(); throw error; }
     },
     async listCoupons(filter, limit, beforeId) {
@@ -123,10 +119,10 @@ export function createMongoPricingStore(connection: Connection): PricingStore {
       return { rows, totalDiscount: sum[0]?.total ?? 0 };
     },
 
-    async insertBanner(banner, options) { await audited(options, session => banners().insertOne(wrap(banner) as never, { ...(session && { session }) })); },
+    async insertBanner(banner) { await banners().insertOne(wrap(banner) as never); },
     async getBanner(id) { const doc = await banners().findOne({ _id: id }); return doc ? unwrap<Banner>(doc as never) : null; },
-    async updateBanner(id, patch, options) { return audited(options, async session => (await banners().updateOne({ _id: id }, { $set: strip(patch) as never }, { ...(session && { session }) })).matchedCount === 1); },
-    async deleteBanner(id, options) { return audited(options, async session => (await banners().deleteOne({ _id: id }, { ...(session && { session }) })).deletedCount === 1); },
+    async updateBanner(id, patch) { return (await banners().updateOne({ _id: id }, { $set: strip(patch) as never })).matchedCount === 1; },
+    async deleteBanner(id) { return (await banners().deleteOne({ _id: id })).deletedCount === 1; },
     async listBanners() { return (await banners().find({}).sort({ sortOrder: 1, _id: 1 }).toArray()).map(d => unwrap<Banner>(d as never)); },
     async activeBannersForZone(zoneId, now) {
       const query = {
@@ -136,7 +132,6 @@ export function createMongoPricingStore(connection: Connection): PricingStore {
       };
       return (await banners().find(query).sort({ sortOrder: 1, _id: 1 }).toArray()).map(d => unwrap<Banner>(d as never));
     },
-    async recordAudit(entry: AuditEvent) { await inTransaction(session => writeAudit(entry, session)); },
   };
   return store;
 }

@@ -2,14 +2,13 @@ import type { Request } from "express";
 import { Types } from "mongoose";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createAuditAdminModule } from "../../src/modules/audit/audit-admin.public.js";
 import type { Actor } from "../../src/modules/catalog/catalog.public.js";
 import { createCustomersModule } from "../../src/modules/customers/customers.public.js";
 import { createReportsModule } from "../../src/modules/reports/reports.public.js";
 import { createSettingsModule } from "../../src/modules/settings/settings.public.js";
 import { api, startHarness, type Harness } from "./support/harness.js";
 
-const PERMS = ["settings:view", "settings:manage", "dashboard:view", "reports:view", "customers:view", "customers:manage", "audit:view"];
+const PERMS = ["settings:view", "settings:manage", "dashboard:view", "reports:view", "customers:view", "customers:manage"];
 const W1 = "a1".repeat(12), W2 = "a2".repeat(12), ZONE = "1".repeat(24);
 const STAFF_ID = "000000000000000000000009";
 const actor = (req: Request): Actor | undefined => {
@@ -30,8 +29,7 @@ beforeAll(async () => {
   await settings.store.ensureIndexes();
   const reports = createReportsModule({ connection: h.connection, auth: actor });
   const customers = createCustomersModule({ connection: h.connection, auth: actor, media: { removeAddressMedia: async id => { removedMedia.push(id); return 1; } } });
-  const audit = createAuditAdminModule({ connection: h.connection, auth: actor });
-  app = h.appWith([...settings.routes, ...reports.routes, ...customers.routes, ...audit.routes]);
+  app = h.appWith([...settings.routes, ...reports.routes, ...customers.routes]);
 }, 180_000);
 afterAll(async () => { await h?.stop(); }, 60_000);
 
@@ -57,7 +55,7 @@ describe("settings", () => {
     expect(eta.body.data.values.find((v: { key: string }) => v.key === "packMinutes")).toEqual({ key: "packMinutes", value: 5, source: "default", version: 0 });
   });
 
-  it("applies the most specific scope, records history and audit, and removes overrides with null", async () => {
+  it("applies the most specific scope, records history, and removes overrides with null", async () => {
     expect((await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 8 } })).status).toBe(200);
     expect((await send("put", "/admin/settings/eta", { scope: { type: "zone", id: ZONE }, values: { packMinutes: 7 } })).status).toBe(200);
     const w = await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W1 }, values: { packMinutes: 6 } });
@@ -74,9 +72,6 @@ describe("settings", () => {
     expect(history.body.data.map((r: { oldValue: unknown; newValue: unknown; scope: { type: string } }) => [r.scope.type, r.oldValue, r.newValue])).toEqual([
       ["warehouse", 9, null], ["warehouse", 6, 9], ["warehouse", null, 6], ["zone", null, 7], ["global", null, 8],
     ]);
-    const audits = await get("/admin/audit?action=settings.update");
-    expect(audits.body.data).toHaveLength(5);
-    expect(audits.body.data[0]).toMatchObject({ entityType: "setting", entityId: "eta.packMinutes", actorId: STAFF_ID, before: { value: 9 }, after: null });
   });
 
   it("does nothing, and writes no history, when the value is unchanged", async () => {
@@ -300,12 +295,10 @@ describe("customers", () => {
     expect((await get("/admin/customers/not-an-id")).status).toBe(404);
   });
 
-  it("edits the COD flag and adds a note under the staff member's name, with an audit record", async () => {
+  it("edits the COD flag and adds a note under the staff member's name", async () => {
     const res = await send("put", `/admin/customers/${id}`, { codAllowed: false, note: "Refused 3 deliveries" });
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ codAllowed: false, internalNotes: [{ text: "Refused 3 deliveries", by: "Pema Sherpa" }] });
-    const audit = (await get("/admin/audit?entityType=customer")).body.data;
-    expect(audit[0]).toMatchObject({ action: "customers.update", entityId: id, before: { status: "active", codAllowed: true }, after: { codAllowed: false, noteAdded: true }, reason: "note added" });
     expect((await send("put", `/admin/customers/${id}`, {})).status).toBe(400);
     expect((await send("put", `/admin/customers/${id}`, { codAllowed: false, role: "admin" })).status).toBe(400);
     expect((await send("put", `/admin/customers/${id}`, { codAllowed: true }, "w1")).status).toBe(403);
@@ -321,8 +314,6 @@ describe("customers", () => {
     const open = await send("post", `/admin/customers/${id}/unblock`, {});
     expect(open.body.data).toMatchObject({ status: "active", blockedReason: null });
     expect((await send("post", `/admin/customers/${id}/unblock`, {})).status).toBe(409);
-    const audit = (await get("/admin/audit?entityId=" + id)).body.data.map((a: { action: string }) => a.action);
-    expect(audit).toEqual(["customers.unblock", "customers.block"]);
     expect((await send("post", `/admin/customers/${id}/block`, { reason: "x" }, "w1")).status).toBe(403);
   });
 
@@ -353,10 +344,9 @@ describe("customers", () => {
     expect(await col("orders").countDocuments({ userId: id })).toBe(3);
     await col("users").insertOne({ _id: new Types.ObjectId(), kind: "customer", name: "New", phone: "+919876543210", status: "active" });
     expect((await send("post", `/admin/customers/${id}/finalise-deletion`, {})).status).toBe(409);
-    expect((await get("/admin/audit?action=customers.finalise_deletion")).body.data).toHaveLength(1);
   });
 
-  it("exports CSV (all-warehouse access only), neutralising formulas, and audits it", async () => {
+  it("exports CSV (all-warehouse access only), neutralising formulas", async () => {
     await col("users").updateOne({ _id: OTHER }, { $set: { name: "=cmd|' /C calc'!A0" } });
     const res = await get("/admin/customers/export");
     expect(res.status).toBe(200);
@@ -366,36 +356,7 @@ describe("customers", () => {
     expect(lines).toHaveLength(3);
     expect(lines.join("\n")).toContain("'=cmd");
     expect((await get("/admin/customers/export", "w1")).status).toBe(403);
-    expect((await get("/admin/audit?action=customers.export")).body.data).toHaveLength(1);
   });
 });
 
-describe("audit search", () => {
-  it("is read-only, filtered, paged, and limited to a scoped manager's warehouses", async () => {
-    await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W1 }, values: { packMinutes: 6 } });
-    await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W2 }, values: { packMinutes: 7 } });
-    await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 8 } });
-    expect((await get("/admin/audit")).body.data).toHaveLength(3);
-    const mine = await get("/admin/audit", "w1");
-    expect(mine.body.data).toHaveLength(1);
-    expect(mine.body.data[0].after.scope).toEqual({ type: "warehouse", id: W1 });
-    const page = await get("/admin/audit?limit=2");
-    expect(page.body.data).toHaveLength(2);
-    expect((await get(`/admin/audit?limit=2&cursor=${page.body.meta.nextCursor}`)).body.data).toHaveLength(1);
-    expect((await get("/admin/audit?actorId=nobody")).body.data).toHaveLength(0);
-    expect((await get("/admin/audit?from=2100-01-01")).body.data).toHaveLength(0);
-    expect((await get("/admin/audit?entityType=Bad%20Type")).status).toBe(400);
-    expect((await request(app).delete(`${api}/admin/audit`).set(as("admin"))).status).toBe(404);
-    expect((await get("/admin/audit", "nobody")).status).toBe(403);
-  });
-});
 
-describe("audit log indexes", () => {
-  it("are created so the audit search does not scan the whole log", async () => {
-    const audit = createAuditAdminModule({ connection: h.connection, auth: actor });
-    await audit.ensureIndexes();
-    await audit.ensureIndexes();
-    const keys = (await col("audit_log").indexes()).map(i => Object.keys(i.key).join(","));
-    expect(keys).toEqual(expect.arrayContaining(["entityType,entityId,_id", "actorId,_id", "action,_id", "warehouseId,_id", "at"]));
-  });
-});

@@ -179,6 +179,5 @@ describe("the real server wiring", () => {
     expect(dashboard.status).toBe(200);
     expect(dashboard.body.data.orders.today).toBeGreaterThanOrEqual(3);
     expect((await call("get", "/admin/rider-tips", owner)).status).toBe(200);
-    expect((await call("get", "/admin/audit?action=settings.update", owner)).body.data.length).toBeGreaterThanOrEqual(3);
   });
 });

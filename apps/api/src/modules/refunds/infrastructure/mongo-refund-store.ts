@@ -1,5 +1,4 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter, type AuditEvent } from "../../audit/audit.public.js";
 import type { Refund, RefundStatus } from "../domain/refund.js";
 import { DuplicateRefundError, type RefundStore } from "../application/ports.js";
 
@@ -8,7 +7,6 @@ const toRefund = ({ _id, ...rest }: Doc): Refund => ({ id: _id, ...rest });
 
 export function createMongoRefundStore(connection: Connection): RefundStore {
   const refunds = () => connection.collection<Doc>("refunds");
-  const writeAudit = createAuditWriter(connection);
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
     try { let result!: T; await session.withTransaction(async () => { result = await fn(session); }); return result; }
@@ -22,12 +20,11 @@ export function createMongoRefundStore(connection: Connection): RefundStore {
       await refunds().createIndex({ userId: 1, createdAt: -1 });
       await refunds().createIndex({ status: 1, warehouseId: 1, createdAt: -1 });
     },
-    async insert(refund, audit) {
+    async insert(refund) {
       const { id, ...rest } = refund;
       try {
         await inTransaction(async session => {
           await refunds().insertOne({ _id: id, ...rest }, { session });
-          if (audit) await writeAudit(audit, session);
         });
       } catch (error) {
         if ((error as { code?: number } | null)?.code === 11000 && refund.dedupeKey) throw new DuplicateRefundError(await this.byKey(refund.dedupeKey));
@@ -49,12 +46,11 @@ export function createMongoRefundStore(connection: Connection): RefundStore {
       return (await refunds().find(query).sort({ _id: -1 }).limit(limit).toArray()).map(toRefund);
     },
     pendingCount(warehouseIds) { return refunds().countDocuments({ status: "requested", ...(warehouseIds && { warehouseId: { $in: [...warehouseIds] } }) }); },
-    async decide(id, from: readonly RefundStatus[], patch, audit) {
+    async decide(id, from: readonly RefundStatus[], patch) {
       return inTransaction(async session => {
         const { id: _i, ...rest } = patch as Partial<Refund> & { id?: string };
         const done = await refunds().updateOne({ _id: id, status: { $in: [...from] } }, { $set: rest as never }, { session });
         if (done.modifiedCount !== 1) return false;
-        if (audit) await writeAudit(audit, session);
         return true;
       });
     },

@@ -6,7 +6,7 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { appliedCoupon, removeCoupon } from "../api/account";
 import { listAddresses } from "../api/addresses";
-import { getStoreStatus, REASONS, syncCart, toServerLines, type ServerCart, type StoreStatus } from "../api/cart";
+import { cachedStoreStatus, getStoreStatus, REASONS, syncCart, toServerLines, type ServerCart, type StoreStatus } from "../api/cart";
 import { Button, Header, Icon, Press, Screen, tap } from "../components/ui";
 import { useCart, type Line } from "../state/cart";
 import { useStore } from "../state/store";
@@ -17,7 +17,7 @@ export default function CartScreen() {
   const { lines, count, subtotal, savings, inc, remove, removeLine, applyServer } = useCart();
   const { zone, signedIn } = useStore();
   const insets = useSafeAreaInsets();
-  const [status, setStatus] = useState<StoreStatus | null>(null);
+  const [status, setStatus] = useState<StoreStatus | null>(() => cachedStoreStatus(zone?.id));
   const [server, setServer] = useState<ServerCart | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export default function CartScreen() {
   const linesRef = useRef<Line[]>(lines);
   linesRef.current = lines;
 
-  useEffect(() => { if (zone) void getStoreStatus(zone.id).then(setStatus).catch(() => setStatus(null)); }, [zone]);
+  useEffect(() => { if (zone) void getStoreStatus(zone.id).then(setStatus).catch(() => undefined); }, [zone]);
 
   // Signed-in customers: send the cart to the server (after a short pause) so prices and stock are checked.
   // Only quantity changes trigger it; price updates that come back do not, so it cannot loop.

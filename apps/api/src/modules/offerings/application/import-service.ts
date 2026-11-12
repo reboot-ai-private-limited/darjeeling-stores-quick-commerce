@@ -264,7 +264,6 @@ export function createImportService(deps: OfferingsDeps) {
           }
           await tx.insertMovements(moves);
           await tx.insertPriceHistory(history);
-          await tx.audit(ctx, { action: "offering.import", entityType: "warehouse_product", entityId: next.id, warehouseId: next.warehouseId });
           await stockSideEffects(tx, await thresholds({ warehouseId: next.warehouseId }), product, before, next, out, { revAlreadyBumped: true });
           offeringIds.push(next.id);
         }

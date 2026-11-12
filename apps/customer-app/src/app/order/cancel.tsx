@@ -3,7 +3,7 @@ import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { cancelOrder, refundMessage } from "../../api/account";
 import { ApiError } from "../../api/http";
-import { Button, Card, Chip, Header, Icon, Screen } from "../../components/ui";
+import { Button, Card, Chip, goBack, Header, Icon, Screen } from "../../components/ui";
 import { colors, radius, rupees, space, type } from "../../theme";
 
 const REASONS = ["Ordered by mistake", "Want to change items", "Delivery is taking too long", "Found a better price", "Other"];
@@ -57,7 +57,7 @@ export default function CancelOrder() {
       {!!err && <Text style={[type.small, { color: colors.red, marginTop: space.md }]}>{err}</Text>}
       <View style={{ gap: space.sm, marginTop: space.xl }}>
         <Button label={busy ? "Cancelling…" : "Cancel this order"} variant="danger" disabled={busy} onPress={() => void submit()} />
-        <Button label="Keep my order" variant="soft" onPress={() => router.back()} />
+        <Button label="Keep my order" variant="soft" onPress={goBack} />
       </View>
     </Screen>
   );

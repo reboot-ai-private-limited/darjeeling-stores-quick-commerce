@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 import { describe, expect, it } from "vitest";
 import { createAdminModules } from "../src/composition/admin.js";
 import { dev2Routes } from "../src/composition/dev2.js";
-import { changeOf } from "../src/modules/audit/audit-reader.js";
 import { escapeRegex, searchFilter } from "../src/modules/customers/domain/customer.js";
 import { addDays, csvCell, dayRange, dayStart, istDay, toCsv } from "../src/modules/reports/domain/reports.js";
 import { changeProblems, defsOf, dependencyProblems, DEFS, GROUPS, REGISTRY, resolveKey, valueProblem, type Layer } from "../src/modules/settings/domain/registry.js";
@@ -19,7 +18,7 @@ describe("the settings registry", () => {
       expect(def.scopes.length).toBeGreaterThan(0);
     }
   });
-  it("names every group and key in a form the audit record accepts", () => {
+  it("names every group and key in a plain, safe form", () => {
     for (const def of REGISTRY) {
       expect(def.group).toMatch(/^[a-zA-Z][a-zA-Z0-9]{0,31}$/);
       expect(def.key).toMatch(/^[a-zA-Z][a-zA-Z0-9]{0,63}$/);
@@ -84,16 +83,12 @@ describe("report dates and CSV", () => {
   });
 });
 
-describe("customer search and audit views", () => {
+describe("customer search", () => {
   it("reads a phone number or a name", () => {
     expect(searchFilter("98765 43210")).toEqual({ phone: "+919876543210" });
     expect(searchFilter("+919876543210")).toEqual({ phone: "+919876543210" });
     expect(searchFilter("Asha")).toEqual({ namePrefix: "Asha" });
     expect(escapeRegex("a.b(c)")).toBe("a\\.b\\(c\\)");
-  });
-  it("shows the before and after of whichever change an audit record carries", () => {
-    expect(changeOf({ customerChange: { before: { status: "active" }, after: { status: "blocked" } } })).toEqual({ before: { status: "active" }, after: { status: "blocked" } });
-    expect(changeOf({ action: "x" })).toEqual({ before: null, after: null });
   });
 });
 
@@ -104,9 +99,9 @@ describe("F25 routes", () => {
   const registered = routes.map(r => `${r.method.toUpperCase()} ${r.path.replace(/:[A-Za-z]+/g, ":p")}`);
 
   it("registers every endpoint the document lists", () => {
-    expect(documented).toHaveLength(15);
+    expect(documented).toHaveLength(14);
     expect(documented.filter(r => !registered.includes(r))).toEqual([]);
-    expect(registered).toHaveLength(15);
+    expect(registered).toHaveLength(14);
   });
   it("does not clash with Dev 2's routes", () => {
     expect(() => assertUniqueRoutes([...dev2Routes(), ...routes])).not.toThrow();
@@ -121,8 +116,8 @@ describe("F25 routes", () => {
     const { createApp } = await import("../src/app.js");
     const { default: request } = await import("supertest");
     const app = createApp({ isReady: () => true, dev2Routes: routes });
-    for (const url of ["/admin/settings/registry", "/admin/dashboard", "/admin/reports", "/admin/customers", "/admin/audit"]) {
+    for (const url of ["/admin/settings/registry", "/admin/dashboard", "/admin/reports", "/admin/customers"]) {
       expect((await request(app).get(`/api/v1${url}`)).status, url).toBe(401);
     }
-  });
+  }, 30_000);
 });

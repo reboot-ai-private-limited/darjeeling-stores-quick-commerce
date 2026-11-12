@@ -1,6 +1,5 @@
 import type { Rider, RiderStatus, Shift } from "../domain/rider.js";
 
-export interface AuditEntry { actorId: string; actorRole: string; action: string; entityType: string; entityId: string; requestId: string; warehouseId?: string }
 
 export interface RiderFilters {
   zoneId?: string | undefined; warehouseId?: string | undefined; status?: RiderStatus | "deactivated" | undefined; q?: string | undefined;
@@ -13,7 +12,7 @@ export class DuplicateRiderError extends Error { constructor(readonly field: "us
 
 export interface RiderStore {
   ensureIndexes(): Promise<void>;
-  insert(rider: Rider, audit: AuditEntry): Promise<void>;
+  insert(rider: Rider): Promise<void>;
   get(id: string): Promise<Rider | null>;
   getByUserId(userId: string): Promise<Rider | null>;
   getMany(ids: readonly string[]): Promise<Rider[]>;
@@ -21,7 +20,7 @@ export interface RiderStore {
   /** Every active rider, for the dispatch suggestions. */
   listActive(): Promise<Rider[]>;
   /** Saves fields of a rider, optionally only if it still has a given shift and active state. False when the condition no longer holds. */
-  update(id: string, patch: Partial<Rider>, when?: { currentShiftId?: string | null; isActive?: boolean }, audit?: AuditEntry): Promise<boolean>;
+  update(id: string, patch: Partial<Rider>, when?: { currentShiftId?: string | null; isActive?: boolean }): Promise<boolean>;
   /** Takes a shift for a rider who has none, in one atomic step. Null when they are inactive or already on a shift. */
   claimShift(riderId: string, shiftId: string, patch: Partial<Rider>): Promise<Rider | null>;
   insertShift(shift: Shift): Promise<void>;
@@ -32,7 +31,6 @@ export interface RiderStore {
   reserveCapacity(riderId: string, max: number, n?: number): Promise<boolean>;
   releaseCapacity(riderId: string, n?: number): Promise<void>;
   setActiveCount(riderId: string, count: number): Promise<void>;
-  recordAudit(entry: AuditEntry): Promise<void>;
   /** Marks online riders who have not been heard from since the cutoff as offline; returns who. */
   markStaleOffline(cutoff: Date, at: Date): Promise<Rider[]>;
 }

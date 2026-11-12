@@ -2,7 +2,7 @@
 
 Spec: [F25](../platform/25-admin-panel-settings-and-reports.md) · Conventions: [00](00-conventions.md)
 
-Settings, dashboard, reports, customers and audit. Staff, roles and 2FA are in [F01](F01-authentication.md) and [F02](F02-roles-and-permissions.md).
+Settings, dashboard, reports and customers. Staff and roles are in [F01](F01-authentication.md) and [F02](F02-roles-and-permissions.md).
 
 ## Endpoints
 
@@ -23,7 +23,6 @@ Settings, dashboard, reports, customers and audit. Staff, roles and 2FA are in [
 | `POST` | `/admin/customers/:id/unblock` | Admin `customers:manage` | Unblock 🔒 |
 | `POST` | `/admin/customers/:id/finalise-deletion` | Admin `customers:manage` | Anonymise after a deletion request 🔒 |
 | `GET` | `/admin/customers/export` | Admin `customers:manage` | CSV export 🔒 |
-| `GET` | `/admin/audit` | Admin `audit:view` | Search the audit log |
 
 ## GET /health
 200: `{ "status": "ok" }` (no `data` wrapper). Used by deploy checks.
@@ -122,20 +121,11 @@ Item and detail:
 - `finalise-deletion` anonymises the user (phone, name and email removed, orders and payments kept for accounting) and deletes their address media. Errors: `409 CONFLICT` (no deletion request).
 - `export` returns `text/csv`.
 
-## GET /admin/audit
-Query: `entityType`, `entityId`, `actorId`, `action`, `from`, `to`, `limit`, `cursor`. 200:
-```json
-{
-  "data": [{ "id": "aud_1", "actorId": "user_9", "actorRole": "admin", "action": "orders.cancel", "entityType": "order", "entityId": "ord_1", "before": { "status": "READY" }, "after": { "status": "CANCELLED" }, "reason": "Customer called to cancel", "ip": "203.0.113.5", "at": "2026-11-05T10:50:00Z" }],
-  "meta": { "nextCursor": null }
-}
-```
-
 ## How it behaves today
-Built in the `settings`, `reports`, `customers` and `audit` modules. Notes where the code is more specific than the examples above:
+Built in the `settings`, `reports` and `customers` modules. Notes where the code is more specific than the examples above:
 
 - **Scope rules.** Staff with all-warehouse access may use any scope. A warehouse-scoped manager may read and write only the `warehouse` scope of their own warehouses; zone and global settings, and every customer change (block, unblock, edit, finalise, export), need all-warehouse access. Settings history, audit and customer figures are filtered to the caller's warehouses. Asking for a warehouse outside the scope is `403 FORBIDDEN`.
-- **Settings.** `PUT` sends only the keys to change; a key already at that value is skipped, writes no history and no audit. Unknown keys, keys not allowed at the scope, out-of-range values and broken cross-key rules (a rain surcharge above the surcharge cap, a packing SLA shorter than the confirm SLA) are `400 VALIDATION_ERROR` with `details: [{ key, message }]`, and nothing is saved. Two writers changing one key at once cannot both win; the loser gets `409 CONFLICT`. Opening hours, pre-order slots and pauses live with the warehouse (F17) and are not settings. Groups `auth`, `app`, `preOrder` and `notifications` exist but have no keys yet.
+- **Settings.** `PUT` sends only the keys to change; a key already at that value is skipped, writes no history. Unknown keys, keys not allowed at the scope, out-of-range values and broken cross-key rules (a rain surcharge above the surcharge cap, a packing SLA shorter than the confirm SLA) are `400 VALIDATION_ERROR` with `details: [{ key, message }]`, and nothing is saved. Two writers changing one key at once cannot both win; the loser gets `409 CONFLICT`. Opening hours, pre-order slots and pauses live with the warehouse (F17) and are not settings. Groups `auth`, `app`, `preOrder` and `notifications` exist but have no keys yet.
 - **Live settings.** The cart and quote, pricing, stock and hours/pre-order modules read these settings on every request, so a change applies on the next one with no restart. Cart and quote: `orders` (`quoteValiditySeconds`, `maxItemsPerOrder`, `maxQtyPerItem`, `maxSplitsPerOrder`, `defaultMinOrder`), `eta` (`packMinutes`, `riderArrivalMinutes`, per warehouse), `payments.codMaxAmount`, `tax.taxInclusive`. Pricing: `discounts` (`surchargeCap`, where 0 means no limit, `rainSurchargeAmount`, `rainExtraMinutes`). Stock: `stock.lowStockGrams` and `lowStockUnits` (per warehouse) and `zonePriceConflictMode` (`block` refuses a price that differs from another warehouse of the zone, `warn` allows it). Hours and pre-orders: `hours.lastOrderMinutesBeforeClose`, `hours.afterHoursMode`, `preOrder.cutoffMinutesBeforeSlot`, `preOrder.packLeadMinutes`. The hours and pre-order keys are defaults for a warehouse whose admin leaves the field out; a value an admin saved for a warehouse is kept. Fee tiers, late-night and rain rules, coupons, opening hours and slots stay in their own screens and are already stored in the database. The remaining modules read the **global** value of their settings, refreshed right after every save (and every 30 seconds in case another process changed it): orders (`confirmMode`, `paymentWindowMinutes`, `customerCancelUntil`, `otpMaxTries`, the three SLA minutes), payments and refunds (`payLinkMinutes`, `refundWindowHours`, `refundPhotoRequired`, `maxRefundPhotos`), riders and dispatch (`assignment.*`, `delivery.punchInRadiusMeters`, `deliveryOtpEnabled`, the two location-ping intervals), tracking and ETA (`eta.averageSpeedKmh`, `detourFactor`, `extraMinutes`, `etaRefreshSeconds`, `tokenTtlHours`, `maxPointAgeDays`), offline sync (`geofenceMeters`, `maxClockSkewMinutes`), media (`media.*`) and discovery (`store.*`). Because they have no zone or warehouse to ask about, these keys can only be set at the global scope (the registry says so). What does not live in settings: secrets and addresses that come from the environment (the delivery-code key, the tracking link address, the UPI address, provider keys), the opening hours, slots and pauses of a warehouse, and the fee, surcharge and coupon rules, which are stored data.
 - **Dashboard.** `orders.today` counts orders placed today (Indian time) that are not still waiting for online payment. `delivered` and `cancelled` are among those. `active` is every order in progress now, not only today's. `revenue.today` is items less discount plus fees, for today's orders that are not cancelled, in paise. `delayedOrders` are active, non-pre-order orders more than the `assignment.delayedAfterMinutes` setting past their promise. `lowStock` counts active warehouse offerings below the `stock.lowStockGrams` or `stock.lowStockUnits` setting.
 - **Reports.** Dates are inclusive Indian days; the default is the last 7 days and the longest range is 366 days. A "sale" is an order that is not cancelled and not waiting for payment. Columns and allowed `groupBy`:
@@ -154,5 +144,4 @@ Built in the `settings`, `reports`, `customers` and `audit` modules. Notes where
 
   Other modules add reports with `reportsModule.service.register(def)`. CSV text that starts with `=`, `+`, `-` or `@` is prefixed with `'` so a spreadsheet does not run it.
 - **Customers.** `q` is a phone number (a 10-digit number is read as +91) or the start of a name. `block` works on active customers, `unblock` on blocked ones, `finalise-deletion` on customers who asked for deletion; any other status is `409 CONFLICT`. Finalising also refuses while the customer has an order in progress. It removes phone, email, addresses, carts, devices and login codes, cancels Notify Me, asks media to delete the address voice notes and photos, and keeps orders and payments. The response is `{ id, status, addressesRemoved, mediaRemoved, mediaFailed }`. Blocking ends the customer's sessions. The export is audited (`customers.export`), capped at 50,000 rows.
-- **Audit.** `before` and `after` come from the record's change snapshot. Customer, setting and staff changes carry one; others show `null`. `reason` is set for blocks and notes. There is no endpoint that changes or deletes an audit record. Cursor paging is by newest first.
 - **Cookie sessions.** A change made with a cookie session needs a trusted `Origin` and `X-CSRF-Token: 1`; a bearer token is exempt.

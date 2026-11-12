@@ -6,7 +6,23 @@ import { adminFetch } from "./session-client";
 // Matches docs/api/F04-master-catalog.md and apps/api/src/modules/catalog/interface/schemas.ts.
 
 export type CategoryNode = { id: string; name: string; slug: string; parentId: string | null; sortOrder: number; isActive: boolean; children?: CategoryNode[] };
-export type Brand = { id: string; name: string; sortOrder: number; isActive: boolean };
+export type Brand = { id: string; name: string; sortOrder: number; isActive: boolean; logoMediaId?: string | null; logoUrls?: Record<string, string> };
+const brandLogo = (b: Brand) => b.logoUrls?.["160"] ?? b.logoUrls?.thumb ?? b.logoUrls?.["320"] ?? Object.values(b.logoUrls ?? {})[0] ?? "";
+
+/** Uploads a brand's logo and returns its media id. */
+async function uploadBrandLogo(brandId: string, file: File): Promise<string> {
+  const ticket = await call<{ data: { mediaId: string; upload: { url: string; method: string; fields: Record<string, string> } } }>("media/upload-url", send("POST", {
+    kind: "brand_logo", contentType: file.type || "image/png", sizeBytes: file.size, ownerRef: { type: "brand", id: brandId },
+  }));
+  const { url, method, fields } = ticket.data.upload;
+  const form = new FormData();
+  Object.entries(fields ?? {}).forEach(([k, v]) => form.append(k, v));
+  form.append("file", file);
+  const put = await fetch(url, { method: method || "POST", body: form });
+  if (!put.ok) throw new Error("The logo could not be uploaded to storage.");
+  await call("media/complete", send("POST", { mediaId: ticket.data.mediaId }));
+  return ticket.data.mediaId;
+}
 
 type Attribute = { name: string; value: string };
 type Variant = { id: string; label: string; weightGrams: number; sku: string; barcode: string | null; isActive: boolean; attributes: Attribute[] };
@@ -46,7 +62,7 @@ export function flattenTree(nodes: CategoryNode[], depth = 0): { id: string; lab
 }
 const firstUrl = (img: Img) => img.urls.thumb ?? img.urls.small ?? img.urls.medium ?? Object.values(img.urls)[0] ?? "";
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 12, fontWeight: 600 };
+const lbl: React.CSSProperties = { display: "block", fontSize: 14, fontWeight: 600 };
 const section: React.CSSProperties = { border: "1px solid var(--admin-border)", borderRadius: 8, padding: 16, margin: "18px 0 0", background: "#fffdf7" };
 const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 };
 const smallBtn: React.CSSProperties = { minHeight: 30, padding: "4px 10px", border: "1px solid #cbc5ba", borderRadius: 6, background: "#fff", cursor: "pointer" };
@@ -79,7 +95,7 @@ function VariantFields({ d, onChange, disabled, canRemove, onRemove, productName
           {d.autoSku
             ? <input readOnly value={genSku(productName, d.label, d.rand ?? "")} disabled style={{ background: "#fff7e7", color: "#8a5a00", fontFamily: "monospace" }} aria-label="Automatic SKU" />
             : <input required maxLength={40} pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,39}" title="2-40 letters, digits, dots, dashes or underscores" value={d.sku} disabled={disabled} onChange={(e) => onChange({ ...d, sku: e.target.value })} style={{ textTransform: "uppercase" }} />}
-          {(!d.id || d.autoSku) && <span style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 400, fontSize: 11, marginTop: 4 }}><input type="checkbox" checked={!!d.autoSku} disabled={disabled} onChange={(e) => onChange({ ...d, autoSku: e.target.checked, sku: e.target.checked ? d.sku : genSku(productName, d.label, d.rand ?? "") })} /> Auto-generate SKU</span>}
+          {(!d.id || d.autoSku) && <span style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 400, fontSize: 13, marginTop: 4 }}><input type="checkbox" checked={!!d.autoSku} disabled={disabled} onChange={(e) => onChange({ ...d, autoSku: e.target.checked, sku: e.target.checked ? d.sku : genSku(productName, d.label, d.rand ?? "") })} /> Auto-generate SKU</span>}
         </label>
         {adv && <label style={lbl}>Barcode (optional)<input maxLength={40} value={d.barcode} disabled={disabled} onChange={(e) => onChange({ ...d, barcode: e.target.value })} /></label>}
       </div>
@@ -116,7 +132,7 @@ function VariantsPanel({ product, canEdit, onChanged }: { product: Product; canE
 
   return (
     <div style={section}>
-      <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Variants ({product.variants.length})</h3>
+      <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Variants ({product.variants.length})</h3>
       {error && <p role="alert" className="admin-role-error">{error}</p>}
       <div style={{ display: "grid", gap: 10 }}>
         {product.variants.map((v) => {
@@ -134,7 +150,7 @@ function VariantsPanel({ product, canEdit, onChanged }: { product: Product; canE
           return (
             <div key={v.id} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", background: "#fff", border: "1px solid var(--admin-border)", borderRadius: 8, opacity: v.isActive ? 1 : 0.6 }}>
               <strong>{v.label}</strong>
-              <span style={{ color: "var(--admin-muted)", fontSize: 12 }}>{v.weightGrams} g · SKU {v.sku}{v.barcode ? ` · ${v.barcode}` : ""}{v.attributes.length ? ` · ${v.attributes.map((a) => `${a.name}: ${a.value}`).join(", ")}` : ""}</span>
+              <span style={{ color: "var(--admin-muted)", fontSize: 14 }}>{v.weightGrams} g · SKU {v.sku}{v.barcode ? ` · ${v.barcode}` : ""}{v.attributes.length ? ` · ${v.attributes.map((a) => `${a.name}: ${a.value}`).join(", ")}` : ""}</span>
               {!v.isActive && <span className="admin-badge admin-badge-paused">Inactive</span>}
               {canEdit && (
                 <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
@@ -178,7 +194,7 @@ async function uploadProductImage(productId: string, alt: string, file: File): P
   return ticket.data.mediaId;
 }
 
-const dropzone: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 150, width: "100%", padding: 20, boxSizing: "border-box", border: "2px dashed #e0b64a", borderRadius: 12, background: "#fffaf0", cursor: "pointer", textAlign: "center", color: "#8a5a00", fontSize: 13, fontWeight: 600 };
+const dropzone: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 150, width: "100%", padding: 20, boxSizing: "border-box", border: "2px dashed #e0b64a", borderRadius: 12, background: "#fffaf0", cursor: "pointer", textAlign: "center", color: "#8a5a00", fontSize: 15, fontWeight: 600 };
 const hiddenInput: React.CSSProperties = { position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" };
 const thumbCard: React.CSSProperties = { margin: 0, width: 170, border: "1px solid var(--admin-border)", borderRadius: 10, padding: 8, background: "#fff", textAlign: "center" };
 const thumbImg: React.CSSProperties = { width: "100%", height: 130, objectFit: "cover", borderRadius: 8, background: "#f7f6f3", display: "block" };
@@ -192,7 +208,7 @@ function Dropzone({ disabled, multiple, label, onFiles }: { disabled: boolean; m
       onDrop={(e) => { e.preventDefault(); setOver(false); if (!disabled) onFiles(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"))); }}>
       <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 16l4-4 4 4 3-3 5 5 M4 4h16v16H4z M9 9h.01" /></svg>
       <span>{label}</span>
-      <span style={{ fontWeight: 400, fontSize: 11, color: "var(--admin-muted)" }}>Click to choose or drag &amp; drop · JPEG, PNG or WebP · up to 5 MB each</span>
+      <span style={{ fontWeight: 400, fontSize: 13, color: "var(--admin-muted)" }}>Click to choose or drag &amp; drop · JPEG, PNG or WebP · up to 5 MB each</span>
       <input type="file" accept="image/jpeg,image/png,image/webp" multiple={multiple} disabled={disabled} style={hiddenInput} onChange={(e) => { onFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
     </label>
   );
@@ -250,7 +266,7 @@ function ImagesPanel({ product, canEdit, onChanged }: { product: Product; canEdi
 
   return (
     <div style={{ ...section, margin: 0 }}>
-      <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Product photos ({product.images.length}/20) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
+      <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Product photos ({product.images.length}/20) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
       {error && <p role="alert" className="admin-role-error">{error}</p>}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
         {product.images.map((img, i) => (
@@ -274,7 +290,7 @@ function ImagesPanel({ product, canEdit, onChanged }: { product: Product; canEdi
         ))}
       </div>
       {canEdit && product.images.length < 20 && <Dropzone disabled={busy} multiple label={busy ? "Uploading…" : product.images.length === 0 ? "Add product photos" : "Add more photos"} onFiles={(f) => void add(f)} />}
-      {product.images.length === 0 && !canEdit && <p style={{ color: "var(--admin-muted)", fontSize: 12 }}>No photos.</p>}
+      {product.images.length === 0 && !canEdit && <p style={{ color: "var(--admin-muted)", fontSize: 14 }}>No photos.</p>}
     </div>
   );
 }
@@ -302,8 +318,12 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
   const [returnable, setReturnable] = useState(product?.isReturnable ?? true);
   const [tags, setTags] = useState((product?.tags ?? []).join(", "));
   const [highlights, setHighlights] = useState((product?.highlights ?? []).join("\n"));
-  const [keyInfo, setKeyInfo] = useState<KeyInfoRow[]>(product?.keyInfo ?? []);
-  const [sections, setSections] = useState<InfoSection[]>(product?.infoSections ?? []);
+  // Key information and information sections look identical in the customer app, so they are edited as one list
+  // (older products that still have key-info rows get them merged in here and saved back as sections).
+  const [sections, setSections] = useState<InfoSection[]>([
+    ...(product?.keyInfo ?? []).map((k) => ({ title: k.label, body: k.value })),
+    ...(product?.infoSections ?? []),
+  ].slice(0, 15));
   const [nutrition, setNutrition] = useState<Nutrition | null>(product?.nutrition ?? null);
   const [variants, setVariants] = useState<VariantDraft[]>([emptyVariant()]);
   const [busy, setBusy] = useState(false);
@@ -346,7 +366,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
       hsnCode: hsn.trim() || null, status, sortOrder: parseInt(sortOrder, 10) || 0, isReturnable: returnable,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       highlights: highlights.split("\n").map((t) => t.trim()).filter(Boolean),
-      keyInfo: keyInfo.filter((r) => r.label.trim() && r.value.trim()),
+      keyInfo: [],
       infoSections: sections.filter((s) => s.title.trim() && s.body.trim()),
       nutrition: nutrition && nutrition.rows.length > 0 ? { ...nutrition, servingSize: nutrition.servingSize?.trim() || null, rows: nutrition.rows.filter((r) => r.name.trim()) } : null,
     };
@@ -388,7 +408,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
         <h2>{isNew ? "New product" : `Edit — ${product.name}`}</h2>
         {error && <p role="alert" className="admin-role-error" style={{ marginBottom: 14 }}>{error}</p>}
         {similar && (
-          <div role="alert" style={{ background: "#fff7e7", border: "1px solid #f5d57a", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13 }}>
+          <div role="alert" style={{ background: "#fff7e7", border: "1px solid #f5d57a", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 15 }}>
             <strong>Possible duplicate{similar.length > 1 ? "s" : ""}:</strong>
             <ul style={{ margin: "6px 0 10px 18px" }}>{similar.map((s) => <li key={s.id}>{s.name} — {s.reason === "sku_exists" ? "a SKU is already used" : "similar name"}</li>)}</ul>
             <button type="button" className="admin-role-button" disabled={busy} onClick={(e) => void submit(e, true)}>Create anyway</button>
@@ -397,14 +417,14 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
 
         {isNew && (
           <div style={{ ...section, margin: "0 0 18px" }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Product photos ({photos.length}/10) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Product photos ({photos.length}/10) <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— the first photo is the main one</small></h3>
             {photos.length > 0 && (
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
                 {photos.map((f, i) => <QueuedPhoto key={`${f.name}-${f.size}-${i}`} file={f} main={i === 0} disabled={dis} onReplace={(nf) => setPhotos(photos.map((x, j) => (j === i ? nf : x)))} onRemove={() => setPhotos(photos.filter((_, j) => j !== i))} />)}
               </div>
             )}
             {photos.length < 10 && <Dropzone disabled={dis} multiple label={photos.length === 0 ? "Add product photos" : "Add more photos"} onFiles={(f) => setPhotos([...photos, ...f].slice(0, 10))} />}
-            <p style={{ fontSize: 12, color: "var(--admin-muted)", margin: "10px 0 0" }}>Photos upload when you click “Create product”.</p>
+            <p style={{ fontSize: 14, color: "var(--admin-muted)", margin: "10px 0 0" }}>Photos upload when you click “Create product”.</p>
           </div>
         )}
 
@@ -417,7 +437,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
 
         {isNew && (
           <div style={{ ...section, margin: "18px 0 0" }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Variants (at least 1, up to 20)</h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Variants (at least 1, up to 20)</h3>
             <div style={{ display: "grid", gap: 10 }}>
               {variants.map((v, i) => <VariantFields key={i} d={v} productName={name} disabled={dis} onChange={(x) => setVariants(variants.map((y, j) => (j === i ? x : y)))} canRemove={variants.length > 1} onRemove={() => setVariants(variants.filter((_, j) => j !== i))} />)}
             </div>
@@ -427,7 +447,7 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
 
         {isNew && whs.length > 0 && (
           <div style={{ ...section, margin: "18px 0 0" }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>Sell in a warehouse <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— optional, saves a trip to Offerings &amp; stock</small></h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>Sell in a warehouse <small style={{ fontWeight: 400, color: "var(--admin-muted)" }}>— optional, saves a trip to Offerings &amp; stock</small></h3>
             <label style={lbl}>Warehouse
               <select value={whId} disabled={dis} onChange={(e) => setWhId(e.target.value)}>
                 <option value="">Not now — add it later</option>
@@ -438,14 +458,14 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
               <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                 {variants.map((v, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                    <span style={{ width: 130, fontSize: 12, fontWeight: 600 }}>{v.label || `Variant ${i + 1}`}</span>
+                    <span style={{ width: 130, fontSize: 14, fontWeight: 600 }}>{v.label || `Variant ${i + 1}`}</span>
                     <label style={{ ...lbl, width: 110 }}>MRP ₹<input type="number" min="0" step="0.01" value={offerOf(i).mrp} disabled={dis} onChange={(e) => setOfferAt(i, { mrp: e.target.value })} /></label>
                     <label style={{ ...lbl, width: 110 }}>Price ₹<input type="number" min="0" step="0.01" value={offerOf(i).price} disabled={dis} onChange={(e) => setOfferAt(i, { price: e.target.value })} /></label>
                     {stockMode !== "pooled_weight" && <label style={{ ...lbl, width: 110 }}>Stock<input type="number" min="0" step="1" value={offerOf(i).stock} disabled={dis} onChange={(e) => setOfferAt(i, { stock: e.target.value })} /></label>}
                   </div>
                 ))}
                 {stockMode === "pooled_weight" && <label style={{ ...lbl, width: 180 }}>Stock (grams, shared by all variants)<input type="number" min="0" step="1" value={grams} disabled={dis} onChange={(e) => setGrams(e.target.value)} /></label>}
-                <p style={{ margin: 0, fontSize: 11, color: "var(--admin-muted)" }}>Customers only see it once the product Status is “Active”.</p>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--admin-muted)" }}>Customers only see it once the product Status is “Active”.</p>
               </div>
             )}
           </div>
@@ -468,41 +488,50 @@ function ProductForm({ product, categories, brands, canEdit, onClose, onSaved }:
           <label style={lbl}>Sort order<input type="number" min={0} step={1} value={sortOrder} disabled={dis} onChange={(e) => setSortOrder(e.target.value)} /></label>
         </div>
 
-        <label style={{ ...lbl, marginTop: 14 }}>Also show under (up to 5 more categories — hold Ctrl/Cmd to select several)
-          <select multiple size={Math.min(6, Math.max(3, cats.length))} value={extra} disabled={dis} onChange={(e) => setExtra(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, 5))}>
-            {cats.filter((c) => c.id !== categoryId).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-        </label>
+        <div style={{ ...lbl, marginTop: 14 }}>
+          <span>Also show under (up to 5 more categories)</span>
+          <details style={{ position: "relative", marginTop: 4 }}>
+            <summary style={{ cursor: dis ? "not-allowed" : "pointer", listStyle: "none", border: "1px solid var(--admin-border)", borderRadius: 8, padding: "10px 12px", background: "#fff", display: "flex", justifyContent: "space-between", gap: 8, pointerEvents: dis ? "none" : "auto" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {extra.filter((x) => x !== categoryId).length === 0
+                  ? "Select categories…"
+                  : extra.filter((x) => x !== categoryId).map((id) => cats.find((c) => c.id === id)?.label ?? "").filter(Boolean).join(", ")}
+              </span>
+              <span aria-hidden="true">▾</span>
+            </summary>
+            <div style={{ position: "absolute", zIndex: 20, left: 0, right: 0, maxHeight: 240, overflowY: "auto", background: "#fff", border: "1px solid var(--admin-border)", borderRadius: 8, marginTop: 4, padding: 6, boxShadow: "0 6px 18px rgba(0,0,0,0.12)" }}>
+              {cats.filter((c) => c.id !== categoryId).map((c) => {
+                const checked = extra.includes(c.id);
+                return (
+                  <label key={c.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 8px", fontWeight: 400, opacity: !checked && extra.length >= 5 ? 0.5 : 1 }}>
+                    <input type="checkbox" checked={checked} disabled={dis || (!checked && extra.length >= 5)} onChange={() => setExtra(checked ? extra.filter((x) => x !== c.id) : [...extra, c.id].slice(0, 5))} />
+                    {c.label}
+                  </label>
+                );
+              })}
+            </div>
+          </details>
+        </div>
         <label style={{ ...lbl, display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}><input type="checkbox" checked={returnable} disabled={dis} onChange={(e) => setReturnable(e.target.checked)} /> Returnable once delivered (damaged or missing items are always refunded)</label>
 
         <div style={section}>
-          <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>Product information</h3>
+          <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Product information</h3>
           <label style={lbl}>Tags (comma separated, up to 20)<input value={tags} disabled={dis} onChange={(e) => setTags(e.target.value)} placeholder="tea, organic, gift" /></label>
           <label style={{ ...lbl, marginTop: 12 }}>Highlights (one per line, up to 6)<textarea value={highlights} disabled={dis} onChange={(e) => setHighlights(e.target.value)} placeholder={"Hand-picked leaves\nNo added colour"} /></label>
 
-          <h4 style={{ margin: "16px 0 8px", fontSize: 13 }}>Key information (up to 15)</h4>
-          {keyInfo.map((r, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "end" }}>
-              <label style={{ ...lbl, flex: 1 }}>Label<input maxLength={40} value={r.label} disabled={dis} onChange={(e) => setKeyInfo(keyInfo.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} placeholder="Shelf life" /></label>
-              <label style={{ ...lbl, flex: 2 }}>Value<input maxLength={200} value={r.value} disabled={dis} onChange={(e) => setKeyInfo(keyInfo.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} placeholder="12 months" /></label>
-              <button type="button" style={smallBtn} disabled={dis} onClick={() => setKeyInfo(keyInfo.filter((_, j) => j !== i))}>Remove</button>
-            </div>
-          ))}
-          {keyInfo.length < 15 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setKeyInfo([...keyInfo, { label: "", value: "" }])}>+ Key info row</button>}
-
-          <h4 style={{ margin: "16px 0 8px", fontSize: 13 }}>Information sections (up to 6)</h4>
+          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Information (up to 15) — e.g. Shelf life, Storage, Ingredients</h4>
           {sections.map((s, i) => (
             <div key={i} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
-                <label style={{ ...lbl, flex: 1 }}>Title<input maxLength={60} value={s.title} disabled={dis} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} placeholder="Ingredients" /></label>
+                <label style={{ ...lbl, flex: 1 }}>Title<input maxLength={60} value={s.title} disabled={dis} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} placeholder="Shelf life, Storage, Ingredients…" /></label>
                 <button type="button" style={smallBtn} disabled={dis} onClick={() => setSections(sections.filter((_, j) => j !== i))}>Remove</button>
               </div>
               <textarea maxLength={1000} value={s.body} disabled={dis} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, body: e.target.value } : x)))} placeholder="Text (up to 1000 characters)" />
             </div>
           ))}
-          {sections.length < 6 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setSections([...sections, { title: "", body: "" }])}>+ Section</button>}
+          {sections.length < 15 && <button type="button" style={smallBtn} disabled={dis} onClick={() => setSections([...sections, { title: "", body: "" }])}>+ Add information</button>}
 
-          <h4 style={{ margin: "16px 0 8px", fontSize: 13 }}>Nutrition (optional)</h4>
+          <h4 style={{ margin: "16px 0 8px", fontSize: 15 }}>Nutrition (optional)</h4>
           {nutrition ? (
             <>
               <div style={grid}>
@@ -623,7 +652,7 @@ export function ProductManager({ categories, brands, canEdit }: { categories: Ca
         <label style={lbl}>Category<select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">All categories</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
         <label style={lbl}>Status<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Active &amp; inactive</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select></label>
       </div>
-      {notice && <p role="status" style={{ margin: "0 24px 12px", color: "#137333", fontSize: 13 }}>{notice}</p>}
+      {notice && <p role="status" style={{ margin: "0 24px 12px", color: "#137333", fontSize: 15 }}>{notice}</p>}
       {error && <p role="alert" className="admin-role-error" style={{ margin: "0 24px 12px" }}>{error} <button onClick={() => setAttempt((n) => n + 1)}>Retry</button></p>}
       {rows === null && !error ? <p className="admin-roles-message">Loading products…</p> : rows && rows.length === 0 ? (
         <p className="admin-roles-message">No products found{search || categoryId || status ? " for these filters" : " yet"}.{canEdit && !search && !categoryId && !status ? " Create the first one with “New product”." : ""}</p>
@@ -668,17 +697,38 @@ export function BrandManager({ brands, canEdit, onChanged }: { brands: Brand[]; 
   const [isActive, setIsActive] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [removeLogo, setRemoveLogo] = useState(false);
+
+  function chooseLogo(file: File | null) {
+    setLogo(file); setRemoveLogo(false);
+    setLogoPreview((old) => { if (old.startsWith("blob:")) URL.revokeObjectURL(old); return file ? URL.createObjectURL(file) : ""; });
+  }
 
   function start(b: Brand | "new") {
     setEditing(b); setError("");
+    setLogo(null); setRemoveLogo(false); setLogoPreview(b === "new" ? "" : brandLogo(b));
     setName(b === "new" ? "" : b.name); setSortOrder(b === "new" ? String(brands.length) : String(b.sortOrder)); setIsActive(b === "new" ? true : b.isActive);
   }
   async function save(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError("");
     try {
       const body = { name: name.trim(), sortOrder: parseInt(sortOrder, 10) || 0 };
-      if (editing === "new") await call("admin/brands", send("POST", body));
-      else if (editing) await call(`admin/brands/${editing.id}`, send("PUT", { ...body, isActive }));
+      let id: string;
+      if (editing === "new") id = (await call<{ data: { id: string } }>("admin/brands", send("POST", body))).data.id;
+      else if (editing) { id = editing.id; await call(`admin/brands/${id}`, send("PUT", { ...body, isActive })); }
+      else return;
+      if (logo || removeLogo) {
+        try {
+          const logoMediaId = logo ? await uploadBrandLogo(id, logo) : null;
+          await call(`admin/brands/${id}`, send("PUT", { logoMediaId }));
+        } catch (err) {
+          setEditing(null); onChanged();
+          setError(`The brand was saved, but its logo was not: ${err instanceof Error ? err.message : "upload failed"}. Edit the brand to try again.`);
+          return;
+        }
+      }
       setEditing(null); onChanged();
     } catch (err) { setError(err instanceof Error ? err.message : "The brand could not be saved."); } finally { setBusy(false); }
   }
@@ -701,6 +751,20 @@ export function BrandManager({ brands, canEdit, onChanged }: { brands: Brand[]; 
             <label style={lbl}>Brand name<input required maxLength={120} value={name} disabled={busy} onChange={(e) => setName(e.target.value)} /></label>
             <label style={lbl}>Sort order<input type="number" min={0} step={1} value={sortOrder} disabled={busy} onChange={(e) => setSortOrder(e.target.value)} /></label>
           </div>
+          <div style={{ marginTop: 14 }}>
+            <span style={{ ...lbl, marginBottom: 6 }}>Logo (shown on the customer app's "Shop by brand" tiles)</span>
+            <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+              {logoPreview && !removeLogo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={logoPreview} alt="Logo preview" style={{ width: 80, height: 80, borderRadius: 40, objectFit: "cover", border: "2px solid #e0b64a" }} />
+                : <span style={{ width: 80, height: 80, borderRadius: 40, background: "#fff3cc", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#8a5a00" }}>No logo</span>}
+              <span style={{ display: "grid", gap: 6 }}>
+                <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-label="Choose a brand logo" onChange={(e) => chooseLogo(e.target.files?.[0] ?? null)} />
+                {logoPreview && !removeLogo && <button type="button" style={{ ...smallBtn, justifySelf: "start" }} disabled={busy} onClick={() => { chooseLogo(null); setRemoveLogo(true); }}>Remove logo</button>}
+                <small style={{ color: "var(--admin-muted)" }}>A square picture works best (JPG, PNG or WebP).</small>
+              </span>
+            </div>
+          </div>
           {editing !== "new" && <label style={{ ...lbl, display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active</label>}
           <div className="admin-role-actions" style={{ marginTop: 16, gap: 8 }}>
             <button className="admin-role-button" disabled={busy}>{busy ? "Saving…" : "Save brand"}</button>
@@ -712,6 +776,10 @@ export function BrandManager({ brands, canEdit, onChanged }: { brands: Brand[]; 
         <div className="admin-tree">
           {brands.map((b) => (
             <div key={b.id} className="admin-tree-row" style={{ opacity: b.isActive ? 1 : 0.6 }}>
+              {brandLogo(b)
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={brandLogo(b)} alt="" style={{ width: 40, height: 40, borderRadius: 20, objectFit: "cover", border: "1px solid var(--admin-border)", flexShrink: 0 }} />
+                : <span aria-hidden="true" title="No logo yet" style={{ width: 40, height: 40, borderRadius: 20, background: "#fff3cc", flexShrink: 0 }} />}
               <span style={{ flex: 1 }}><strong>{b.name}</strong>{!b.isActive && <small style={{ marginLeft: 8 }}>inactive</small>}</span>
               {canEdit && <div className="admin-role-actions" style={{ padding: 0, gap: 6 }}>
                 <button style={smallBtn} disabled={busy} onClick={() => start(b)}>Edit</button>

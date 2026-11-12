@@ -34,7 +34,7 @@ export async function createAdministrationRoutes(connection: Connection, jwtSecr
       const userId = await sessions.authenticate(accessCredential(req));
       if (!userId) return error(res, 401, "UNAUTHORIZED", "Session required");
       try {
-        const data = await mutateRole(operation, typeof req.params.id === "string" ? req.params.id : undefined, req.body, String(res.getHeader("X-Request-Id")), {
+        const data = await mutateRole(operation, typeof req.params.id === "string" ? req.params.id : undefined, req.body, {
           actor: async transaction => {
             if (!await sessions.authenticate(accessCredential(req), transaction)) return null;
             const user = await identities.lockActiveStaff(userId, transaction);

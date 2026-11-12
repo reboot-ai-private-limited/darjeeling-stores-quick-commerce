@@ -1,11 +1,10 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Refund, RefundStatus } from "../domain/refund.js";
 
 export class DuplicateRefundError extends Error { constructor(readonly existing: Refund | null) { super("Duplicate refund"); } }
 
 export interface RefundStore {
   ensureIndexes(): Promise<void>;
-  insert(refund: Refund, audit?: AuditEvent): Promise<void>;
+  insert(refund: Refund): Promise<void>;
   get(id: string): Promise<Refund | null>;
   byKey(key: string): Promise<Refund | null>;
   forOrder(orderId: string): Promise<Refund[]>;
@@ -13,7 +12,7 @@ export interface RefundStore {
   list(filter: { status?: RefundStatus; source?: string; warehouseIds?: readonly string[]; from?: Date; to?: Date }, limit: number, beforeId?: string): Promise<Refund[]>;
   pendingCount(warehouseIds?: readonly string[]): Promise<number>;
   /** Moves a refund on only if it is still in one of the given statuses. False when someone else got there first. */
-  decide(id: string, from: readonly RefundStatus[], patch: Partial<Refund>, audit?: AuditEvent): Promise<boolean>;
+  decide(id: string, from: readonly RefundStatus[], patch: Partial<Refund>): Promise<boolean>;
 }
 
 /** The orders module, as refunds see it. */

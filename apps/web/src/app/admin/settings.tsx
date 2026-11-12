@@ -107,15 +107,15 @@ function StoreSettings({ session }: { session: AdminSession }) {
     } finally { setBusy(false); }
   }
 
-  if (!registry) return <p role="status" style={{ fontSize: 12 }}>Loading settings…</p>;
+  if (!registry) return <p role="status" style={{ fontSize: 14 }}>Loading settings…</p>;
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
       <nav className="admin-panel" aria-label="Settings groups" style={{ flex: "0 0 230px", padding: 8 }}>
         {groups.map(g => (
           <button key={g} onClick={() => setGroup(g)} aria-current={g === group ? "true" : undefined}
-            style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 10px", border: 0, borderRadius: 8, background: g === group ? "#f3f1ee" : "transparent", color: g === group ? "var(--admin-accent)" : "inherit", fontWeight: g === group ? 600 : 400, cursor: "pointer", font: "inherit", fontSize: 13 }}>
-            {GROUP_LABEL[g]![0]}<small style={{ display: "block", fontWeight: 400, color: "var(--admin-muted)", fontSize: 11 }}>{GROUP_LABEL[g]![1]}</small>
+            style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 10px", border: 0, borderRadius: 8, background: g === group ? "#f3f1ee" : "transparent", color: g === group ? "var(--admin-accent)" : "inherit", fontWeight: g === group ? 600 : 400, cursor: "pointer", font: "inherit", fontSize: 15 }}>
+            {GROUP_LABEL[g]![0]}<small style={{ display: "block", fontWeight: 400, color: "var(--admin-muted)", fontSize: 13 }}>{GROUP_LABEL[g]![1]}</small>
           </button>
         ))}
       </nav>
@@ -124,7 +124,7 @@ function StoreSettings({ session }: { session: AdminSession }) {
         <div className="admin-panel-toolbar" style={{ flexWrap: "wrap", gap: 8 }}>
           <h2 id="settings-title">{GROUP_LABEL[group]?.[0]}</h2>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <label style={{ fontSize: 12 }}>Applies to{" "}
+            <label style={{ fontSize: 14 }}>Applies to{" "}
               <select value={scopeType} onChange={e => setScopeType(e.target.value as ScopeType)} style={inputStyle} aria-label="Where the setting applies">
                 {(everywhere ? (["global", "zone", "warehouse"] as ScopeType[]) : (["warehouse"] as ScopeType[])).map(s => <option key={s} value={s}>{SCOPE_LABEL[s]}</option>)}
               </select>
@@ -134,12 +134,12 @@ function StoreSettings({ session }: { session: AdminSession }) {
           </div>
         </div>
         <div style={{ padding: "0 20px 16px" }}>
-          <p style={{ fontSize: 12, color: "var(--admin-muted)", margin: "0 0 12px" }}>
+          <p style={{ fontSize: 14, color: "var(--admin-muted)", margin: "0 0 12px" }}>
             A value set for a warehouse wins over its zone, which wins over &ldquo;Everywhere&rdquo;, which wins over the built-in default. Changes apply to the next request.
           </p>
           {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
           {changed.length > 0 && <Notice kind="info">You have unsaved changes. Save them before switching to another group or place, or they are discarded.</Notice>}
-          {loading && <p role="status" style={{ fontSize: 12 }}>Loading…</p>}
+          {loading && <p role="status" style={{ fontSize: 14 }}>Loading…</p>}
           {!loading && ready && defs.map(def => {
             const row = rowOf(def.key);
             const here = row?.source === scopeType && scopeType !== "global" ? true : row?.source === "global" && scopeType === "global";
@@ -149,13 +149,13 @@ function StoreSettings({ session }: { session: AdminSession }) {
             return (
               <div key={def.key} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--admin-border)", background: touched ? "#fcfbf8" : undefined }}>
                 <div>
-                  <div style={{ fontSize: 13 }}>{def.description}</div>
-                  <div style={{ fontSize: 11, color: "var(--admin-muted)", marginTop: 2 }}>
+                  <div style={{ fontSize: 15 }}>{def.description}</div>
+                  <div style={{ fontSize: 13, color: "var(--admin-muted)", marginTop: 2 }}>
                     <code>{def.key}</code> · {allowed ? <Badge tone={here ? "active" : "inactive"}>{here ? "Set here" : `From ${SOURCE_LABEL[row?.source ?? "default"]!.toLowerCase()}`}</Badge> : <>Only for {def.scopes.map(s => SCOPE_LABEL[s].toLowerCase()).join(" or ")}</>}
                     {def.min !== undefined && def.max !== undefined && def.type !== "boolean" && def.type !== "enum" && <> · allowed {show(def, def.min)} to {show(def, def.max)}</>}
                     {def.key === "surchargeCap" && <> · 0 means no limit</>}
                   </div>
-                  {errors[def.key] && <div role="alert" style={{ color: "#b3261e", fontSize: 11, marginTop: 3 }}>{errors[def.key]}</div>}
+                  {errors[def.key] && <div role="alert" style={{ color: "#b3261e", fontSize: 13, marginTop: 3 }}>{errors[def.key]}</div>}
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   {def.type === "boolean" ? (
@@ -167,7 +167,7 @@ function StoreSettings({ session }: { session: AdminSession }) {
                       {def.unit === "paise" && <span aria-hidden="true">₹</span>}
                       <input aria-label={def.description} type="number" disabled={!canManage || !allowed} value={toInput(def, value as Value)} step={def.type === "number" ? 0.1 : def.unit === "paise" ? 0.01 : 1}
                         onChange={e => { const v = fromInput(def, e.target.value); if (v !== null) setDraft(d => ({ ...d, [def.key]: v })); }} style={{ ...inputStyle, width: 110, textAlign: "right" }} />
-                      {def.unit && def.unit !== "paise" && <span style={{ fontSize: 11, color: "var(--admin-muted)", width: 50 }}>{unitText(def)}</span>}
+                      {def.unit && def.unit !== "paise" && <span style={{ fontSize: 13, color: "var(--admin-muted)", width: 50 }}>{unitText(def)}</span>}
                     </>
                   )}
                   {canManage && allowed && (row?.source === scopeType || touched) && (
@@ -223,7 +223,7 @@ function History({ warehouses }: { warehouses: { id: string; name: string }[] })
         <select value={group} onChange={e => setGroup(e.target.value)} style={inputStyle} aria-label="Group"><option value="">All groups</option>{Object.keys(GROUP_LABEL).map(g => <option key={g} value={g}>{GROUP_LABEL[g]![0]}</option>)}</select>
       </div>
       {error && <Notice>{error}</Notice>}
-      {rows.length === 0 && !loading ? <p style={{ padding: 20, margin: 0, fontSize: 12, color: "var(--admin-muted)" }}>No settings have been changed yet.</p> : (
+      {rows.length === 0 && !loading ? <p style={{ padding: 20, margin: 0, fontSize: 14, color: "var(--admin-muted)" }}>No settings have been changed yet.</p> : (
         <div style={{ overflowX: "auto" }}>
           <table className="admin-product-table" style={{ width: "100%" }}>
             <thead><tr><th>When</th><th>Setting</th><th>Applies to</th><th>Was</th><th>Now</th><th>By</th></tr></thead>
@@ -233,7 +233,7 @@ function History({ warehouses }: { warehouses: { id: string; name: string }[] })
           </table>
         </div>
       )}
-      <div style={{ padding: 12, textAlign: "center" }}>{loading ? <span role="status" style={{ fontSize: 12 }}>Loading…</span> : cursor && <button className="admin-text-button" onClick={() => void load(cursor, false)}>Show older changes</button>}</div>
+      <div style={{ padding: 12, textAlign: "center" }}>{loading ? <span role="status" style={{ fontSize: 14 }}>Loading…</span> : cursor && <button className="admin-text-button" onClick={() => void load(cursor, false)}>Show older changes</button>}</div>
     </section>
   );
 }

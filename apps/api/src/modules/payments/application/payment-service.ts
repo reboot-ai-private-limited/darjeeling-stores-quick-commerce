@@ -6,7 +6,6 @@ import { DuplicateEventError, type PaymentDeps } from "./ports.js";
 const IST_MS = 5.5 * 3_600_000;
 const istDay = (at: Date) => new Date(at.getTime() + IST_MS).toISOString().slice(0, 10);
 const dayRange = (date: string) => { const from = new Date(new Date(`${date}T00:00:00Z`).getTime() - IST_MS); return { from, to: new Date(from.getTime() + 86_400_000) }; };
-const audit = (ctx: Ctx, action: string, paymentId: string) => ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId, action, entityType: "payment", entityId: paymentId });
 /** Payments span warehouses, so only staff who can see every warehouse use these screens. */
 const wholeBusiness = (ctx: Ctx) => { if (!ctx.actor.scope.all) throw forbidden("Payments are shown to staff who manage every warehouse"); };
 
@@ -52,7 +51,7 @@ export function createPaymentService(deps: PaymentDeps) {
       return "amount_mismatch";
     }
     const at = now();
-    const won = await store.capture(payment.id, { razorpayPaymentId: entity.id, signatureVerified: true, failureReason: null, capturedAt: at }, options.actor && audit(options.actor, "payments.mark_paid", payment.id));
+    const won = await store.capture(payment.id, { razorpayPaymentId: entity.id, signatureVerified: true, failureReason: null, capturedAt: at });
     if (!won) return "already_captured";
 
     if (payment.method === "razorpay_link") {

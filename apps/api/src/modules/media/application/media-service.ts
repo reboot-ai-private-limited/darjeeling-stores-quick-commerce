@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { AppError, conflict, forbidden, notFound, validation } from "../../catalog/catalog.public.js";
 import {
   CUSTOMER_DELETABLE, EVIDENCE_KINDS, ORDER_COPY_KINDS, ORDER_COPY_OF, RULES, WIDTHS, addDays, canUpload, checkDeclared, checkUploaded,
@@ -6,7 +5,7 @@ import {
   type MediaFile, type MediaKind, type MediaStatus, type OwnerType, type Principal, type RejectReason,
 } from "../domain/media.js";
 import { DuplicateMediaError } from "./errors.js";
-import type { AuditEntry, MediaDeps } from "./ports.js";
+import type { MediaDeps } from "./ports.js";
 
 const UPLOAD_TTL_MS = 15 * 60_000;
 const SIGNED_URL_SECONDS = 300;
@@ -60,13 +59,6 @@ export function createMediaService(deps: MediaDeps) {
     return false;
   }
 
-  function auditFor(actor: Actor | null, action: string, id: string): AuditEntry {
-    return {
-      actorId: actor?.principal.userId ?? "system", actorRole: actor?.principal.role ?? "system", action, entityId: id,
-      requestId: actor?.requestId ?? randomUUID(),
-    };
-  }
-
   /** One attempt to remove the stored file. Failure keeps the row `deleting` and schedules a retry with backoff. */
   async function attemptDelete(id: string): Promise<MediaStatus> {
     const file = await store.get(id);
@@ -87,11 +79,11 @@ export function createMediaService(deps: MediaDeps) {
     }
   }
 
-  /** The one way a file is removed: mark it `deleting` with an audit entry, then delete it from storage. */
+  /** The one way a file is removed: mark it `deleting`, then delete it from storage. */
   async function startDelete(file: MediaFile, reason: string, actor: Actor | null): Promise<MediaStatus> {
     const at = now();
     const started = await store.update(file.id, { status: "deleting", deleteReason: reason, deleteRequestedAt: at, nextDeleteAt: at, updatedAt: at }, {
-      from: LIVE, audit: auditFor(actor, "media.delete", file.id),
+      from: LIVE,
     });
     if (!started) {
       const current = await store.get(file.id);
@@ -218,7 +210,7 @@ export function createMediaService(deps: MediaDeps) {
       const file = await store.get(mediaId);
       if (!file) throw notFound("Media");
       if (file.status !== "deleting") throw conflict("This file is not waiting to be deleted", { reason: "not_deleting" });
-      await store.update(mediaId, { nextDeleteAt: now(), updatedAt: now() }, { from: ["deleting"], audit: auditFor(actor, "media.retry_delete", mediaId) });
+      await store.update(mediaId, { nextDeleteAt: now(), updatedAt: now() }, { from: ["deleting"] });
       return { status: await attemptDelete(mediaId) };
     },
 

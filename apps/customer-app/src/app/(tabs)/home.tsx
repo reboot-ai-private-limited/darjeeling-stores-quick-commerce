@@ -5,6 +5,7 @@ import Animated, { Extrapolation, FadeInDown, FadeOutUp, interpolate, useAnimate
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { categoryPictures, getHome, type Home as HomeData } from "../../api/catalog";
 import { BadgeRails, BrandRow, BudgetRail, PopularSearches, RecentlyViewed, uniqueProducts } from "../../components/homeExtras";
+import { getStoreStatus } from "../../api/cart";
 import { CategoryFeed } from "../../components/CategoryFeed";
 import { CategoryTabs, LiveOrderCard, OffersRow, OrderAgainCard, SectionHead } from "../../components/home";
 import { BannerCarousel, CategoryTile, ProductCard } from "../../components/shop";
@@ -47,6 +48,8 @@ export default function Home() {
     finally { setRefreshing(false); }
   }, [zoneId]);
   useEffect(() => { void load(); }, [load]);
+  // Warm the store status (free-delivery amount, minimum order) so the cart can show its bar straight away.
+  useEffect(() => { if (zoneId) void getStoreStatus(zoneId).catch(() => undefined); }, [zoneId]);
   useEffect(() => { const t = setInterval(() => setHint(h => (h + 1) % HINTS.length), 2600); return () => clearInterval(t); }, []);
 
   if (!booting && !zone) return <Redirect href="/location" />;
@@ -100,7 +103,7 @@ export default function Home() {
               <RecentlyViewed eta={etaText} />
               <BadgeRails products={all} eta={etaText} />
               <BudgetRail products={all} eta={etaText} />
-              <BrandRow products={all} />
+              <BrandRow products={all} zoneId={zoneId} />
 
               {data.sections.map(sec => (
                 <View key={sec.categoryId} style={{ marginTop: space.xl }}>

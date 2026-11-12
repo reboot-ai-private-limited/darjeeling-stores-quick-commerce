@@ -1,5 +1,4 @@
 import type { Geography } from "../../../platform/geography.js";
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Order, OrderEvent, OrderGroup, OrderStatus } from "../domain/order.js";
 
 /** The order group already exists for this customer and idempotency key. */
@@ -33,9 +32,9 @@ export interface OrderStore {
   listOrders(filter: OrderFilter, limit: number, beforeId?: string): Promise<Order[]>;
   listByStatus(status: OrderStatus, limit: number): Promise<Order[]>;
   /** Moves the order on only if it is still in `from`; the event and change entry go in the same transaction. Throws StaleOrderError if not. */
-  transition(orderId: string, from: OrderStatus, patch: Partial<Order>, event: OrderEvent, audit?: AuditEvent): Promise<Order>;
+  transition(orderId: string, from: OrderStatus, patch: Partial<Order>, event: OrderEvent): Promise<Order>;
   /** Changes fields of an order that does not change its status. `where` makes it conditional on the order's current values. */
-  patch(orderId: string, patch: Partial<Order>, event?: OrderEvent, where?: Partial<Pick<Order, "status" | "rev">>, audit?: AuditEvent): Promise<Order | null>;
+  patch(orderId: string, patch: Partial<Order>, event?: OrderEvent, where?: Partial<Pick<Order, "status" | "rev">>): Promise<Order | null>;
   addEvent(event: OrderEvent): Promise<void>;
   eventsOf(orderId: string): Promise<OrderEvent[]>;
   addNote(orderId: string, note: Order["notes"][number], event: OrderEvent): Promise<void>;
@@ -44,7 +43,6 @@ export interface OrderStore {
   recordChange(change: Omit<Change, "seq">): Promise<void>;
   /** Counts a wrong delivery code for the group. Returns the number of wrong tries so far. */
   countWrongOtp(groupId: string): Promise<number>;
-  recordAudit(entry: AuditEvent): Promise<void>;
 }
 
 export interface QuoteSource {

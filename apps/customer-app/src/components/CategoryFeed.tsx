@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Text, View } from "react-native";
+import { FlatList, Text, View } from "react-native";
+import { RailsSkeleton } from "./Skeleton";
 import Animated from "react-native-reanimated";
 import { cardImage, getProducts, type Category, type Product } from "../api/catalog";
 import { liftIn } from "../motion";
@@ -51,7 +52,7 @@ export function CategoryFeed({ category, zoneId, eta }: { category: Category; zo
   }, [children, shelves]);
 
   if (error) return <View style={{ alignItems: "center", gap: space.sm, marginTop: 60 }}><Icon name="wifi-off" size={36} color={colors.faint} /><Text style={type.small}>Couldn't load this category.</Text></View>;
-  if (!shelves && !grid) return <ActivityIndicator color={colors.maroon} style={{ marginTop: 70 }} />;
+  if (!shelves && !grid) return <RailsSkeleton />;
 
   const open = (c: Category) => router.push({ pathname: "/category/[id]", params: { id: c.id, name: c.name } });
 

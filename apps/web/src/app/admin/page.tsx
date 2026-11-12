@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Roles from "./roles";
 import StaffLogin from "./staff-login";
 import Staff from "./staff";
-import Security from "./security";
 import CitiesLocalities from "./cities-localities";
 import ZonesEditor from "./zones-editor";
 import Warehouses from "./warehouses";
@@ -31,7 +30,7 @@ const groups = [
   { label: "Organization", items: ["Warehouses", "Zones & localities", "Staff", "Roles & permissions"] },
   { label: "Catalog", items: ["Products & categories"] },
   { label: "Inventory", items: ["Offerings & stock"] },
-  { label: "Administration", items: ["Security", "Settings", "Audit log"] },
+  { label: "Administration", items: ["Settings"] },
 ];
 const iconPaths: Record<string, string> = {
   Overview: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",
@@ -46,11 +45,9 @@ const iconPaths: Record<string, string> = {
   "Roles & permissions": "M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M8 12l3 3 5-6",
   "Products & categories": "M4 6h16 M4 10h16 M4 14h10 M4 18h6",
   "Offerings & stock": "M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z M4 13h2v-2H4z M18 13h2v-2h-2z M7 13h10v-2H7z",
-  Security: "M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2",
   Settings: "M4 7h16 M4 17h16 M8 4v6 M16 14v6",
   Coupons: "M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z M14 6v12",
   Banners: "M3 5h18v14H3z M3 15l5-5 4 4 3-3 6 6",
-  "Audit log": "M6 3h12v18H6z M9 7h6 M9 11h6 M9 15h4",
   Menu: "M4 6h16 M4 12h16 M4 18h16",
   Lock: "M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2",
 };
@@ -109,7 +106,6 @@ export default function AdminPage() {
   const can = (permission: string) => session.user.permissions.includes("*") || session.user.permissions.includes(permission);
   const available = (item: string) =>
     item === "Overview" ||
-    item === "Security" ||
     (item === "Orders" && can("orders:view")) ||
     (item === "Settings" && (can("settings:view") || can("delivery_rules:manage") || can("warehouses:view") || can("warehouses:manage"))) ||
     (item === "Staff" && can("staff:manage")) ||
@@ -135,7 +131,7 @@ export default function AdminPage() {
     <div className="admin-workspace">
       <header className="admin-topbar"><div className="admin-breadcrumb"><button className="admin-menu" aria-label="Toggle navigation" aria-controls="admin-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Icon name="Menu" /></button><span>Workspace</span><span className="admin-slash" aria-hidden="true">/</span><strong>{section}</strong></div><span className="admin-connection"><span aria-hidden="true" />Signed in</span></header>
       <main className="admin-content" id="admin-main">
-        {section === "Staff" ? <Staff userId={session.user.id} onSignOut={() => { setSession(null); setSection("Overview"); }} /> : section === "Security" ? <Security onSession={setSession} /> : section === "Roles & permissions" ? <Roles /> : section === "Zones & localities" ? <div>
+        {section === "Staff" ? <Staff userId={session.user.id} onSignOut={() => { setSession(null); setSection("Overview"); }} /> : section === "Roles & permissions" ? <Roles /> : section === "Zones & localities" ? <div>
           <div className="admin-tab-nav" role="tablist">
             <button
               role="tab"

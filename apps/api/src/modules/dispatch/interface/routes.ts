@@ -27,6 +27,7 @@ export const batchUpdate = z.union([
 ]);
 export const batchesQuery = z.object({ status: z.enum(["planned", "active", "done", "cancelled"]).optional(), riderId: id.optional() });
 export const handoverBody = z.object({ toRiderId: id, reason: note.min(1) }).strict();
+export const reassignBody = z.object({ toRiderId: id, reason: note.optional() }).strict();
 export const resolveBody = z.object({ action: z.enum(["redispatch", "cancel_return"]), goodsCondition: z.enum(["good", "spoiled"]).optional(), note: note.nullish() }).strict();
 export const assignmentsQuery = z.object({
   status: z.enum(["assigned", "acknowledged", "reassigned", "cancelled", "completed"]).optional(), riderId: id.optional(), warehouseId: id.optional(),
@@ -59,6 +60,8 @@ export function dispatchRoutes(
   const none = (req: { body?: unknown }) => req.body ?? {};
   return [
     // ---- admin: dispatch ----
+    // Every ready order waiting for a rider, with the best riders, so an admin can assign in one click.
+    { method: "get", path: "/admin/dispatch/ready", handler: dispatch(async (ctx, _req, res) => sendData(res, await assign.readyOrders(ctx))) },
     { method: "get", path: "/admin/dispatch/suggestions", handler: dispatch(async (ctx, req, res) => sendData(res, await assign.suggestions(ctx, parse(suggestionsQuery, req.query).orderId))) },
     { method: "post", path: "/admin/orders/:id/assign", handler: dispatch(async (ctx, req, res) => {
       const body = parse(assignBody, req.body);
@@ -70,6 +73,8 @@ export function dispatchRoutes(
     { method: "get", path: "/admin/batches", handler: dispatch(async (ctx, req, res) => sendData(res, await batches.list(ctx, parse(batchesQuery, req.query)))) },
     { method: "put", path: "/admin/batches/:id", handler: dispatch(async (ctx, req, res) => sendData(res, await batches.update(ctx, pathId(req, "id", "Batch"), parse(batchUpdate, req.body) as never))) },
     { method: "post", path: "/admin/batches/:id/cancel", handler: dispatch(async (ctx, req, res) => { await batches.cancel(ctx, pathId(req, "id", "Batch")); sendData(res, { ok: true }); }) },
+    // Before pickup: give an assigned order to another rider in one step.
+    { method: "post", path: "/admin/orders/:id/reassign", handler: dispatch(async (ctx, req, res) => sendData(res, await assign.reassign(ctx, pathId(req, "id", "Order"), parse(reassignBody, req.body)))) },
     { method: "post", path: "/admin/orders/:id/handover", handler: dispatch(async (ctx, req, res) => sendData(res, await assign.handover(ctx, pathId(req, "id", "Order"), parse(handoverBody, req.body)))) },
     { method: "post", path: "/admin/orders/:id/failed/resolve", handler: orderAdmin(async (ctx, req, res) => sendData(res, await assign.resolveFailed(ctx, pathId(req, "id", "Order"), parse(resolveBody, req.body)))) },
     { method: "get", path: "/admin/assignments", handler: dispatch(async (ctx, req, res) => {

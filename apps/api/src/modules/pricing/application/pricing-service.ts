@@ -34,8 +34,6 @@ export interface BannerInput {
   title: string; imageMediaId: string | null; link: Banner["link"]; zoneId: string | null; sortOrder: number; startsAt: Date | null; endsAt: Date | null; isActive: boolean;
 }
 
-const audit = (ctx: Ctx, action: string, entityType: string, entityId: string) =>
-  ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId, action, entityType, entityId });
 /** The reasons a client may see. */
 const publicReason = (reason: CouponReason): string =>
   reason === "user_limit_reached" ? "limit_reached" : reason === "not_found" || reason === "inactive" || reason === "not_started" ? "not_applicable" : reason;
@@ -104,7 +102,7 @@ export function createPricingService(deps: PricingDeps) {
       const at = now();
       const rule = { ...input, id: newId(), createdAt: at, updatedAt: at } as Rule;
       checkRule(rule);
-      try { await store.insertRule(rule, { audit: audit(ctx, "pricing.rule_create", "delivery_rule", rule.id) }); } catch (error) { taken(error); }
+      try { await store.insertRule(rule); } catch (error) { taken(error); }
       return ruleView(rule);
     },
 
@@ -117,7 +115,7 @@ export function createPricingService(deps: PricingDeps) {
       const { type: _type, ...fields } = patch;
       const next = { ...current, ...fields, updatedAt: now() } as Rule;
       checkRule(next);
-      try { await store.updateRule(id, { ...fields, updatedAt: next.updatedAt } as Partial<Rule>, { audit: audit(ctx, "pricing.rule_update", "delivery_rule", id) }); } catch (error) { taken(error); }
+      try { await store.updateRule(id, { ...fields, updatedAt: next.updatedAt } as Partial<Rule>); } catch (error) { taken(error); }
       return ruleView(next);
     },
 
@@ -125,7 +123,7 @@ export function createPricingService(deps: PricingDeps) {
       const rule = await store.getRule(id);
       if (!rule) throw notFound("Rule");
       await assertZones(ctx, rule.zoneIds);
-      await store.updateRule(id, { isActive: false, updatedAt: now() }, { audit: audit(ctx, "pricing.rule_deactivate", "delivery_rule", id) });
+      await store.updateRule(id, { isActive: false, updatedAt: now() });
       return { ok: true };
     },
 
@@ -147,13 +145,13 @@ export function createPricingService(deps: PricingDeps) {
       const covers = (r: SurchargeRule) => input.zoneIds.length === 0 || r.zoneIds.length === 0 || r.zoneIds.some(z => input.zoneIds.includes(z));
       if (!input.on) {
         const off = existing.filter(r => r.isActive && covers(r));
-        for (const r of off) await store.updateRule(r.id, { isActive: false, updatedAt: now() }, { audit: audit(ctx, "pricing.rain_off", "delivery_rule", r.id) });
+        for (const r of off) await store.updateRule(r.id, { isActive: false, updatedAt: now() });
         return { ruleId: off[0]?.id ?? null, isActive: false, activeUntil: null };
       }
       if (input.until && input.until.getTime() <= now().getTime()) throw validation("The end time must be in the future", { field: "until" });
       const match = existing.find(r => r.zoneIds.length === input.zoneIds.length && r.zoneIds.every(z => input.zoneIds.includes(z)));
       if (match) {
-        await store.updateRule(match.id, { isActive: true, activeUntil: input.until, updatedAt: now() }, { audit: audit(ctx, "pricing.rain_on", "delivery_rule", match.id) });
+        await store.updateRule(match.id, { isActive: true, activeUntil: input.until, updatedAt: now() });
         return { ruleId: match.id, isActive: true, activeUntil: input.until?.toISOString() ?? null };
       }
       const at = now();
@@ -162,7 +160,7 @@ export function createPricingService(deps: PricingDeps) {
         id: newId(), type: "surcharge", kind: "rain", zoneIds: input.zoneIds, isActive: true, activeUntil: input.until, window: null,
         amount: settings.rainDefaults.amount, extraMinutes: settings.rainDefaults.extraMinutes, waivedByFreeDelivery: false, createdAt: at, updatedAt: at,
       };
-      await store.insertRule(rule, { audit: audit(ctx, "pricing.rain_on", "delivery_rule", rule.id) });
+      await store.insertRule(rule);
       return { ruleId: rule.id, isActive: true, activeUntil: input.until?.toISOString() ?? null };
     },
 
@@ -201,7 +199,7 @@ export function createPricingService(deps: PricingDeps) {
       await assertZones(ctx, input.zoneIds);
       const at = now();
       const coupon: Coupon = { ...input, id: newId(), usedCount: 0, createdAt: at, updatedAt: at };
-      try { await store.insertCoupon(coupon, { audit: audit(ctx, "pricing.coupon_create", "coupon", coupon.id) }); }
+      try { await store.insertCoupon(coupon); }
       catch (error) { if (error instanceof DuplicateCodeError) throw conflict("That coupon code already exists", { code: input.code }); throw error; }
       return couponView(coupon);
     },
@@ -229,7 +227,7 @@ export function createPricingService(deps: PricingDeps) {
       if (next.endsAt && next.startsAt && next.endsAt.getTime() <= next.startsAt.getTime()) throw validation("The end must be after the start", { field: "endsAt" });
       if (next.type === "percent" && (next.value < 1 || next.value > 100)) throw validation("A percentage is from 1 to 100", { field: "value" });
       if (next.totalLimit !== null && next.totalLimit < current.usedCount) throw validation("The total limit is below the uses so far", { field: "totalLimit" });
-      try { await store.updateCoupon(id, { ...patch, updatedAt: next.updatedAt }, { audit: audit(ctx, "pricing.coupon_update", "coupon", id) }); }
+      try { await store.updateCoupon(id, { ...patch, updatedAt: next.updatedAt }); }
       catch (error) { if (error instanceof DuplicateCodeError) throw conflict("That coupon code already exists", { code: patch.code }); throw error; }
       return couponView(next);
     },
@@ -238,7 +236,7 @@ export function createPricingService(deps: PricingDeps) {
       const coupon = await store.getCoupon(id);
       if (!coupon) throw notFound("Coupon");
       await assertZones(ctx, coupon.zoneIds);
-      await store.updateCoupon(id, { isActive: false, updatedAt: now() }, { audit: audit(ctx, "pricing.coupon_deactivate", "coupon", id) });
+      await store.updateCoupon(id, { isActive: false, updatedAt: now() });
       return couponView({ ...coupon, isActive: false });
     },
 
@@ -300,7 +298,7 @@ export function createPricingService(deps: PricingDeps) {
       const at = now();
       const banner: Banner = { ...input, id: newId(), createdAt: at, updatedAt: at };
       if (banner.imageMediaId) await claimImage(ctx, banner.id, banner.imageMediaId);
-      try { await store.insertBanner(banner, { audit: audit(ctx, "pricing.banner_create", "banner", banner.id) }); }
+      try { await store.insertBanner(banner); }
       catch (error) { if (banner.imageMediaId) await media.release(banner.imageMediaId, "banner_not_saved").catch(() => undefined); throw error; }
       return bannerView(banner);
     },
@@ -314,7 +312,7 @@ export function createPricingService(deps: PricingDeps) {
       if (next.endsAt && next.startsAt && next.endsAt.getTime() <= next.startsAt.getTime()) throw validation("The end must be after the start", { field: "endsAt" });
       const swapped = patch.imageMediaId !== undefined && patch.imageMediaId !== current.imageMediaId;
       if (swapped && patch.imageMediaId) await claimImage(ctx, id, patch.imageMediaId);
-      try { await store.updateBanner(id, { ...patch, updatedAt: next.updatedAt }, { audit: audit(ctx, "pricing.banner_update", "banner", id) }); }
+      try { await store.updateBanner(id, { ...patch, updatedAt: next.updatedAt }); }
       catch (error) { if (swapped && patch.imageMediaId) await media.release(patch.imageMediaId, "banner_not_saved").catch(() => undefined); throw error; }
       if (swapped && current.imageMediaId) await media.release(current.imageMediaId, "banner_image_replaced").catch(() => undefined);
       return bannerView(next);
@@ -324,7 +322,7 @@ export function createPricingService(deps: PricingDeps) {
       const current = await store.getBanner(id);
       if (!current) throw notFound("Banner");
       await assertZones(ctx, current.zoneId ? [current.zoneId] : []);
-      await store.deleteBanner(id, { audit: audit(ctx, "pricing.banner_delete", "banner", id) });
+      await store.deleteBanner(id);
       if (current.imageMediaId) await media.release(current.imageMediaId, "banner_deleted").catch(() => undefined);
       return { ok: true };
     },

@@ -27,7 +27,7 @@ describe("role management", () => {
       expect((await request(app).post("/api/v1/admin/roles").set("Authorization", auth).send(body)).status).toBe(400);
     }
   });
-  it("creates, updates and deletes with one audit per mutation", async () => {
+  it("creates, updates and deletes roles", async () => {
     const created = await create("packing");
     expect(created.status).toBe(201);
     const id = created.body.data.id;
@@ -36,9 +36,6 @@ describe("role management", () => {
     expect(updated.status).toBe(200);
     expect(updated.body.data.permissions).toEqual(["stock:view"]);
     expect((await request(app).delete(`/api/v1/admin/roles/${id}`).set("Authorization", auth)).status).toBe(200);
-    expect(await db.collection("audit_log").countDocuments({ entityId: id })).toBe(3);
-    const audit = await db.collection("audit_log").findOne({ entityId: id, action: "role.update" });
-    expect(audit?.roleChange).toMatchObject({ before: { permissions: ["orders:view"] }, after: { permissions: ["stock:view"] } });
   });
   it("protects system roles and assigned roles", async () => {
     const system = await db.collection("roles").findOne({ name: "super_admin" });
@@ -61,19 +58,6 @@ describe("role management", () => {
   });
   it("rejects cookie mutation without trusted origin/CSRF", async () => {
     expect((await request(app).post("/api/v1/admin/roles").set("Authorization", auth).set("Origin", "https://evil.example").send({ name: "csrf", permissions: [] })).status).toBe(403);
-  });
-  it("rolls back the role when audit persistence fails", async () => {
-    const existing = await create("audit_existing");
-    const id = existing.body.data.id;
-    await db.db!.command({ collMod: "audit_log", validator: { required_audit_field: { $exists: true } }, validationLevel: "strict" });
-    try {
-      expect((await create("audit_failure")).status).toBe(500);
-      expect(await db.collection("roles").findOne({ name: "audit_failure" })).toBeNull();
-      expect((await request(app).put(`/api/v1/admin/roles/${id}`).set("Authorization", auth).send({ permissions: [] })).status).toBe(500);
-      expect((await request(app).get(`/api/v1/admin/roles/${id}`).set("Authorization", auth)).body.data.permissions).toEqual(["orders:view"]);
-      expect((await request(app).delete(`/api/v1/admin/roles/${id}`).set("Authorization", auth)).status).toBe(500);
-      expect((await request(app).get(`/api/v1/admin/roles/${id}`).set("Authorization", auth)).status).toBe(200);
-    } finally { await db.db!.command({ collMod: "audit_log", validator: {} }); }
   });
   it("never leaves a user assigned to a concurrently deleted role", async () => {
     const created = await create("racing");

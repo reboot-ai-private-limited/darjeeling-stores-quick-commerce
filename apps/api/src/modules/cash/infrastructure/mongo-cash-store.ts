@@ -1,6 +1,5 @@
 import type { ClientSession, Connection } from "mongoose";
 import { Types } from "mongoose";
-import { createAuditWriter, type AuditEvent } from "../../audit/audit.public.js";
 import type { LedgerEntry, Reconciliation } from "../domain/cash.js";
 import { DuplicateCollectionError, InsufficientCashError, type CashStore, type NewReconciliation, type RiderBalance } from "../application/ports.js";
 
@@ -17,7 +16,6 @@ export function createMongoCashStore(connection: Connection): CashStore {
   const balances = () => connection.collection<BalanceDoc>("cash_balances");
   const totals = () => connection.collection<TotalDoc>("cash_totals");
   const recon = () => connection.collection<ReconDoc>("cash_reconciliation");
-  const writeAudit = createAuditWriter(connection);
 
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
@@ -82,7 +80,6 @@ export function createMongoCashStore(connection: Connection): CashStore {
               { upsert: true, session },
             );
           }
-          if (options.audit) await writeAudit(options.audit, session);
           return toEntry(doc);
         });
       } catch (error) {
@@ -147,6 +144,5 @@ export function createMongoCashStore(connection: Connection): CashStore {
     async reopenReconciliation(id) {
       await recon().updateOne({ _id: id }, { $set: { status: "open", outcome: null, note: null, bankReference: null, resolvedBy: null, resolvedAt: null } });
     },
-    async recordAudit(entry: AuditEvent) { await inTransaction(session => writeAudit(entry, session)); },
   };
 }

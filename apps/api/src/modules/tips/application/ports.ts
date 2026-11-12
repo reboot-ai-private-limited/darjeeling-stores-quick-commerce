@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 
 export interface TipRow {
   orderId: string; orderNo: string; riderId: string; warehouseId: string; amount: number; deliveredAt: Date;
@@ -18,11 +17,10 @@ export interface TipStore {
   /** The same figures for each rider who earned a tip in the range. */
   byRider(filter: TipFilter): Promise<(TipTotals & { riderId: string; riderName: string })[]>;
   /**
-   * Marks owed tips as paid, once each, together with the audit record. Either the listed orders or every owed tip delivered before `before`.
+   * Marks owed tips as paid, once each, Either the listed orders or every owed tip delivered before `before`.
    * Orders that are already paid, belong to another rider or are outside the warehouses are left alone.
    */
   pay(input: {
     riderId: string; orderIds?: readonly string[] | undefined; before?: Date | undefined; warehouseIds: readonly string[] | null; by: string; note: string | null; at: Date;
-    audit: (summary: { count: number; amount: number }) => AuditEvent;
   }): Promise<{ count: number; amount: number }>;
 }

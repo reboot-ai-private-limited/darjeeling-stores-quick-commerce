@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Customer, CustomerStats, CustomerStatus, Transition } from "../domain/customer.js";
 
 export interface CustomerQuery {
@@ -21,14 +20,13 @@ export interface CustomerStore {
   /** Every customer, newest first, for the export. */
   all(limit: number): Promise<CustomerRow[]>;
   staffName(userId: string): Promise<string | null>;
-  /** Sets the COD flag and/or adds a note, with the audit record, in one transaction. */
-  edit(input: { id: string; codAllowed?: boolean; note?: { text: string; by: string }; at: Date; audit: (before: Customer, after: Customer) => AuditEvent }): Promise<Outcome<Customer>>;
+  /** Sets the COD flag and/or adds a note, in one transaction. */
+  edit(input: { id: string; codAllowed?: boolean; note?: { text: string; by: string }; at: Date }): Promise<Outcome<Customer>>;
   transition(input: {
-    id: string; action: Exclude<Transition, "finalise">; reason: string | null; by: string; at: Date; audit: (before: Customer, after: Customer) => AuditEvent;
+    id: string; action: Exclude<Transition, "finalise">; reason: string | null; by: string; at: Date;
   }): Promise<Outcome<Customer>>;
   /** Anonymises the customer and removes their addresses, carts, devices and login codes. Orders and payments stay. */
-  finalise(input: { id: string; by: string; at: Date; audit: (before: Customer, after: Customer) => AuditEvent }): Promise<Outcome<{ customer: Customer; addressIds: string[] }>>;
-  recordExport(event: AuditEvent): Promise<void>;
+  finalise(input: { id: string; by: string; at: Date }): Promise<Outcome<{ customer: Customer; addressIds: string[] }>>;
 }
 
 /** Deletes the private files of an address (voice note, house photo). Provided by the media module. */

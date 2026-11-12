@@ -47,12 +47,11 @@ describe("staff management", () => {
     expect((await create("STAFF@example.com")).status).toBe(409);
     const detail = await request(app).get(`/api/v1/admin/staff/${id}`).set("Authorization", auth);
     expect(detail.status).toBe(200);
-    expect(detail.body.data).toMatchObject({ lastLoginAt: null, twoFactorEnabled: false });
+    expect(detail.body.data).toMatchObject({ lastLoginAt: null });
     expect(detail.body.data).not.toHaveProperty("passwordHash");
     const updated = await request(app).put(`/api/v1/admin/staff/${id}`).set("Authorization", auth).send({ name: "New Name" });
     expect(updated.status).toBe(200);
     expect(updated.body.data.name).toBe("New Name");
-    expect(await db.collection("audit_log").countDocuments({ entityId: id })).toBe(2);
   });
   it("validates bodies, role type and IDs", async () => {
     const customer = await db.collection("roles").findOne({ name: "customer" });
@@ -88,7 +87,7 @@ describe("staff management", () => {
     expect(await sessions.authenticate(renewed.accessToken)).toBeNull();
     expect((await request(app).get("/api/v1/admin/roles").set("Authorization", auth)).status).toBe(200);
   });
-  it("replaces salted password hashes, removes 2FA credentials and revokes sessions", async () => {
+  it("replaces salted password hashes and revokes sessions", async () => {
     const created = await create("credentials@example.com");
     const id = created.body.data.id;
     const userId = new mongoose.Types.ObjectId(id);
@@ -106,14 +105,6 @@ describe("staff management", () => {
     expect(after?.mustChangePassword).toBe(true);
     expect(await sessions.authenticate(pair.accessToken)).toBeNull();
     expect(await sessions.rotate(pair.refreshToken)).toMatchObject({ error: "UNAUTHORIZED" });
-    await db.collection("users").updateOne({ _id: userId }, { $set: { twoFactor: { enabled: true, secretEncrypted: "encrypted-secret", recoveryCodeHashes: ["recovery-hash"] } } });
-    const next = await issueReady(sessions, userId);
-    expect((await request(app).post(`/api/v1/admin/staff/${id}/reset-2fa`).set("Authorization", auth)).status).toBe(200);
-    expect((await db.collection("users").findOne({ _id: userId }))?.twoFactor).toEqual({ enabled: false, requiresEnrollment: true });
-    expect(await sessions.authenticate(next.accessToken)).toBeNull();
-    expect(await sessions.rotate(next.refreshToken)).toMatchObject({ error: "UNAUTHORIZED" });
-    const audit = JSON.stringify(await db.collection("audit_log").find({ entityId: id }).toArray());
-    for (const secret of ["Temp-Passw0rd!", "New-Temp-Passw0rd!", "encrypted-secret", "recovery-hash", after!.passwordHash]) expect(audit).not.toContain(secret);
   });
   it("validates and paginates literal search without leaking credential fields", async () => {
     await create("literal+search@example.com", { name: "Search [literal]" });
@@ -158,7 +149,7 @@ describe("staff management", () => {
   });
   it("protects owners, stronger targets, self authority and account kinds", async () => {
     const owner = await db.collection("users").findOne({ phone: "+919000000001" });
-    for (const action of ["deactivate", "reactivate", "reset-password", "reset-2fa", "force-logout"]) {
+    for (const action of ["deactivate", "reactivate", "reset-password", "force-logout"]) {
       expect((await request(app).post(`/api/v1/admin/staff/${owner!._id}/${action}`).set("Authorization", auth).send(action === "reset-password" ? { newPassword: "Other-Passw0rd!" } : {})).status).toBe(403);
     }
     expect((await create("new-owner@example.com", { roleId: String(owner!.roleId) })).status).toBe(400);
@@ -174,25 +165,6 @@ describe("staff management", () => {
     expect((await request(app).get(`/api/v1/admin/staff/${customer.insertedId}`).set("Authorization", auth)).status).toBe(404);
     await db.collection("users").updateOne({ _id: new mongoose.Types.ObjectId(manager.body.data.id) }, { $set: { status: "deleted" } });
     expect((await request(app).post(`/api/v1/admin/staff/${manager.body.data.id}/reactivate`).set("Authorization", auth)).status).toBe(409);
-  });
-  it("rolls back staff and session changes if auditing fails", async () => {
-    const created = await create("audit-staff@example.com");
-    const id = created.body.data.id;
-    const sessions = createSessionStore(db, key);
-    const pair = await issueReady(sessions, new mongoose.Types.ObjectId(id));
-    const before = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(id) });
-    await db.db!.command({ collMod: "audit_log", validator: { required_audit_field: { $exists: true } }, validationLevel: "strict" });
-    try {
-      expect((await create("audit-failed@example.com")).status).toBe(500);
-      expect(await db.collection("users").findOne({ email: "audit-failed@example.com" })).toBeNull();
-      for (const action of ["deactivate", "reset-password", "reset-2fa", "force-logout"]) {
-        expect((await request(app).post(`/api/v1/admin/staff/${id}/${action}`).set("Authorization", auth).send(action === "reset-password" ? { newPassword: "Rolled-Back-Passw0rd!" } : {})).status).toBe(500);
-        expect(await sessions.authenticate(pair.accessToken)).not.toBeNull();
-      }
-      expect((await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(id) }))?.passwordHash).toBe(before?.passwordHash);
-      expect((await request(app).put(`/api/v1/admin/staff/${id}`).set("Authorization", auth).send({ name: "Rolled Back" })).status).toBe(500);
-      expect((await request(app).get(`/api/v1/admin/staff/${id}`).set("Authorization", auth)).body.data).toMatchObject({ name: "Dorjee Lama", status: "active", twoFactorEnabled: false });
-    } finally { await db.db!.command({ collMod: "audit_log", validator: {} }); }
   });
   it("revokes a refresh that races with force logout", async () => {
     const created = await create("refresh-race@example.com");
@@ -231,7 +203,7 @@ describe("staff management", () => {
   it("registers all F02 routes without mock OTP and returns grouped permissions", async () => {
     const routes = await createAdministrationRoutes(db, key);
     const standalone = createApp({ additionalRoutes: routes });
-    expect(routes).toHaveLength(15);
+    expect(routes).toHaveLength(14);
     expect((await request(standalone).post("/api/v1/auth/request-otp").send({ phone: "9000000001" })).status).toBe(404);
     expect((await request(standalone).get("/api/v1/admin/staff")).status).toBe(401);
     expect((await request(standalone).get("/api/v1/admin/staff").set("Authorization", auth)).status).toBe(401);

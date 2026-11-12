@@ -1,4 +1,3 @@
-import type { AuditEvent } from "../../audit/audit.public.js";
 import type { Pause, WarehouseHours } from "../domain/hours.js";
 
 export class SlotFullError extends Error {}
@@ -7,10 +6,10 @@ export interface HoursStore {
   ensureIndexes(): Promise<void>;
   getHours(warehouseId: string): Promise<WarehouseHours | null>;
   getManyHours(warehouseIds: readonly string[]): Promise<WarehouseHours[]>;
-  saveHours(hours: WarehouseHours, audit?: AuditEvent): Promise<void>;
+  saveHours(hours: WarehouseHours): Promise<void>;
   getPause(scope: "warehouse" | "zone", id: string): Promise<Pause | null>;
   getPauses(scope: "warehouse" | "zone", ids: readonly string[]): Promise<Pause[]>;
-  savePause(pause: Pause, audit?: AuditEvent): Promise<void>;
+  savePause(pause: Pause): Promise<void>;
   /** Takes one place in a slot for an order, once. Throws SlotFullError at capacity. Returns false if the order already holds a place. */
   holdSlot(input: { warehouseId: string; date: string; slotStart: string; capacity: number; orderId: string; at: Date }): Promise<boolean>;
   /** Gives the place back; safe to repeat. */

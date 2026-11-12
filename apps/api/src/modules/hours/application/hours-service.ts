@@ -10,8 +10,6 @@ import { SlotFullError, type HoursSettings, type HoursStore, type PreorderSource
 export interface HoursDeps { store: HoursStore; geography: Geography; preorders: PreorderSource; settings: SettingsProvider<HoursSettings>; now: () => Date }
 export interface ClosedReason { code: "STORE_CLOSED" | "ZONE_PAUSED"; message: string; opensAt: Date | null; until: Date | null; preOrderAvailable: boolean }
 
-const audit = (ctx: Ctx, action: string, entityType: string, entityId: string, warehouseId?: string) =>
-  ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId, action, entityType, entityId, ...(warehouseId && { warehouseId }) });
 
 /** When a warehouse takes orders, the next-morning pre-order slots, and the pause switch (F17). */
 export function createHoursService(deps: HoursDeps) {
@@ -136,7 +134,7 @@ export function createHoursService(deps: HoursDeps) {
       const current = await store.getHours(warehouseId);
       const preOrder = current?.preOrder ?? { ...DEFAULT_PREORDER, cutoffMinutesBeforeSlot: defaults.cutoffMinutesBeforeSlot, packLeadMinutes: defaults.packLeadMinutes };
       const next: WarehouseHours = { warehouseId, ...input, preOrder, updatedAt: now() };
-      await store.saveHours(next, audit(ctx, "hours.set_hours", "warehouse", warehouseId, warehouseId));
+      await store.saveHours(next);
       return hoursView(next);
     },
 
@@ -152,7 +150,7 @@ export function createHoursService(deps: HoursDeps) {
       const next: WarehouseHours = current
         ? { ...current, preOrder, updatedAt: now() }
         : { warehouseId, hours: [], lastOrderMinutesBeforeClose: defaults.lastOrderMinutesBeforeClose, afterHoursMode: defaults.afterHoursMode, preOrder, updatedAt: now() };
-      await store.saveHours(next, audit(ctx, "hours.set_preorder", "warehouse", warehouseId, warehouseId));
+      await store.saveHours(next);
       return hoursView(next);
     },
 
@@ -160,13 +158,13 @@ export function createHoursService(deps: HoursDeps) {
       if (input.scope === "warehouse") await warehouseOf(ctx, input.id); else await assertZone(ctx, input.id);
       if (input.until && input.until.getTime() <= now().getTime()) throw validation("The end time must be in the future", { field: "until" });
       const pause: Pause = { scope: input.scope, id: input.id, active: true, message: input.message, until: input.until, by: ctx.actor.userId, at: now() };
-      await store.savePause(pause, audit(ctx, "hours.pause", input.scope, input.id));
+      await store.savePause(pause);
       return { scope: input.scope, id: input.id, pause: { active: true, message: pause.message, until: pause.until?.toISOString() ?? null } };
     },
     async resume(ctx: Ctx, input: { scope: "warehouse" | "zone"; id: string }) {
       if (input.scope === "warehouse") await warehouseOf(ctx, input.id); else await assertZone(ctx, input.id);
       const current = await store.getPause(input.scope, input.id);
-      if (current) await store.savePause({ ...current, active: false, by: ctx.actor.userId, at: now() }, audit(ctx, "hours.resume", input.scope, input.id));
+      if (current) await store.savePause({ ...current, active: false, by: ctx.actor.userId, at: now() });
       return { ok: true };
     },
 

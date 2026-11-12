@@ -4,29 +4,13 @@ import type { Route } from "../../../platform/routes.js";
 import { AppError, guarded, parse, pathId, sendData, sendError, type AuthResolver, type Ctx } from "../../catalog/catalog.public.js";
 import type { CampaignService } from "../application/campaign-service.js";
 import type { DeliveryService } from "../application/delivery-service.js";
-import type { TemplateService } from "../application/template-service.js";
 import { CHANNELS } from "../domain/notification.js";
 import { deliveryReportsIn, verifyMetaSignature } from "../domain/webhook.js";
 
 const id = z.string().regex(/^[a-f0-9]{24}$/, "Invalid id");
 const channel = z.enum(CHANNELS as unknown as [string, ...string[]]);
-const category = z.enum(["utility", "marketing", "authentication"]);
 const text = (max: number) => z.string().trim().min(1).max(max);
 
-const templateFields = {
-  key: z.string().trim().regex(/^[a-z][a-z0-9_]{1,63}$/, "Use lower_snake_case"), channel,
-  title: text(100).nullable(), body: text(1024), whatsappTemplateName: z.string().trim().regex(/^[a-z0-9_]{1,512}$/, "Use the provider's template name").nullable(),
-  category, language: z.string().trim().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, "Use a code such as en or en_US"), isActive: z.boolean(),
-};
-export const templateCreate = z.object({
-  ...templateFields, title: templateFields.title.default(null), whatsappTemplateName: templateFields.whatsappTemplateName.default(null),
-  language: templateFields.language.default("en"), isActive: templateFields.isActive.default(true),
-}).strict();
-export const templateUpdate = z.object({
-  key: templateFields.key.optional(), channel: channel.optional(), title: templateFields.title.optional(), body: templateFields.body.optional(),
-  whatsappTemplateName: templateFields.whatsappTemplateName.optional(), category: category.optional(), language: templateFields.language.optional(),
-  isActive: z.boolean().optional(),
-}).strict();
 export const prefsBody = z.object({ promoPush: z.boolean().optional(), promoWhatsApp: z.boolean().optional(), cartReminders: z.boolean().optional() }).strict();
 export const logQuery = z.object({
   status: z.enum(["queued", "sent", "delivered", "failed"]).optional(), channel: channel.optional(), userId: id.optional(), orderId: id.optional(),
@@ -56,28 +40,18 @@ function asCustomer(resolve: CustomerResolver, handler: (who: { userId: string }
   };
 }
 
-const auditOf = (ctx: Ctx) => ({ actorId: ctx.actor.userId, actorRole: ctx.actor.role, requestId: ctx.requestId });
 
-/** The 10 endpoints of docs/api/F23-notifications.md. Paths are relative to the API prefix. */
+/** The 7 endpoints of docs/api/F23-notifications.md. Paths are relative to the API prefix. */
 export function notificationRoutes(
-  services: { templates: TemplateService; delivery: DeliveryService; campaigns: CampaignService },
+  services: { delivery: DeliveryService; campaigns: CampaignService },
   customer: CustomerResolver, staff: AuthResolver, webhook: WebhookConfig,
 ): Route[] {
-  const { templates, delivery, campaigns } = services;
+  const { delivery, campaigns } = services;
   const manage = (h: Parameters<typeof guarded>[2]) => guarded(staff, "notifications:manage", h);
 
   return [
     { method: "get", path: "/me/notification-prefs", handler: asCustomer(customer, async (who, _req, res) => sendData(res, await delivery.getPrefs(who.userId))) },
     { method: "put", path: "/me/notification-prefs", handler: asCustomer(customer, async (who, req, res) => sendData(res, await delivery.setPrefs(who.userId, parse(prefsBody, req.body)))) },
-
-    { method: "get", path: "/admin/notification-templates", handler: manage(async (_ctx, _req, res) => {
-      const data = await templates.list();
-      sendData(res, data, 200, { count: data.length });
-    }) },
-    { method: "post", path: "/admin/notification-templates", handler: manage(async (ctx, req, res) =>
-      sendData(res, await templates.create(parse(templateCreate, req.body) as never, auditOf(ctx)), 201)) },
-    { method: "put", path: "/admin/notification-templates/:id", handler: manage(async (ctx, req, res) =>
-      sendData(res, await templates.update(pathId(req, "id", "Template"), parse(templateUpdate, req.body) as never, auditOf(ctx)))) },
 
     { method: "get", path: "/admin/notifications", handler: manage(async (_ctx, req, res) => {
       const q = parse(logQuery, req.query);
@@ -85,9 +59,9 @@ export function notificationRoutes(
       sendData(res, page.items, 200, { nextCursor: page.nextCursor, failedCount: page.failedCount });
     }) },
     { method: "post", path: "/admin/notifications/:id/retry", handler: manage(async (ctx, req, res) =>
-      sendData(res, await delivery.retry(pathId(req, "id", "Notification"), auditOf(ctx)))) },
+      sendData(res, await delivery.retry(pathId(req, "id", "Notification")))) },
     { method: "post", path: "/admin/broadcast", handler: manage(async (ctx, req, res) =>
-      sendData(res, await campaigns.broadcast(parse(broadcastBody, req.body) as never, auditOf(ctx)), 202)) },
+      sendData(res, await campaigns.broadcast(parse(broadcastBody, req.body) as never), 202)) },
 
     // The provider calls these, not a logged-in person.
     { method: "get", path: "/webhooks/whatsapp", handler: (req, res) => {

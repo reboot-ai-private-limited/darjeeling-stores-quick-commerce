@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { GOOGLE_MAPS_KEY, GoogleLocationPicker } from "./google-map";
 import { adminFetch } from "./session-client";
 
 interface City {
@@ -183,8 +184,8 @@ export default function CitiesLocalities() {
     if (loc === "new") {
       setLocCityId(selectedCityFilter || (cities && cities.length > 0 ? cities[0]!.id : ""));
       setLocName("");
-      setLocLat("27.0410");
-      setLocLng("88.2663");
+      setLocLat(GOOGLE_MAPS_KEY ? "" : "27.0410");
+      setLocLng(GOOGLE_MAPS_KEY ? "" : "88.2663");
       setLocZoneId("");
       setLocTravelMinutes("");
       setLocSortOrder("0");
@@ -322,53 +323,35 @@ export default function CitiesLocalities() {
             <>
               {editingCity && (
                 <form
-                  className="admin-panel admin-role-form"
+                  className="admin-panel admin-role-form is-wide"
                   onSubmit={saveCity}
                   aria-label={editingCity === "new" ? "Create city" : "Edit city"}
                 >
                   <h2>{editingCity === "new" ? "Create city" : `Edit ${editingCity.name}`}</h2>
-                  <label htmlFor="city-name">City name</label>
-                  <input
-                    id="city-name"
-                    value={cityName}
-                    onChange={(e) => setCityName(e.target.value)}
-                    required
-                    maxLength={100}
-                    disabled={cityBusy}
-                    placeholder="e.g. Darjeeling"
-                  />
-                  <label htmlFor="city-state" style={{ marginTop: 12 }}>
-                    State
-                  </label>
-                  <input
-                    id="city-state"
-                    value={cityState}
-                    onChange={(e) => setCityState(e.target.value)}
-                    required
-                    maxLength={100}
-                    disabled={cityBusy}
-                    placeholder="e.g. West Bengal"
-                  />
-
+                  <p className="admin-form-hint">
+                    {editingCity === "new"
+                      ? "A city only needs a name and state. After saving, draw its delivery zones under Zones, then add localities here."
+                      : "Changing the name updates it everywhere customers see it."}
+                  </p>
+                  <div className="admin-form-row" style={{ marginTop: 18 }}>
+                    <label className="admin-field" htmlFor="city-name">
+                      City name *
+                      <input id="city-name" value={cityName} onChange={(e) => setCityName(e.target.value)} required maxLength={100} disabled={cityBusy} placeholder="e.g. Siliguri" />
+                    </label>
+                    <label className="admin-field" htmlFor="city-state">
+                      State *
+                      <input id="city-state" value={cityState} onChange={(e) => setCityState(e.target.value)} required maxLength={100} disabled={cityBusy} placeholder="e.g. West Bengal" />
+                    </label>
+                  </div>
                   {editingCity !== "new" && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
-                      <input
-                        type="checkbox"
-                        checked={cityActive}
-                        onChange={(e) => setCityActive(e.target.checked)}
-                        disabled={cityBusy}
-                      />
-                      <span>Active for public picker and orders</span>
+                    <label className="admin-check" style={{ marginTop: 8 }}>
+                      <input type="checkbox" checked={cityActive} onChange={(e) => setCityActive(e.target.checked)} disabled={cityBusy} />
+                      <span>Active for the public picker and orders</span>
                     </label>
                   )}
-
-                  <div className="admin-role-actions" style={{ marginTop: 20 }}>
-                    <button className="admin-role-button" type="submit" disabled={cityBusy}>
-                      {cityBusy ? "Saving…" : "Save city"}
-                    </button>
-                    <button type="button" disabled={cityBusy} onClick={() => setEditingCity(null)}>
-                      Cancel
-                    </button>
+                  <div className="admin-form-actions">
+                    <button className="admin-role-button" type="submit" disabled={cityBusy}>{cityBusy ? "Saving…" : "Save city"}</button>
+                    <button type="button" disabled={cityBusy} onClick={() => setEditingCity(null)}>Cancel</button>
                   </div>
                 </form>
               )}
@@ -422,149 +405,79 @@ export default function CitiesLocalities() {
             <>
               {editingLocality && (
                 <form
-                  className="admin-panel admin-role-form"
+                  className="admin-panel admin-role-form is-wide"
                   onSubmit={saveLocality}
                   aria-label={editingLocality === "new" ? "Create locality" : "Edit locality"}
                 >
                   <h2>{editingLocality === "new" ? "Create locality" : `Edit ${editingLocality.name}`}</h2>
-
-                  <label htmlFor="loc-city">City</label>
-                  <select
-                    id="loc-city"
-                    value={locCityId}
-                    onChange={(e) => setLocCityId(e.target.value)}
-                    required
-                    disabled={localityBusy}
-                    style={{
-                      width: "100%",
-                      maxWidth: 360,
-                      padding: 10,
-                      border: "1px solid #cbc5ba",
-                      borderRadius: 6,
-                      marginTop: 7,
-                    }}
-                  >
-                    <option value="">Select a city</option>
-                    {(cities ?? []).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.state})
-                      </option>
-                    ))}
-                  </select>
-
-                  <label htmlFor="loc-name" style={{ marginTop: 12 }}>
-                    Locality name
-                  </label>
-                  <input
-                    id="loc-name"
-                    value={locName}
-                    onChange={(e) => setLocName(e.target.value)}
-                    required
-                    maxLength={100}
-                    disabled={localityBusy}
-                    placeholder="e.g. Chowrasta"
-                  />
-
-                  <div style={{ display: "flex", gap: 12, marginTop: 12, maxWidth: 360 }}>
-                    <div style={{ flex: 1 }}>
-                      <label htmlFor="loc-lat">Latitude</label>
-                      <input
-                        id="loc-lat"
-                        type="number"
-                        step="any"
-                        value={locLat}
-                        onChange={(e) => setLocLat(e.target.value)}
-                        required
-                        disabled={localityBusy}
-                        placeholder="27.0410"
-                      />
+                  <p className="admin-form-hint">A locality is a neighbourhood customers pick when they enter an address. Click the map to place it.</p>
+                  <div className="admin-locality-grid">
+                    <div style={{ display: "grid", gap: 16 }}>
+                      <label className="admin-field" htmlFor="loc-city">
+                        City *
+                        <select id="loc-city" value={locCityId} onChange={(e) => setLocCityId(e.target.value)} required disabled={localityBusy}>
+                          <option value="">Select a city</option>
+                          {(cities ?? []).map((c) => (
+                            <option key={c.id} value={c.id}>{c.name} ({c.state})</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="admin-field" htmlFor="loc-name">
+                        Locality name *
+                        <input id="loc-name" value={locName} onChange={(e) => setLocName(e.target.value)} required maxLength={100} disabled={localityBusy} placeholder="e.g. Chowrasta" />
+                      </label>
+                      <label className="admin-field" htmlFor="loc-zone">
+                        Linked zone (optional)
+                        <select id="loc-zone" value={locZoneId} onChange={(e) => setLocZoneId(e.target.value)} disabled={localityBusy}>
+                          <option value="">None (find the zone from the map point)</option>
+                          {zonesForSelectedCity.map((z) => (
+                            <option key={z.id} value={z.id}>{z.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="admin-form-row">
+                        <label className="admin-field" htmlFor="loc-travel">
+                          Travel minutes (delivery time)
+                          <input id="loc-travel" type="number" min="0" value={locTravelMinutes} onChange={(e) => setLocTravelMinutes(e.target.value)} disabled={localityBusy} placeholder="8" />
+                        </label>
+                        <label className="admin-field" htmlFor="loc-sort">
+                          Sort order
+                          <input id="loc-sort" type="number" min="0" value={locSortOrder} onChange={(e) => setLocSortOrder(e.target.value)} disabled={localityBusy} placeholder="0" />
+                        </label>
+                      </div>
+                      {editingLocality !== "new" && (
+                        <label className="admin-check">
+                          <input type="checkbox" checked={locActive} onChange={(e) => setLocActive(e.target.checked)} disabled={localityBusy} />
+                          <span>Active for the customer address picker</span>
+                        </label>
+                      )}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <label htmlFor="loc-lng">Longitude</label>
-                      <input
-                        id="loc-lng"
-                        type="number"
-                        step="any"
-                        value={locLng}
-                        onChange={(e) => setLocLng(e.target.value)}
-                        required
-                        disabled={localityBusy}
-                        placeholder="88.2663"
-                      />
-                    </div>
-                  </div>
 
-                  <label htmlFor="loc-zone" style={{ marginTop: 12 }}>
-                    Linked Zone (optional override)
-                  </label>
-                  <select
-                    id="loc-zone"
-                    value={locZoneId}
-                    onChange={(e) => setLocZoneId(e.target.value)}
-                    disabled={localityBusy}
-                    style={{
-                      width: "100%",
-                      maxWidth: 360,
-                      padding: 10,
-                      border: "1px solid #cbc5ba",
-                      borderRadius: 6,
-                      marginTop: 7,
-                    }}
-                  >
-                    <option value="">None (resolve by GPS point)</option>
-                    {zonesForSelectedCity.map((z) => (
-                      <option key={z.id} value={z.id}>
-                        {z.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <div style={{ display: "flex", gap: 12, marginTop: 12, maxWidth: 360 }}>
-                    <div style={{ flex: 1 }}>
-                      <label htmlFor="loc-travel">Travel min (ETA)</label>
-                      <input
-                        id="loc-travel"
-                        type="number"
-                        min="0"
-                        value={locTravelMinutes}
-                        onChange={(e) => setLocTravelMinutes(e.target.value)}
-                        disabled={localityBusy}
-                        placeholder="8"
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label htmlFor="loc-sort">Sort order</label>
-                      <input
-                        id="loc-sort"
-                        type="number"
-                        min="0"
-                        value={locSortOrder}
-                        onChange={(e) => setLocSortOrder(e.target.value)}
-                        disabled={localityBusy}
-                        placeholder="0"
-                      />
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <strong style={{ fontSize: 15 }}>Location on the map *</strong>
+                      {GOOGLE_MAPS_KEY && (
+                        <GoogleLocationPicker
+                          lat={locLat.trim() === "" || Number.isNaN(parseFloat(locLat)) ? null : parseFloat(locLat)}
+                          lng={locLng.trim() === "" || Number.isNaN(parseFloat(locLng)) ? null : parseFloat(locLng)}
+                          zones={[]} selectedZoneId="" disabled={localityBusy}
+                          onPick={(la, ln) => { setLocLat(la.toFixed(6)); setLocLng(ln.toFixed(6)); }}
+                        />
+                      )}
+                      <div className="admin-form-row">
+                        <label className="admin-field" htmlFor="loc-lat">
+                          Latitude *
+                          <input id="loc-lat" type="number" step="any" value={locLat} onChange={(e) => setLocLat(e.target.value)} required disabled={localityBusy} placeholder="27.0410" />
+                        </label>
+                        <label className="admin-field" htmlFor="loc-lng">
+                          Longitude *
+                          <input id="loc-lng" type="number" step="any" value={locLng} onChange={(e) => setLocLng(e.target.value)} required disabled={localityBusy} placeholder="88.2663" />
+                        </label>
+                      </div>
                     </div>
                   </div>
-
-                  {editingLocality !== "new" && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
-                      <input
-                        type="checkbox"
-                        checked={locActive}
-                        onChange={(e) => setLocActive(e.target.checked)}
-                        disabled={localityBusy}
-                      />
-                      <span>Active for customer address picker</span>
-                    </label>
-                  )}
-
-                  <div className="admin-role-actions" style={{ marginTop: 20 }}>
-                    <button className="admin-role-button" type="submit" disabled={localityBusy}>
-                      {localityBusy ? "Saving…" : "Save locality"}
-                    </button>
-                    <button type="button" disabled={localityBusy} onClick={() => setEditingLocality(null)}>
-                      Cancel
-                    </button>
+                  <div className="admin-form-actions">
+                    <button className="admin-role-button" type="submit" disabled={localityBusy}>{localityBusy ? "Saving…" : "Save locality"}</button>
+                    <button type="button" disabled={localityBusy} onClick={() => setEditingLocality(null)}>Cancel</button>
                   </div>
                 </form>
               )}

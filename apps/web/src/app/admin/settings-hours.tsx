@@ -43,7 +43,7 @@ function HoursCard({ details, canEdit, onSaved }: { details: Details; canEdit: b
         {rules.map((rule, i) => (
           <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end", padding: "10px 12px", border: "1px solid var(--admin-border)", borderRadius: 8 }}>
             <div role="group" aria-label={`Days for block ${i + 1}`} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              {DAYS.map((d, n) => <label key={d} style={{ fontSize: 12, display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" disabled={!canEdit} checked={rule.days.includes(n)} onChange={() => update(i, { days: rule.days.includes(n) ? rule.days.filter(x => x !== n) : [...rule.days, n].sort() })} />{d}</label>)}
+              {DAYS.map((d, n) => <label key={d} style={{ fontSize: 14, display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" disabled={!canEdit} checked={rule.days.includes(n)} onChange={() => update(i, { days: rule.days.includes(n) ? rule.days.filter(x => x !== n) : [...rule.days, n].sort() })} />{d}</label>)}
             </div>
             <Field label="Opens"><input type="time" required disabled={!canEdit} value={rule.open} onChange={e => update(i, { open: e.target.value })} style={inputStyle} /></Field>
             <Field label="Closes"><input type="time" required disabled={!canEdit} value={rule.close} onChange={e => update(i, { close: e.target.value })} style={inputStyle} /></Field>
@@ -58,7 +58,7 @@ function HoursCard({ details, canEdit, onSaved }: { details: Details; canEdit: b
           <Field label="Stop taking orders this many minutes before closing"><input type="number" min={0} max={240} step={1} disabled={!canEdit} value={lastOrder} onChange={e => setLastOrder(e.target.value)} style={{ ...inputStyle, width: 120 }} /></Field>
           <Field label="Outside opening hours"><select disabled={!canEdit} value={after} onChange={e => setAfter(e.target.value as typeof after)} style={inputStyle}><option value="closed">Show &ldquo;closed&rdquo;</option><option value="pre_order">Let customers pre-order for the next morning</option></select></Field>
         </div>
-        <p style={{ margin: 0, fontSize: 11, color: "var(--admin-muted)" }}>For late-night delivery, set a later closing time here and add a late-night fee under Delivery fees &amp; surcharges.</p>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--admin-muted)" }}>For late-night delivery, set a later closing time here and add a late-night fee under Delivery fees &amp; surcharges.</p>
         {canEdit && <div><button className="admin-role-button" disabled={busy}>{busy ? "Saving…" : "Save opening hours"}</button></div>}
       </div>
     </form>
@@ -87,9 +87,9 @@ function PreOrderCard({ details, canEdit, onSaved }: { details: Details; canEdit
     <form className="admin-panel" onSubmit={e => void save(e)} aria-labelledby="pre-title">
       <div className="admin-panel-toolbar"><h2 id="pre-title">Pre-order slots</h2><Badge tone={details.preOrder.enabled ? "active" : "inactive"}>{details.preOrder.enabled ? "On" : "Off"}</Badge></div>
       <div style={{ padding: "0 20px 18px", display: "grid", gap: 12 }}>
-        <p style={{ margin: 0, fontSize: 12, color: "var(--admin-muted)" }}>When the store is closed, customers can book a delivery window for the next morning. Slots need &ldquo;Let customers pre-order&rdquo; selected under Opening hours.</p>
+        <p style={{ margin: 0, fontSize: 14, color: "var(--admin-muted)" }}>When the store is closed, customers can book a delivery window for the next morning. Slots need &ldquo;Let customers pre-order&rdquo; selected under Opening hours.</p>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
-        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}><input type="checkbox" disabled={!canEdit} checked={enabled} onChange={e => setEnabled(e.target.checked)} /> Accept pre-orders at this warehouse</label>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 15 }}><input type="checkbox" disabled={!canEdit} checked={enabled} onChange={e => setEnabled(e.target.checked)} /> Accept pre-orders at this warehouse</label>
         {slots.map((slot, i) => (
           <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end" }}>
             <Field label="Slot starts"><input type="time" required disabled={!canEdit} value={slot.start} onChange={e => update(i, { start: e.target.value })} style={inputStyle} /></Field>
@@ -129,7 +129,7 @@ function PauseCard({ details, canEdit, onSaved }: { details: Details; canEdit: b
   return (
     <section className="admin-panel" aria-labelledby="pause-title">
       <div className="admin-panel-toolbar"><h2 id="pause-title">Pause orders</h2><Badge tone={details.pause ? "disabled" : "active"}>{details.pause ? "Paused" : "Taking orders"}</Badge></div>
-      <div style={{ padding: "0 20px 16px", display: "grid", gap: 10, fontSize: 12 }}>
+      <div style={{ padding: "0 20px 16px", display: "grid", gap: 10, fontSize: 14 }}>
         {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
         {details.pause ? (
           <>
@@ -173,11 +173,11 @@ export default function Hours({ session }: { session: AdminSession }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>Warehouse{" "}
+      <label style={{ fontSize: 15, fontWeight: 600 }}>Warehouse{" "}
         <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} style={inputStyle}>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select>
       </label>
       {error && <Notice>{error}</Notice>}
-      {loading && !details && <p role="status" style={{ fontSize: 12 }}>Loading…</p>}
+      {loading && !details && <p role="status" style={{ fontSize: 14 }}>Loading…</p>}
       {details && details.warehouseId === warehouseId && (
         <>
           {!canEdit && <Notice kind="info">You can view these settings but not change them.</Notice>}

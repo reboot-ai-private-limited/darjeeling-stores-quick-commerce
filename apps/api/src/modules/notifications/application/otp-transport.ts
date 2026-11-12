@@ -1,3 +1,4 @@
+import { templatesFor } from "../domain/templates.js";
 import { AppError } from "../../catalog/catalog.public.js";
 import { maskPhone, render, type Notification } from "../domain/notification.js";
 import type { NotificationStore, SmsProvider, WhatsAppProvider } from "./ports.js";
@@ -31,7 +32,7 @@ export function createOtpTransport(deps: {
 
   return {
     async send(phone, code) {
-      const templates = (await store.templatesFor(OTP_TEMPLATE_KEY)).filter(t => t.isActive);
+      const templates = templatesFor(OTP_TEMPLATE_KEY);
       const wa = templates.find(t => t.channel === "whatsapp");
       try {
         const sent = await whatsapp.sendTemplate({

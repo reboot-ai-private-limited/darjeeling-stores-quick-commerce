@@ -27,12 +27,9 @@ export interface StorageProvider {
   remove(ref: StoredRef, variants: readonly Variant[]): Promise<void>;
 }
 
-export interface AuditEntry { actorId: string; actorRole: string; action: string; entityId: string; requestId: string }
-
 export interface UpdateOptions {
   /** Only change the row when it is in one of these statuses. */
   from?: readonly MediaStatus[];
-  audit?: AuditEntry;
 }
 
 export interface MediaStore {

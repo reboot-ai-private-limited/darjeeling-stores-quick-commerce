@@ -15,7 +15,6 @@ import type {
   LockActorFn,
   WarehouseDependencyPort,
   WarehouseStore,
-  WriteAuditFn,
   ZoneStore,
 } from "./ports.js";
 
@@ -54,7 +53,6 @@ export interface WarehouseServiceDependencies {
   warehouseStore: WarehouseStore;
   zoneStore: ZoneStore;
   dependencyPort?: WarehouseDependencyPort | undefined;
-  writeAudit: WriteAuditFn;
   withTransaction: <T>(fn: (session: ClientSession) => Promise<T>) => Promise<T>;
   newId: () => string;
   lockActor?: LockActorFn | undefined;
@@ -230,24 +228,6 @@ export function createWarehouseService(deps: WarehouseServiceDependencies) {
         const created = await deps.warehouseStore.create(record, session);
         const dto = toWarehouseDTO(created);
 
-        // 4. Write audit log
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "warehouse.create",
-            entityType: "warehouse",
-            entityId: id,
-            warehouseId: id,
-            requestId,
-            warehouseChange: {
-              before: null,
-              after: dto,
-            },
-          },
-          session
-        );
-
         return dto;
       });
     },
@@ -389,24 +369,6 @@ export function createWarehouseService(deps: WarehouseServiceDependencies) {
 
         const beforeDTO = toWarehouseDTO(current);
         const afterDTO = toWarehouseDTO(updated);
-
-        // Audit write
-        await deps.writeAudit(
-          {
-            actorId: liveActor.id ?? "anonymous",
-            actorRole: liveActor.roleName ?? "staff",
-            action: "warehouse.update",
-            entityType: "warehouse",
-            entityId: id,
-            warehouseId: id,
-            requestId,
-            warehouseChange: {
-              before: beforeDTO,
-              after: afterDTO,
-            },
-          },
-          session
-        );
 
         return afterDTO;
       });

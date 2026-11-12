@@ -1,5 +1,4 @@
 import type { ClientSession, Connection } from "mongoose";
-import { createAuditWriter, type AuditEvent } from "../../audit/audit.public.js";
 import type { Order, OrderEvent, OrderGroup, OrderStatus } from "../domain/order.js";
 import { DuplicateGroupError, StaleOrderError, type Change, type OrderFilter, type OrderStore } from "../application/ports.js";
 
@@ -19,7 +18,6 @@ export function createMongoOrderStore(connection: Connection): OrderStore {
   const events = () => connection.collection<EventDoc>("order_events");
   const changes = () => connection.collection<ChangeDoc>("order_changes");
   const counters = () => connection.collection<{ _id: string; value: number }>("order_counters");
-  const writeAudit = createAuditWriter(connection);
 
   async function inTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await connection.startSession();
@@ -112,7 +110,7 @@ export function createMongoOrderStore(connection: Connection): OrderStore {
     },
     async listByStatus(status, limit) { return (await orders().find({ status }).sort({ createdAt: 1 }).limit(limit).toArray()).map(toOrder); },
 
-    async transition(orderId, from, patch, event, audit) {
+    async transition(orderId, from, patch, event) {
       return inTransaction(async session => {
         const { id: _id, ...rest } = strip(patch) as Partial<Order> & { id?: string };
         const updated = await orders().findOneAndUpdate({ _id: orderId, status: from }, { $set: { ...rest, updatedAt: event.at } as never, $inc: { rev: 1 } }, { returnDocument: "after", session });
@@ -120,18 +118,16 @@ export function createMongoOrderStore(connection: Connection): OrderStore {
         const { id, ...eventRest } = event;
         await events().insertOne({ _id: id, ...eventRest }, { session });
         await change({ orderId, warehouseId: updated.warehouseId, event: "status_changed", at: event.at }, session);
-        if (audit) await writeAudit(audit, session);
         return toOrder(updated);
       });
     },
-    async patch(orderId, patch, event, where, audit) {
+    async patch(orderId, patch, event, where) {
       return inTransaction(async session => {
         const filter: Record<string, unknown> = { _id: orderId, ...(where?.status && { status: where.status }), ...(where?.rev !== undefined && { rev: where.rev }) };
         const updated = await orders().findOneAndUpdate(filter, { $set: { ...strip(patch), updatedAt: new Date() } as never, $inc: { rev: 1 } }, { returnDocument: "after", session });
         if (!updated) return null;
         if (event) { const { id, ...rest } = event; await events().insertOne({ _id: id, ...rest }, { session }); }
         await change({ orderId, warehouseId: updated.warehouseId, event: "updated", at: new Date() }, session);
-        if (audit) await writeAudit(audit, session);
         return toOrder(updated);
       });
     },
@@ -156,7 +152,6 @@ export function createMongoOrderStore(connection: Connection): OrderStore {
       const updated = await groups().findOneAndUpdate({ _id: groupId }, { $inc: { otpWrong: 1 } }, { returnDocument: "after" });
       return updated?.otpWrong ?? 0;
     },
-    async recordAudit(entry: AuditEvent) { await inTransaction(session => writeAudit(entry, session)); },
   };
 }
 export type { OrderStatus };
