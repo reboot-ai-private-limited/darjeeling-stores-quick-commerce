@@ -18,7 +18,7 @@ import { createRefundsModule, type Eligibility, type RefundSettings } from "../m
 import { createPricingModule, type OrderHistory, type PricingSettings } from "../modules/pricing/pricing.public.js";
 import { createSyncModule, type SyncSettings } from "../modules/sync/sync.public.js";
 import { baselineEta, createTrackingModule, DEFAULT_TRACKING_SETTINGS, type EtaProvider, type RoutePathProvider, type TrackingSettings } from "../modules/tracking/tracking.public.js";
-import { createDiscoveryModule, type BannerSource, type DiscoverySettings, type StoreSettings } from "../modules/discovery/discovery.public.js";
+import { createDiscoveryModule, defaultStoreSettings, type BannerSource, type DiscoverySettings, type StoreSettings } from "../modules/discovery/discovery.public.js";
 import { createJobsModule } from "../modules/jobs/jobs.public.js";
 import {
   createMediaModule, storageFromEnv, type AccessPolicy, type MediaSettings, type PrincipalResolver, type StorageProvider,
@@ -179,9 +179,17 @@ export function createDev2Modules(options: Dev2Options = {}) {
       release: (mediaId, reason) => media.service.removeInternal(mediaId, reason),
     },
   });
+  // Store status carries what the fee rule of the zone says (the amount that makes delivery free, the smallest order), on top of the stand-in ETA and hours.
+  const storeSettings: StoreSettings = options.storeSettings ?? {
+    forZone: async zoneId => {
+      const base = await defaultStoreSettings.forZone(zoneId);
+      const [minOrder, free] = await Promise.all([pricing.service.minOrderFor(zoneId), pricing.service.freeDeliveryThreshold(zoneId)]);
+      return { ...base, minOrder: minOrder ?? base.minOrder, freeDeliveryAbove: free };
+    },
+  };
   const discovery = createDiscoveryModule({
     connection, geography, catalog: catalog.store, source: offerings.zoneSource, media: { urls: ids => media.service.urls(ids) },
-    banners: options.banners ?? pricing.bannerSource, ...(options.storeSettings && { storeSettings: options.storeSettings }),
+    banners: options.banners ?? pricing.bannerSource, storeSettings,
     ...(options.contacts && { contacts: options.contacts }), ...(customerThenIndexes && { customer: customerThenIndexes }),
     ...(options.discoverySettings && { settings: options.discoverySettings }),
   });
