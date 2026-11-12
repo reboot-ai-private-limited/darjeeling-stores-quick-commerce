@@ -111,6 +111,8 @@ export function createFieldService(deps: DispatchDeps) {
     async pickup(rider: Rider, orderId: string, checklist: { itemsVerified: boolean; bagCount: number | null }) {
       const { assignment } = await owned(rider, orderId);
       if (!checklist.itemsVerified) throw validation("Check the items before picking up", { field: "checklist.itemsVerified" });
+      const current = await orders.get(orderId);
+      if (current && ["CONFIRMED", "PACKING", "READY"].includes(current.status)) throw new AppError("INVALID_TRANSITION", "The order is still being packed. Wait until the store marks it ready.", { reason: "still_packing" });
       const moved = await orders.transition(orderId, "PICKED_UP", by(rider), { bagCount: checklist.bagCount, itemsVerified: true });
       if (!moved.ok) throw transitionError(moved, "PICKED_UP");
       const at = now();

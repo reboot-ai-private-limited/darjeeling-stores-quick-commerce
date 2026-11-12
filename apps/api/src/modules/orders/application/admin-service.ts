@@ -45,7 +45,7 @@ export function createAdminOrderService(deps: OrderDeps, core: OrderCore) {
     return false;
   }
   const summary = async (order: Order, event: string, at: Date) => {
-    const rider = ["ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "ARRIVED"].includes(order.status) ? await riders.riderOf(order.id) : null;
+    const rider = ["CONFIRMED", "PACKING", "READY", "ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "ARRIVED"].includes(order.status) ? await riders.riderOf(order.id) : null;
     return {
       event, order: {
         id: order.id, orderNo: order.orderNo, groupId: order.groupId, warehouseId: order.warehouseId, status: order.status, itemCount: order.items.filter(i => i.status !== "unavailable").reduce((s, i) => s + i.qty, 0),
@@ -149,7 +149,13 @@ export function createAdminOrderService(deps: OrderDeps, core: OrderCore) {
 
     confirm: (ctx: Ctx, id: string) => step(ctx, id, "CONFIRMED"),
     startPacking: (ctx: Ctx, id: string) => step(ctx, id, "PACKING"),
-    completePacking: (ctx: Ctx, id: string) => step(ctx, id, "READY"),
+    /** Packing done. An order that was given a rider early becomes "assigned" straight away. */
+    async completePacking(ctx: Ctx, id: string) {
+      const { group } = await load(ctx, id);
+      const ready = core.orThrow(await core.move(id, "READY", actorOf(ctx)), "READY");
+      await deps.dispatch.ready(id).catch(() => undefined);
+      return view((await store.getOrder(id)) ?? ready, group);
+    },
 
     unavailable: (ctx: Ctx, id: string, index: number, input: { reason: string; availableQty?: number | undefined }) => removeQuantity(ctx, id, index, input.availableQty ?? 0, input.reason),
     async editQuantity(ctx: Ctx, id: string, index: number, qty: number) {

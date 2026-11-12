@@ -244,7 +244,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
       riderOf: async orderId => { const id = await dispatch.field.riderOfOrder(orderId); const r = id ? await riders.service.byId(id) : null; return r && { id: r.id, name: r.name, phone: r.phone }; },
       ordersOf: riderId => dispatch.field.liveOrderIds(riderId),
     },
-    dispatch: { cancelled: orderId => dispatch.hooks.onOrderCancelled(orderId), paid: orderId => dispatch.hooks.onOrderPaid(orderId) },
+    dispatch: { cancelled: orderId => dispatch.hooks.onOrderCancelled(orderId), paid: orderId => dispatch.hooks.onOrderPaid(orderId), ready: orderId => dispatch.hooks.onOrderReady(orderId) },
     link: orderId => { try { return tracking.service.link(orderId); } catch { return null; } },
     notifier: {
       placed: async (userId, group, orderNos) => { await notifications.notify({ userId, templateKey: "customer_order_placed", channels: ["push"], vars: { orderNo: orderNos.join(", ") }, data: { type: "order", groupId: group.id }, dedupeKey: `order:${group.id}:placed` }); },

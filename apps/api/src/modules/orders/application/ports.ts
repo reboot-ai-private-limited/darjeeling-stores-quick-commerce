@@ -108,7 +108,7 @@ export interface OrderNotifier {
   newOrder(warehouseId: string, order: Order): Promise<void>;
 }
 /** Dispatch is told when an order is cancelled so its rider is released. */
-export interface DispatchHooks { cancelled(orderId: string): Promise<void>; paid(orderId: string): Promise<void> }
+export interface DispatchHooks { cancelled(orderId: string): Promise<void>; paid(orderId: string): Promise<void>; ready(orderId: string): Promise<void> }
 export interface HoursPolicy {
   /** The status new orders in this warehouse start in after payment (manual means an admin confirms). */
   confirmMode(warehouseId: string): Promise<"auto" | "manual">;

@@ -56,7 +56,7 @@ export function createDispatchModule(options: DispatchModuleOptions) {
   return {
     store, assign, batches, board, field, settings,
     /** For the orders module (Dev 1): call these when an order is cancelled, paid or becomes ready. */
-    hooks: { onOrderCancelled: assign.onOrderCancelled, onOrderPaid: assign.onOrderPaid, autoAssignPending: assign.autoAssignPending },
+    hooks: { onOrderCancelled: assign.onOrderCancelled, onOrderPaid: assign.onOrderPaid, onOrderReady: assign.onOrderReady, autoAssignPending: assign.autoAssignPending },
     routes: dispatchRoutes({ assign, batches, board, field }, riders, rider, auth),
   };
 }
