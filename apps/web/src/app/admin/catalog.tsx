@@ -364,56 +364,9 @@ function CategoryManager({ canEdit }: { canEdit: boolean }) {
   );
 }
 
-// ─── Catalog Export ───────────────────────────────────────────────────────────
-
-function CatalogExport() {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function download() {
-    setBusy(true); setError("");
-    try {
-      const res = await adminFetch(`/api/v1/admin/catalog/export`);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: { message?: string } }).error?.message ?? "Export failed.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `catalog-export.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <div className="admin-heading" style={{ marginBottom: 20 }}>
-        <div>
-          <h1>Export catalog</h1>
-          <p>Download the full master catalog as a CSV file.</p>
-        </div>
-      </div>
-      <section className="admin-panel" aria-labelledby="export-title" style={{ maxWidth: 480 }}>
-        <div className="admin-panel-toolbar"><h2 id="export-title">Download</h2></div>
-        <div style={{ padding: 24, display: "grid", gap: 16 }}>
-          {error && <p role="alert" className="admin-role-error">{error}</p>}
-          <button className="admin-role-button" onClick={download} disabled={busy}>{busy ? "Exporting…" : "Download CSV"}</button>
-        </div>
-      </section>
-    </>
-  );
-}
-
 // ─── Root Catalog Component ───────────────────────────────────────────────────
 
-type Tab = "categories" | "products" | "brands" | "export";
+type Tab = "categories" | "products" | "brands";
 
 export default function Catalog({ session }: { session: AdminSession }) {
   const [tab, setTab] = useState<Tab>("categories");
@@ -433,7 +386,7 @@ export default function Catalog({ session }: { session: AdminSession }) {
     void api<{ data: Brand[] }>("brands").then((body) => setBrands(body.data)).catch(() => {});
   }, [brandAttempt]);
 
-  const labels: Record<Tab, string> = { categories: "Categories", products: "Products & variants", brands: "Brands", export: "Export" };
+  const labels: Record<Tab, string> = { categories: "Categories", products: "Products & variants", brands: "Brands" };
   return (
     <>
       <div className="admin-tab-nav" role="tablist" aria-label="Catalog sections">
@@ -445,10 +398,8 @@ export default function Catalog({ session }: { session: AdminSession }) {
         <CategoryManager canEdit={canEdit} />
       ) : tab === "products" ? (
         <ProductManager categories={categories} brands={brands} canEdit={canEdit} />
-      ) : tab === "brands" ? (
-        <BrandManager brands={brands} canEdit={canEdit} onChanged={() => setBrandAttempt((n) => n + 1)} />
       ) : (
-        <CatalogExport />
+        <BrandManager brands={brands} canEdit={canEdit} onChanged={() => setBrandAttempt((n) => n + 1)} />
       )}
     </>
   );

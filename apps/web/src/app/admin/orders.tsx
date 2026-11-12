@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ago, api, Badge, can, dateTime, errorText, Field, Heading, inputStyle, json, money, Notice, Tabs, timeOnly, usePolling, useWarehouses } from "./admin-kit";
+import { ago, api, Badge, can, dateTime, errorText, Field, inputStyle, json, money, Notice, Tabs, timeOnly, usePolling, useWarehouses } from "./admin-kit";
 import { AssignRider, ChangeRider } from "./assign-rider";
 import type { AdminSession } from "./session-client";
 
@@ -16,6 +16,9 @@ const LABEL: Record<Status, string> = {
 const TERMINAL: Status[] = ["DELIVERED", "CANCELLED"];
 const CANCELLABLE: Status[] = ["PENDING_PAYMENT", "PLACED", "CONFIRMED", "PACKING", "READY", "ASSIGNED"];
 const EDITABLE_LINES: Status[] = ["PLACED", "CONFIRMED", "PACKING", "READY"];
+/** Orders that can be given a rider before they are picked up. A rider chosen before packing is done is alerted at once and can collect the order when it is ready. */
+const CAN_GET_RIDER: Status[] = ["CONFIRMED", "PACKING", "READY"];
+const RIDER_SHOWN: Status[] = ["CONFIRMED", "PACKING", "ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "ARRIVED"];
 const CHARGE_LABEL: Record<string, string> = { delivery_fee: "Delivery fee", surcharge_rain: "Rain surcharge", surcharge_late_night: "Late-night fee", surcharge_other: "Surcharge", tip: "Rider tip" };
 
 type OrderItem = { index: number; name: string; variantLabel: string; qty: number; unitPrice: number; lineTotal: number; status: "ok" | "unavailable" | "reduced"; unavailableReason?: string };
@@ -94,30 +97,30 @@ function OrderDetail({ id, canManage, onClose, onChanged }: { id: string; canMan
           <span>{order.isPreOrder && order.scheduledWindow ? `Slot ${timeOnly(order.scheduledWindow.start)}–${timeOnly(order.scheduledWindow.end)}` : `Promised ${timeOnly(order.promisedAt)}`}</span>
         </div>
 
-        {order.status === "READY" && (
-          <div style={{ border: "1px solid #e0b64a", background: "#fffaf0", borderRadius: 10, padding: 12, display: "grid", gap: 8 }}>
-            <strong style={{ fontSize: 15 }}>Ready: choose a rider</strong>
+        {canManage && CAN_GET_RIDER.includes(order.status) && !order.rider && (
+          <div style={{ border: "1px solid #e0b64a", background: "#fffaf0", borderRadius: 8, padding: 12, display: "grid", gap: 6 }}>
+            <strong style={{ fontSize: 14 }}>{order.status === "READY" ? "Choose a rider" : "Give to a rider now"}</strong>
+            {order.status !== "READY" && <small style={{ color: "var(--admin-muted)" }}>The rider is alerted at once and can collect it as soon as packing is done.</small>}
             <AssignRider orderId={order.id} onAssigned={() => { reload(); onChanged(); }} />
           </div>
         )}
 
-        {["ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "ARRIVED"].includes(order.status) && (
-          <div style={{ border: "1px solid var(--admin-border)", background: "#fff", borderRadius: 10, padding: 12 }}>
-            <ChangeRider orderId={order.id} status={order.status} riderName={order.rider?.name} onChanged={() => { reload(); onChanged(); }} />
+        {order.rider && RIDER_SHOWN.includes(order.status) && (
+          <div style={{ border: "1px solid var(--admin-border)", borderRadius: 8, padding: 12, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
+            <ChangeRider orderId={order.id} status={order.status} riderName={order.rider.name} onChanged={() => { reload(); onChanged(); }} />
+            {canManage && ["CONFIRMED", "PACKING", "ASSIGNED"].includes(order.status) && (
+              <button className="admin-text-button" style={{ color: "#b3261e" }} disabled={busy} onClick={() => run("Rider removed", () => post("unassign"))}>Remove rider</button>
+            )}
           </div>
         )}
 
-        {canManage && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {step && <button className="admin-role-button" disabled={busy} onClick={() => run(step.label, () => post(step.path))}>{step.label}</button>}
-            <button className="admin-text-button" onClick={() => setPanel(panel === "note" ? "" : "note")}>Add note</button>
-            {CANCELLABLE.includes(order.status) && <button className="admin-text-button" style={{ color: "#b3261e" }} onClick={() => setPanel(panel === "cancel" ? "" : "cancel")}>Cancel order</button>}
-            <button className="admin-text-button" onClick={() => setPanel(panel === "force" ? "" : "force")}>Fix status…</button>
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 8 }}>
-          <a className="admin-text-button" href={`/api/v1/admin/orders/${order.id}/print?type=slip`} target="_blank" rel="noreferrer">Print packing slip</a>
-          <a className="admin-text-button" href={`/api/v1/admin/orders/${order.id}/print?type=bill`} target="_blank" rel="noreferrer">Print bill</a>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {canManage && step && <button className="admin-role-button" disabled={busy} onClick={() => run(step.label, () => post(step.path))}>{step.label}</button>}
+          {canManage && <button className="admin-text-button" onClick={() => setPanel(panel === "note" ? "" : "note")}>Add note</button>}
+          <a className="admin-text-button" href={`/api/v1/admin/orders/${order.id}/print?type=slip`} target="_blank" rel="noreferrer">Packing slip</a>
+          <a className="admin-text-button" href={`/api/v1/admin/orders/${order.id}/print?type=bill`} target="_blank" rel="noreferrer">Bill</a>
+          {canManage && CANCELLABLE.includes(order.status) && <button className="admin-text-button" style={{ color: "#b3261e" }} onClick={() => setPanel(panel === "cancel" ? "" : "cancel")}>Cancel order</button>}
+          {canManage && <button className="admin-text-button" onClick={() => setPanel(panel === "force" ? "" : "force")}>Fix status…</button>}
         </div>
 
         {panel === "note" && (
@@ -154,7 +157,6 @@ function OrderDetail({ id, canManage, onClose, onChanged }: { id: string; canMan
           <span>{order.address.locality}</span>
           {order.address.deliveryNotes && <span style={{ color: "#8a5a00" }}>Note: {order.address.deliveryNotes}</span>}
           <a href={`https://www.google.com/maps?q=${order.address.location.lat},${order.address.location.lng}`} target="_blank" rel="noreferrer">Open in maps</a>
-          {order.rider && <span>Rider: <strong>{order.rider.name}</strong></span>}
         </div>
 
         <table className="admin-product-table" style={{ width: "100%" }}>
@@ -292,7 +294,7 @@ export default function Orders({ session }: { session: AdminSession }) {
     return () => { active = false; clearInterval(timer); };
   }, [canView]);
 
-  if (!canView) return <><Heading title="Orders" subtitle="Orders and packing." /><Notice kind="info">Your role does not include orders.</Notice></>;
+  if (!canView) return <Notice kind="info">Your role does not include orders.</Notice>;
 
   const rows = [...(list.data?.data ?? []), ...more];
   const next = moreCursor === undefined ? list.data?.meta.nextCursor ?? null : moreCursor;
@@ -311,17 +313,17 @@ export default function Orders({ session }: { session: AdminSession }) {
 
   return (
     <>
-      <Heading title="Orders" subtitle="New orders appear here by themselves. Open one to pack, edit or cancel it.">
-        {fresh > 0 && <button className="admin-role-button" onClick={() => { setFresh(0); list.reload(); }}>{fresh} new since you opened this</button>}
-      </Heading>
-      <Tabs label="Order groups" value={tab} onChange={k => { setTab(k); setSelected(null); }} tabs={TABS.map(t => ({ key: t.key, label: t.label }))} />
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <Tabs label="Order groups" value={tab} onChange={k => { setTab(k); setSelected(null); }} tabs={TABS.map(t => ({ key: t.key, label: t.label }))} />
+        {fresh > 0 && <button className="admin-role-button" onClick={() => { setFresh(0); list.reload(); }}>{fresh} new</button>}
+      </div>
 
-      <form className="admin-panel" onSubmit={(e: FormEvent) => { e.preventDefault(); setSearch(q.trim()); }} style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end", padding: "12px 16px", marginBottom: 12 }}>
-        <Field label="Search"><input value={q} onChange={e => setQ(e.target.value)} placeholder="Order no, name or phone" style={{ ...inputStyle, width: 200 }} /></Field>
+      <form className="admin-panel" onSubmit={(e: FormEvent) => { e.preventDefault(); setSearch(q.trim()); }} style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end", padding: "10px 12px", marginBottom: 12 }}>
+        <Field label="Search"><input value={q} onChange={e => setQ(e.target.value)} placeholder="Order no, name or phone" style={{ ...inputStyle, width: 220 }} /></Field>
         {warehouses.length > 1 && <Field label="Warehouse"><select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} style={inputStyle}><option value="">All</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>}
         <Field label="From"><input type="date" value={from} onChange={e => setFrom(e.target.value)} style={inputStyle} /></Field>
         <Field label="To"><input type="date" value={to} onChange={e => setTo(e.target.value)} style={inputStyle} /></Field>
-        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14, paddingBottom: 8 }}><input type="checkbox" checked={flagged} onChange={e => setFlagged(e.target.checked)} /> Offline-delivery flags only</label>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14, paddingBottom: 8 }}><input type="checkbox" checked={flagged} onChange={e => setFlagged(e.target.checked)} /> Flagged only</label>
         <button className="admin-role-button">Search</button>
         {(search || warehouseId || from || to || flagged) && <button type="button" className="admin-text-button" onClick={() => { setQ(""); setSearch(""); setWarehouseId(""); setFrom(""); setTo(""); setFlagged(false); }}>Clear</button>}
       </form>
@@ -330,9 +332,8 @@ export default function Orders({ session }: { session: AdminSession }) {
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
         <section className="admin-panel" aria-label="Orders" style={{ flex: "1 1 520px", minWidth: 0 }}>
-          <div className="admin-panel-toolbar"><h2>{def.label}</h2><span>{list.loading && !list.data ? "Loading…" : `${rows.length} shown${next ? "+" : ""}`}</span></div>
           {rows.length === 0 && !list.loading
-            ? <p style={{ padding: "20px", margin: 0, fontSize: 14, color: "var(--admin-muted)" }}>No orders here{search ? " match your search" : " right now"}.</p>
+            ? <p style={{ padding: "20px", margin: 0, fontSize: 14, color: "var(--admin-muted)" }} role={list.loading ? "status" : undefined}>{list.loading ? "Loading…" : `No orders here${search ? " match your search" : " right now"}.`}</p>
             : (
               <div style={{ overflowX: "auto" }}>
                 <table className="admin-product-table" style={{ width: "100%" }}>
@@ -348,7 +349,15 @@ export default function Orders({ session }: { session: AdminSession }) {
                           <td><Badge tone={tone(o.status)}>{LABEL[o.status]}</Badge><br /><small style={{ color: "var(--admin-muted)" }}>{o.paymentMethod === "cod" ? "Cash" : "Online"}{o.rider ? ` · ${o.rider.name}` : ""}</small></td>
                           <td style={{ textAlign: "right" }}>{money(orderTotal(o))}</td>
                           <td style={late ? { color: "#b3261e" } : undefined}>{o.isPreOrder && o.scheduledWindow ? timeOnly(o.scheduledWindow.start) : TERMINAL.includes(o.status) ? ago(o.createdAt) : timeOnly(o.promisedAt)}{late ? <><br /><small>late</small></> : null}</td>
-                          {canManage && <td onClick={e => e.stopPropagation()}>{act && <button className="admin-role-button" onClick={() => void quick(o, act[1])}>{act[0]}</button>}{o.status === "READY" && <AssignRider orderId={o.id} compact onAssigned={() => list.reload()} />}{o.status === "ASSIGNED" && <ChangeRider orderId={o.id} status={o.status} riderName={o.rider?.name} compact onChanged={() => list.reload()} />}</td>}
+                          {canManage && (
+                            <td onClick={e => e.stopPropagation()}>
+                              <div style={{ display: "grid", gap: 6, justifyItems: "start" }}>
+                                {act && <button className="admin-role-button" onClick={() => void quick(o, act[1])}>{act[0]}</button>}
+                                {CAN_GET_RIDER.includes(o.status) && !o.rider && <AssignRider orderId={o.id} compact onAssigned={() => list.reload()} />}
+                                {o.rider && ["CONFIRMED", "PACKING", "ASSIGNED"].includes(o.status) && <ChangeRider orderId={o.id} status={o.status} riderName={o.rider.name} compact onChanged={() => list.reload()} />}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -365,7 +374,6 @@ export default function Orders({ session }: { session: AdminSession }) {
           </div>
         )}
       </div>
-      <p style={{ fontSize: 13, color: "var(--admin-muted)", marginTop: 10 }}>The list refreshes every few seconds{more.length > 0 ? " (paused while older orders are shown)" : ""}. All times are Indian time.</p>
     </>
   );
 }

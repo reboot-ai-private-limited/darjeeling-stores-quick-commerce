@@ -342,7 +342,7 @@ function OfferingsTab({ warehouseId, canManage, pictures, categories, attempt, s
         </form>
       )}
 
-      <section className="admin-panel" aria-labelledby="offerings-title">
+      <section className="admin-panel" aria-label="Offerings">
         <div className="admin-staff-filters">
           <label>
             Search products
@@ -368,10 +368,6 @@ function OfferingsTab({ warehouseId, canManage, pictures, categories, attempt, s
             <span>Low stock only</span>
           </label>
           {filtered && <button type="button" className="admin-text-button" onClick={() => { setSearchText(""); setQ(""); setCategoryId(""); setStatusFilter(""); setLowOnly(false); }}>Clear filters</button>}
-        </div>
-        <div className="admin-panel-toolbar">
-          <h2 id="offerings-title">Offerings</h2>
-          <span>{loading ? "Loading…" : `${offerings.length} shown`}</span>
         </div>
         {!warehouseId ? (
           <p className="admin-roles-message">Select a warehouse above to see its offerings.</p>
@@ -522,10 +518,12 @@ export default function Inventory({ session }: { session: AdminSession }) {
 
   const canManage =
     session.user.permissions.includes("*") ||
-    session.user.permissions.includes("inventory:manage");
+    session.user.permissions.includes("stock:manage") ||
+    session.user.permissions.includes("warehouse_catalog:manage");
   const canView =
     canManage ||
-    session.user.permissions.includes("inventory:view") ||
+    session.user.permissions.includes("stock:view") ||
+    session.user.permissions.includes("warehouse_catalog:view") ||
     session.user.permissions.includes("warehouses:view") ||
     session.user.permissions.includes("warehouses:manage");
 
@@ -568,18 +566,13 @@ export default function Inventory({ session }: { session: AdminSession }) {
 
   return (
     <>
-      <div className="admin-heading" style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div>
-          <h1>Offerings &amp; stock</h1>
-          <p>What each warehouse sells: price, availability and stock, all in one place.</p>
-        </div>
+      <div className="admin-heading" style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", justifyContent: "space-between" }}>
+        <WarehousePicker warehouses={visibleWarehouses} value={warehouseId} onChange={chooseWarehouse} />
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button className="admin-text-button" onClick={() => setAttempt((v) => v + 1)}>Reload</button>
           {canManage && <button className="admin-role-button" style={{ minHeight: 44 }} onClick={() => setAdding(!adding)}>{adding ? "Close" : "+ Add products"}</button>}
         </div>
       </div>
-
-      <WarehousePicker warehouses={visibleWarehouses} value={warehouseId} onChange={chooseWarehouse} />
 
       <OfferingsTab warehouseId={warehouseId} canManage={canManage} pictures={lookups.pictures} categories={lookups.categories} attempt={attempt} setAttempt={setAttempt} adding={adding} setAdding={setAdding} />
     </>

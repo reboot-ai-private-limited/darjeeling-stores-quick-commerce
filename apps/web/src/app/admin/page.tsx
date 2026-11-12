@@ -113,7 +113,7 @@ export default function AdminPage() {
     (item === "Zones & localities" && can("zones:manage") && session.user.scope.all) ||
     (item === "Warehouses" && (can("warehouses:view") || can("warehouses:manage"))) ||
     (item === "Products & categories" && (can("catalog:manage") || can("catalog:view"))) ||
-    (item === "Offerings & stock" && (can("inventory:manage") || can("inventory:view") || can("warehouses:view") || can("warehouses:manage"))) ||
+    (item === "Offerings & stock" && (can("stock:manage") || can("stock:view") || can("warehouse_catalog:manage") || can("warehouse_catalog:view") || can("warehouses:view") || can("warehouses:manage"))) ||
     (item === "Dispatch board" && can("dispatch:manage")) ||
     (item === "Riders & fleet" && (can("riders:manage") || can("riders:view"))) ||
     (item === "Cash & settlement" && can("cash:manage")) ||
