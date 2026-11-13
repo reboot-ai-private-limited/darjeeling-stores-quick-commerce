@@ -28,6 +28,13 @@ export const paymentMessage = (e: unknown): string => {
   return e instanceof Error ? e.message : "Something went wrong with the payment.";
 };
 
+/**
+ * Razorpay sends the customer back to this address when a payment attempt ends (it is never really opened: the app catches it first).
+ * Redirect mode is what makes netbanking, wallets and card verification work inside an app, because they need the bank's page and
+ * an embedded browser cannot open pop-ups. The result itself still comes from the server (webhook), so nothing is read from this address.
+ */
+export const PAYMENT_RETURN_URL = "https://example.com/darjeeling-payment-return";
+
 /** The page Razorpay's standard checkout runs in. It reports back to the app through postMessage. */
 export const checkoutHtml = (c: CheckoutData, prefill: { name?: string; phone?: string }) => `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#f7f3ea;font-family:sans-serif;display:flex;align-items:center;justify-content:center;color:#7a6f66}</style></head><body><div>Opening secure payment…</div>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -37,7 +44,7 @@ try{
   var rzp=new Razorpay({
     key:${JSON.stringify(c.razorpayKeyId)}, order_id:${JSON.stringify(c.razorpayOrderId)}, amount:${c.amount}, currency:${JSON.stringify(c.currency)},
     name:"Darjeeling Stores", prefill:{name:${JSON.stringify(prefill.name ?? "")},contact:${JSON.stringify(prefill.phone ?? "")}},
-    theme:{color:"#401815"},
+    theme:{color:"#401815"}, redirect:true, callback_url:${JSON.stringify(PAYMENT_RETURN_URL)},
     handler:function(r){send({type:"success",data:r});},
     modal:{ondismiss:function(){send({type:"dismissed"});}}
   });

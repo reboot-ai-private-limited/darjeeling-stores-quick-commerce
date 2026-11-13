@@ -60,6 +60,10 @@ export default function Pay() {
       handled.current = true;
       try { await verifyPayment(id, e.data); } catch (err) { setMsg(paymentMessage(err)); }
       void confirm();
+    } else if (e.type === "returned") {
+      // Back from the bank or card page: the server (webhook) decides whether it worked.
+      handled.current = true;
+      void confirm();
     } else if (e.type === "failed") { handled.current = true; setMsg(e.reason); setPhase("failed"); }
     else if (e.type === "dismissed") { handled.current = true; setMsg("Payment was cancelled."); setPhase("failed"); }
     else { handled.current = true; setMsg("Couldn't open the payment page. Check your internet connection."); setPhase("failed"); }
@@ -69,7 +73,7 @@ export default function Pay() {
 
   if (phase === "checkout" && data) {
     return (
-      <Screen pad={false}>
+      <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title="Pay securely" subtitle="Your order is held for a few minutes" /></View>
         <RazorpayCheckout key={attempt} data={data} prefill={prefill} onEvent={e => void onEvent(e)} />
       </Screen>
@@ -93,7 +97,7 @@ export default function Pay() {
           <>
             <View style={[s.icon, { backgroundColor: colors.redSoft }]}><Icon name="x" size={34} color={colors.red} /></View>
             <Text style={type.h2}>Payment not completed</Text>
-            <Text style={[type.small, { textAlign: "center" }]}>{msg || "Something went wrong."} Your order is kept for a few minutes so you can try again.</Text>
+            <Text style={[type.small, { textAlign: "center" }]}>{msg || "Something went wrong."}{!msg || /[.!?]$/.test(msg) ? "" : "."} Your order is kept for a few minutes so you can try again.</Text>
             <Button label="Try again" icon="refresh-cw" onPress={() => void start(true)} style={s.btn} />
             <Button label="View my order" variant="soft" onPress={viewOrder} style={s.btn} />
           </>

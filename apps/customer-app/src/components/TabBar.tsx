@@ -14,6 +14,8 @@ const TABS: Record<string, { label: string; icon: IconName }> = {
 
 /** Height of the floating bar (tab row plus padding), without the bottom safe-area gap. */
 export const TAB_BAR_H = 68;
+/** Space between the floating bar and the phone's own navigation buttons / gesture line, so the two never run together. */
+export const TAB_BAR_GAP = 10;
 
 type Route = { key: string; name: string };
 export type BarProps = {
@@ -30,7 +32,7 @@ export function TabBar({ state, emitter, navigateToTab }: BarProps) {
   const slide = useAnimatedStyle(() => ({ transform: [{ translateX: withTiming(state.index * tabW, { duration: 260, easing: Easing.out(Easing.cubic) }) }] }), [state.index, tabW]);
 
   return (
-    <View style={[s.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
+    <View style={[s.wrap, { paddingBottom: insets.bottom + TAB_BAR_GAP }]} pointerEvents="box-none">
       <View style={s.bar} onLayout={e => setW(e.nativeEvent.layout.width - 12)}>
         <Animated.View style={[s.blob, { width: tabW }, slide]}><View style={s.blobInner} /></Animated.View>
         {state.routes.map((route, i) => {
