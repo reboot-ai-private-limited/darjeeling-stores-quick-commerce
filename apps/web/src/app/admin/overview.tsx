@@ -49,7 +49,7 @@ export default function Overview({ session, onNavigate }: { session: AdminSessio
   const attention = data ? ([
     { label: "Delayed orders", value: data.delayedOrders, colour: RED, open: go("Orders", "orders:view") },
     { label: "Riders yet to confirm", value: data.unacknowledgedAssignments, colour: RED, open: go("Dispatch board", "dispatch:manage") },
-    { label: "Pending refunds", value: data.pendingRefunds, colour: AMBER, open: undefined },
+    { label: "Pending refunds", value: data.pendingRefunds, colour: AMBER, open: go("Payments & refunds", "refunds:manage") },
     { label: "Low stock items", value: data.lowStock, colour: AMBER, open: go("Offerings & stock", "stock:view") },
     { label: "Deliveries to review", value: data.offlineDeliveryReviews, colour: AMBER, open: go("Cash & settlement", "cash:manage") },
     { label: "Cash items to reconcile", value: data.reconciliationOpen, colour: AMBER, open: go("Cash & settlement", "cash:manage") },

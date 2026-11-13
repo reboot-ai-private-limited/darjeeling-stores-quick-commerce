@@ -12,6 +12,7 @@ import Inventory from "./inventory";
 import Dispatch from "./dispatch";
 import Riders from "./riders";
 import CashDesk from "./cash";
+import PaymentsDesk from "./payments";
 import Notifications from "./notifications";
 import Overview from "./overview";
 import Orders from "./orders";
@@ -25,7 +26,7 @@ const groups = [
   { label: "Workspace", items: ["Overview", "Orders"] },
   { label: "Operations", items: ["Dispatch board"] },
   { label: "Fleet", items: ["Riders & fleet"] },
-  { label: "Finance", items: ["Cash & settlement"] },
+  { label: "Finance", items: ["Payments & refunds", "Cash & settlement"] },
   { label: "Engagement", items: ["Notifications & demand", "Coupons", "Banners"] },
   { label: "Organization", items: ["Warehouses", "Zones & localities", "Staff", "Roles & permissions"] },
   { label: "Catalog", items: ["Products & categories"] },
@@ -37,6 +38,7 @@ const iconPaths: Record<string, string> = {
   Orders: "M7 3h10l3 4v14H4V7z M4 7h16 M9 11h6 M9 15h6",
   "Dispatch board": "M12 2L2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5",
   "Riders & fleet": "M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z M12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z",
+  "Payments & refunds": "M3 7h18v12H3z M3 11h18 M7 15h4",
   "Cash & settlement": "M12 2v20 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
   "Notifications & demand": "M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9",
   Warehouses: "M3 21V8l9-5 9 5v13 M3 21h18 M8 21V11h8v10 M8 15h8",
@@ -117,6 +119,7 @@ export default function AdminPage() {
     (item === "Dispatch board" && can("dispatch:manage")) ||
     (item === "Riders & fleet" && (can("riders:manage") || can("riders:view"))) ||
     (item === "Cash & settlement" && can("cash:manage")) ||
+    (item === "Payments & refunds" && (can("refunds:manage") || can("payments:view"))) ||
     ((item === "Coupons" || item === "Banners") && can("pricing:manage")) ||
     (item === "Notifications & demand" && (can("notifications:manage") || can("notify_demand:view")));
   return <div className="admin-shell">
@@ -151,7 +154,7 @@ export default function AdminPage() {
             </button>
           </div>
           {geoTab === "zones" ? <ZonesEditor session={session} /> : <CitiesLocalities />}
-        </div> : section === "Coupons" ? <Coupons session={session} /> : section === "Banners" ? <Banners session={session} /> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : section === "Offerings & stock" ? <Inventory session={session} /> : section === "Dispatch board" ? <Dispatch session={session} /> : section === "Riders & fleet" ? <Riders session={session} /> : section === "Cash & settlement" ? <CashDesk session={session} /> : section === "Notifications & demand" ? <Notifications session={session} /> : section === "Orders" ? <Orders session={session} /> : section === "Settings" ? <Settings session={session} /> : <Overview session={session} onNavigate={setSection} />}
+        </div> : section === "Coupons" ? <Coupons session={session} /> : section === "Banners" ? <Banners session={session} /> : section === "Warehouses" ? <Warehouses session={session} /> : section === "Products & categories" ? <Catalog session={session} /> : section === "Offerings & stock" ? <Inventory session={session} /> : section === "Dispatch board" ? <Dispatch session={session} /> : section === "Riders & fleet" ? <Riders session={session} /> : section === "Cash & settlement" ? <CashDesk session={session} /> : section === "Payments & refunds" ? <PaymentsDesk session={session} /> : section === "Notifications & demand" ? <Notifications session={session} /> : section === "Orders" ? <Orders session={session} /> : section === "Settings" ? <Settings session={session} /> : <Overview session={session} onNavigate={setSection} />}
         <footer className="admin-footer"><span>Darjeeling Stores</span><span>Administration workspace</span></footer>
       </main>
     </div>
