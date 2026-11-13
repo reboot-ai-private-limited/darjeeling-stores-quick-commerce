@@ -1,7 +1,8 @@
 export type RefundReason = "cancelled" | "item_unavailable" | "late_payment" | "damaged_item" | "missing_item" | "overpaid" | "other";
 export type RefundSource = "auto" | "customer_request" | "admin";
 export type RefundStatus = "requested" | "approved" | "done" | "rejected";
-export type RefundMethod = "razorpay_dashboard" | "upi" | "cash";
+/** `razorpay_api` is sent back through Razorpay by this system; the others are paid by hand and recorded. */
+export type RefundMethod = "razorpay_api" | "razorpay_dashboard" | "upi" | "cash";
 
 export interface Refund {
   id: string; groupId: string; orderId: string; orderNo: string; userId: string; warehouseId: string; paymentMethod: "cod" | "online";

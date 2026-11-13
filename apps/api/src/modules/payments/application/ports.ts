@@ -30,6 +30,8 @@ export interface PaymentProvider {
   verifyWebhook(rawBody: Buffer | undefined, signature: string | undefined): boolean;
   createPaymentLink(input: { amount: number; reference: string; description: string; expiresAt: Date; customer: { name: string; phone: string } }): Promise<{ id: string; url: string; upiIntentUrl: string | null }>;
   capturesOn(from: Date, to: Date): Promise<ProviderCapture[]>;
+  /** Sends money back to the customer's original payment method. `key` makes a repeated call a single refund. */
+  refund(input: { paymentId: string; amount: number; key: string; notes?: Record<string, string> }): Promise<{ id: string }>;
 }
 
 export interface GroupAccess {

@@ -12,9 +12,9 @@ const REASON_OF: Record<AutoRefundInput["kind"], RefundReason> = {
   cancel: "cancelled", item_removed: "item_unavailable", failed_delivery: "cancelled", overpaid: "overpaid", late_payment: "late_payment",
 };
 
-/** Refunds are manual in version one: the admin pays outside the system and records it here (F16). */
+/** An admin either pays a refund outside the system and records it, or sends it back through Razorpay from here (F16). */
 export function createRefundService(deps: RefundDeps) {
-  const { store, orders, media, eligibility, notifier, settings, now, newId } = deps;
+  const { store, orders, media, eligibility, notifier, gateway, settings, now, newId } = deps;
 
   /** Money already promised back for an order, rejected ones left out. */
   async function committed(orderId: string): Promise<number> {
@@ -31,6 +31,26 @@ export function createRefundService(deps: RefundDeps) {
     if (!refund) throw notFound("Refund");
     assertWarehouseScope(ctx.actor, refund.warehouseId);
     return refund;
+  }
+
+  /** Paying this must not take the order's refunds past what it cost. */
+  async function assertWithinOrder(refund: Refund): Promise<void> {
+    const order = await orders.get(refund.orderId);
+    if (!order) return;
+    const done = (await store.forOrder(refund.orderId)).filter(r => r.status === "done" && r.id !== refund.id).reduce((sum, r) => sum + r.amount, 0);
+    if (done + refund.amount > orderTotal(order)) throw new AppError("REFUND_EXCEEDS_AMOUNT", "Paying this would refund more than the order cost", { refundable: orderTotal(order) - done });
+  }
+  async function markDone(ctx: Ctx, id: string, input: { method: RefundMethod; reference: string | null; note: string | null }) {
+    const refund = await load(ctx, id);
+    await assertWithinOrder(refund);
+    const next = { status: "done" as const, method: input.method, reference: input.reference, note: input.note ?? refund.note, decidedBy: refund.decidedBy ?? ctx.actor.userId, markedDoneAt: now() };
+    if (!(await store.decide(id, ["requested", "approved"], next))) {
+      throw conflict("This refund is already closed", { status: (await store.get(id))?.status });
+    }
+    await syncOrder(refund.orderId);
+    const updated = { ...refund, ...next };
+    await notifier.done(refund.userId, updated).catch(() => undefined);
+    return refundView(updated);
   }
 
   return {
@@ -151,21 +171,16 @@ export function createRefundService(deps: RefundDeps) {
     },
 
     /** The admin has paid it outside the system. A second click changes nothing. */
-    async markDone(ctx: Ctx, id: string, input: { method: RefundMethod; reference: string | null; note: string | null }) {
+    markDone,
+
+    /** Sends the money back through Razorpay and closes the refund. Pressing it twice refunds once, because Razorpay is given this refund's id as the key. */
+    async payViaGateway(ctx: Ctx, id: string) {
       const refund = await load(ctx, id);
-      const order = await orders.get(refund.orderId);
-      if (order) {
-        const done = (await store.forOrder(refund.orderId)).filter(r => r.status === "done" && r.id !== id).reduce((sum, r) => sum + r.amount, 0);
-        if (done + refund.amount > orderTotal(order)) throw new AppError("REFUND_EXCEEDS_AMOUNT", "Paying this would refund more than the order cost", { refundable: orderTotal(order) - done });
-      }
-      const next = { status: "done" as const, method: input.method, reference: input.reference, note: input.note ?? refund.note, decidedBy: refund.decidedBy ?? ctx.actor.userId, markedDoneAt: now() };
-      if (!(await store.decide(id, ["requested", "approved"], next))) {
-        throw conflict("This refund is already closed", { status: (await store.get(id))?.status });
-      }
-      await syncOrder(refund.orderId);
-      const updated = { ...refund, ...next };
-      await notifier.done(refund.userId, updated).catch(() => undefined);
-      return refundView(updated);
+      if (refund.paymentMethod !== "online") throw conflict("This order was paid on delivery, so there is nothing to send back through Razorpay", { reason: "not_online" });
+      if (!OPEN.includes(refund.status)) throw conflict("This refund is already closed", { status: refund.status });
+      await assertWithinOrder(refund);
+      const sent = await gateway.refund({ groupId: refund.groupId, amount: refund.amount, key: refund.id });
+      return markDone(ctx, id, { method: "razorpay_api", reference: sent.id, note: null });
     },
   };
 }

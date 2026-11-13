@@ -2,7 +2,7 @@
 
 Spec: [F16](../orders/16-cancellations-and-refunds.md) · Conventions: [00](00-conventions.md)
 
-Refunds are **manual in v1**: the admin pays outside the system (Razorpay dashboard, UPI or cash) and then clicks **Mark refund done**. Admin cancel of an order is `POST /admin/orders/:id/cancel` in [F14](F14-order-lifecycle-and-packing.md).
+Refunds for online orders can be sent back through Razorpay with one click (**Refund via Razorpay**, `pay-via-razorpay`); any refund can also be paid outside the system (Razorpay dashboard, UPI or cash) and recorded with **Mark refund done**. Admin cancel of an order is `POST /admin/orders/:id/cancel` in [F14](F14-order-lifecycle-and-packing.md).
 
 ## Endpoints
 
@@ -17,6 +17,7 @@ Refunds are **manual in v1**: the admin pays outside the system (Razorpay dashbo
 | `POST` | `/admin/refunds` | Admin `refunds:manage` | Create a refund by hand 🔒 |
 | `POST` | `/admin/refunds/:id/approve` | Admin `refunds:manage` | Approve a customer request 🔒 |
 | `POST` | `/admin/refunds/:id/reject` | Admin `refunds:manage` | Reject with a reason 🔒 |
+| `POST` | `/admin/refunds/:id/pay-via-razorpay` | Admin `refunds:manage` | Send the money back through Razorpay and close the refund 🔒 |
 | `POST` | `/admin/refunds/:id/mark-done` | Admin `refunds:manage` | Record that it was paid 🔒 |
 
 ## Object: refund
@@ -89,6 +90,9 @@ Body: `{ "orderId": "ord_1", "amount": 1500, "reason": "other", "note": "Goodwil
 
 ## POST /admin/refunds/:id/approve · reject
 Approve: no body. Reject: `{ "reason": "Photo does not show damage" }` (required). 200: the refund. The customer is notified. Errors: `409 CONFLICT` (wrong status).
+
+## POST /admin/refunds/:id/pay-via-razorpay
+No body. Only for a refund on an order paid online that is still `requested` or `approved`. It refunds the captured Razorpay payment of the order (Razorpay is given the refund id as an idempotency key, so a repeat click never refunds twice), then closes the refund as `status: "done"`, `method: "razorpay_api"`, `reference` = the Razorpay refund id. 200: the refund. Errors: `409 CONFLICT` with `details.reason` `not_online` (cash order), `no_captured_payment` (no online payment was received) or `exceeds_payment`; `409` (already closed); `422 REFUND_EXCEEDS_AMOUNT`; `503 SERVICE_UNAVAILABLE` (Razorpay not set up or unreachable; the refund stays open).
 
 ## POST /admin/refunds/:id/mark-done
 Body:

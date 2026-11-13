@@ -193,6 +193,14 @@ export function createPaymentService(deps: PaymentDeps) {
       return { ...paymentView(p), groupNo: g?.groupNo ?? null, customerName: g?.customerName ?? null, lastEvent: last && { type: last.type, result: last.result, at: last.at.toISOString() } };
     },
 
+    /** Sends money back through Razorpay for a group that was paid online. Calling it again with the same key refunds once. */
+    async refundOnline(input: { groupId: string; amount: number; key: string }): Promise<{ id: string }> {
+      const paid = (await store.forGroup(input.groupId)).filter(p => p.method === "razorpay" && p.status === "captured" && p.razorpayPaymentId).at(-1);
+      if (!paid) throw conflict("No online payment was received for this order, so there is nothing to send back through Razorpay", { reason: "no_captured_payment" });
+      if (input.amount > paid.amount) throw conflict("That is more than the customer paid online", { reason: "exceeds_payment", paid: paid.amount });
+      return provider.refund({ paymentId: paid.razorpayPaymentId!, amount: input.amount, key: input.key, notes: { groupId: input.groupId } });
+    },
+
     /** Compares one day's captures at Razorpay with ours. */
     async reconcile(ctx: Ctx, date?: string) {
       wholeBusiness(ctx);

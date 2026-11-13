@@ -10,6 +10,7 @@ export function createFakePayments() {
   const orders: { id: string; amount: number; receipt: string }[] = [];
   const links: { id: string; amount: number; reference: string; url: string }[] = [];
   const captures: ProviderCapture[] = [];
+  const refunds: { id: string; paymentId: string; amount: number; key: string }[] = [];
   const state = { fail: false };
   let counter = 0;
   const provider: PaymentProvider = {
@@ -28,12 +29,20 @@ export function createFakePayments() {
       return { id: link.id, url: link.url, upiIntentUrl: `upi://pay?pa=shop@bank&am=${amount / 100}&tn=${reference}` };
     },
     async capturesOn() { return captures.map(c => ({ ...c })); },
+    async refund({ paymentId, amount, key }) {
+      if (state.fail) throw new Error("provider is down");
+      const seen = refunds.find(r => r.key === key);
+      if (seen) return { id: seen.id };
+      const refund = { id: `rfnd_${++counter}`, paymentId, amount, key };
+      refunds.push(refund);
+      return { id: refund.id };
+    },
   };
   return {
-    provider, orders, links, captures, state,
+    provider, orders, links, captures, refunds, state,
     sign: (raw: string) => createHmac("sha256", WEBHOOK_SECRET).update(raw).digest("hex"),
     checkoutSignature: (orderId: string, paymentId: string) => checkoutSignature(orderId, paymentId, KEY_SECRET),
-    reset() { orders.length = 0; links.length = 0; captures.length = 0; state.fail = false; counter = 0; },
+    reset() { orders.length = 0; links.length = 0; captures.length = 0; refunds.length = 0; state.fail = false; counter = 0; },
   };
 }
 export type FakePayments = ReturnType<typeof createFakePayments>;
