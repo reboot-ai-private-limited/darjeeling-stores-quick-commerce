@@ -30,7 +30,7 @@ function Stat({ icon, label, value, i, tint }: { icon: React.ComponentProps<type
 }
 
 export default function Home() {
-  const { shift, toggleBreak, deliveredToday, cashInHand, pendingSync, active, orders, me, refreshOrders, warehouses, switchStore } = useStore();
+  const { ringing, shift, toggleBreak, deliveredToday, cashInHand, pendingSync, active, orders, me, refreshOrders, warehouses, switchStore } = useStore();
   const [picking, setPicking] = useState(false);
   async function chooseStore(id: string) {
     setPicking(false);
@@ -89,6 +89,18 @@ export default function Home() {
           ))}</Card>
         )}
         {breakError ? <Text style={{ color: colors.red, fontWeight: "700", fontSize: 13, marginTop: 10 }}>{breakError}</Text> : null}
+        {ringing ? (
+          <Press onPress={() => router.push("/new-delivery")} haptic style={{ marginTop: picking ? 12 : 52 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.yellow, borderRadius: 20, padding: 16 }}>
+              <Icon name="bell" size={24} color={colors.maroon} />
+              <View style={{ flex: 1 }}>
+                <Text style={[type.body, { fontWeight: "900", color: colors.maroon }]}>New delivery waiting</Text>
+                <Text style={[type.small, { color: colors.maroon }]}>{ringing.orders.map(o => o.orderNo).join(" + ")} · tap to accept</Text>
+              </View>
+              <Icon name="chevron-right" size={20} color={colors.maroon} />
+            </View>
+          </Press>
+        ) : null}
         <View style={s.stats}>
           <Stat i={2} icon="check-circle" label="Delivered today" value={String(delivered)} tint={colors.greenSoft} />
           <Stat i={3} icon="credit-card" label="Cash in hand" value={`₹${cash.toLocaleString("en-IN")}`} tint={colors.yellowSoft} />

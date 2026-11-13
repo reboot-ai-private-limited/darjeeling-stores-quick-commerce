@@ -1,18 +1,10 @@
-import { Redirect, router, Tabs, usePathname } from "expo-router";
-import { useEffect } from "react";
+import { Redirect, Tabs } from "expo-router";
 import { TabBar, type BarProps } from "../../components/TabBar";
 import { useStore } from "../../state/store";
 
 export default function TabsLayout() {
-  const { signedIn, shift, ringing } = useStore();
-  const pathname = usePathname();
-
-  // A new assignment arrived and has not been accepted: open the alarm over whatever the rider is doing.
-  const ringingId = ringing?.id;
-  useEffect(() => {
-    if (ringingId && !shift.onBreak && pathname !== "/alarm") router.push("/alarm");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ringingId]);
+  // A new assignment no longer takes over the screen: the phone rings through the notification, and Home shows a "New delivery waiting" banner.
+  const { signedIn, shift } = useStore();
 
   if (!signedIn) return <Redirect href="/login" />;
   if (!shift.on) return <Redirect href="/start-shift" />;
