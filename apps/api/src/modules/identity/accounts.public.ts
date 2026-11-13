@@ -77,7 +77,7 @@ export function createRiderIdentity(connection: Connection): RiderIdentity {
       if (!PHONE.test(phone)) return { ok: false, reason: "phone_used" };
       const role = await connection.collection("roles").findOne({ name: "rider", isSystem: true });
       if (!role) throw new Error("The rider role is missing; start the API once so the roles are created");
-      if (await users().findOne({ phone }, { projection: { _id: 1 } })) return { ok: false, reason: "phone_used" };
+      if (await users().findOne({ phone, kind: "rider" }, { projection: { _id: 1 } })) return { ok: false, reason: "phone_used" };
       const now = new Date();
       const _id = new Types.ObjectId();
       try {

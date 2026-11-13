@@ -36,6 +36,12 @@ const schema = sessionSettings.extend({
   UPI_PAYEE_NAME: z.string().trim().min(1).max(60).optional(),
   /** Road travel times for ETAs (Google Routes). Without it the straight-line estimate is used. */
   GOOGLE_MAPS_API_KEY: z.string().trim().min(10).max(200).optional(),
+  /** Sends login codes by SMS through StartMessaging. Both the key and the template id are needed; without them code delivery answers 503. */
+  STARTMESSAGING_API_KEY: z.string().trim().min(10).max(200).optional(),
+  STARTMESSAGING_TEMPLATE_ID: z.string().trim().min(1).max(100).optional(),
+  /** The {{appName}} the template shows in the message. */
+  STARTMESSAGING_APP_NAME: z.string().trim().min(1).max(40).default("Darjeeling Stores"),
+  STARTMESSAGING_BASE_URL: z.url().default("https://api.startmessaging.com"),
   PUBLIC_APP_CONFIG_JSON: z.string().default("{}").transform((value, context) => {
     try { return JSON.parse(value) as unknown; }
     catch { context.addIssue({ code: "custom", message: "Must be valid JSON" }); return z.NEVER; }
@@ -51,6 +57,7 @@ const schema = sessionSettings.extend({
 }).superRefine((config, context) => {
   if (config.mockOTP && config.NODE_ENV !== "development") context.addIssue({ code: "custom", path: ["mockOTP"], message: "Mock OTP requires development mode" });
   if (config.mockOTP && !config.JWT_SECRET) context.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "JWT signing key required" });
+  if (Boolean(config.STARTMESSAGING_API_KEY) !== Boolean(config.STARTMESSAGING_TEMPLATE_ID)) context.addIssue({ code: "custom", path: ["STARTMESSAGING_TEMPLATE_ID"], message: "Set the StartMessaging key and template id together" });
   if (config.UPI_VPA && !config.UPI_PAYEE_NAME) context.addIssue({ code: "custom", path: ["UPI_PAYEE_NAME"], message: "Name the UPI payee together with the UPI address" });
   if (durationSeconds(config.ACCESS_TOKEN_TTL) >= durationSeconds(config.REFRESH_TOKEN_TTL)) context.addIssue({ code: "custom", path: ["REFRESH_TOKEN_TTL"], message: "Refresh lifetime must exceed access lifetime" });
   const secure = config.AUTH_COOKIE_SECURE === undefined ? config.NODE_ENV === "production" : config.AUTH_COOKIE_SECURE === "true";

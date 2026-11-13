@@ -37,11 +37,17 @@ describe("identity persistence", () => {
   it("permits only one concurrent claimant of a normalized phone", async () => {
     const results = await Promise.allSettled([
       store.createUser({ kind: "customer", roleId, phone: "+91 98000-00003" }),
-      store.createUser({ kind: "rider", roleId, phone: "+919800000003" }),
+      store.createUser({ kind: "customer", roleId, phone: "+919800000003" }),
     ]);
     expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
     const rejected = results.find(result => result.status === "rejected");
     expect(rejected?.status === "rejected" && rejected.reason).toMatchObject({ code: 11000 });
+  });
+
+  it("lets one phone number hold one account of each kind", async () => {
+    await store.createUser({ kind: "customer", roleId, phone: "+919800000004" });
+    await store.createUser({ kind: "rider", roleId, phone: "+919800000004" });
+    await expect(store.createUser({ kind: "rider", roleId, phone: "+919800000004" })).rejects.toMatchObject({ code: 11000 });
   });
 
   it("rejects missing identifiers, malformed references and client-controlled authority", async () => {

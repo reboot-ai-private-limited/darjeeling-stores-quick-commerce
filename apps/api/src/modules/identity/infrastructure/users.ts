@@ -37,7 +37,8 @@ const userSchema = new Schema({
 }, { timestamps: true, strict: "throw", collection: "users" });
 
 userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: "string" } } });
-userSchema.index({ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
+// One phone number can hold one account of each kind, so the same person can sign in to the customer app and the rider app with one number.
+userSchema.index({ phone: 1, kind: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
 userSchema.index({ kind: 1, status: 1, _id: 1 });
 userSchema.index({ kind: 1, roleId: 1, _id: 1 });
 
@@ -45,6 +46,8 @@ export function createIdentityStore(connection: Connection) {
   const users = connection.model("IdentityUser", userSchema);
   return {
     async initialize(): Promise<void> {
+      // The earlier index allowed a phone number on one account only; drop it so the per-kind index below can take over.
+      try { await connection.collection("users").dropIndex("phone_1"); } catch { /* Already gone, or the collection is new. */ }
       await users.createIndexes();
     },
     async lockActiveStaff(id: Types.ObjectId, session: ClientSession) {

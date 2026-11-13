@@ -10,6 +10,7 @@ import { accessCredential, clearSessionCookies, setSessionCookies, trustedCookie
 import { nativeClient } from "./interface/native-session.js";
 import { deletionRequest, deviceInput, fcmToken, IdentityError, otpRequest, otpVerify, phoneRequest, phoneVerify, profileUpdate } from "./domain/consumer-policy.js";
 export type { ConsumerOptions, OtpTransport } from "./infrastructure/otp.js";
+export { createStartMessagingTransport } from "./infrastructure/startmessaging-transport.js";
 
 export async function createConsumerRoutes(connection: Connection, jwtSecret: string, options: ConsumerOptions, origins: readonly string[] = [], secureCookies = false, settings = sessionSettings.parse({})): Promise<Route[]> {
   const otp = createOtpService(connection, jwtSecret, options, settings);
