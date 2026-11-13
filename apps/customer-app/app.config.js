@@ -12,10 +12,13 @@ module.exports = ({ config }) => {
   if (!hasFirebaseFile && process.env.EAS_BUILD_PROFILE === "production") {
     throw new Error("google-services.json is missing from apps/customer-app. Download it from the Firebase console, or the release build cannot receive notifications.");
   }
+  const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!mapsKey) console.warn("[customer-app] GOOGLE_MAPS_API_KEY is not set: the app will close when a map screen opens in a release build.");
   if (!hasFirebaseFile) console.warn("[customer-app] google-services.json not found: builds will not receive push notifications until you add it.");
   return {
     ...config,
-    android: { ...config.android, ...(hasFirebaseFile ? { googleServicesFile: file } : {}) },
+    // The map screens need a Google Maps key in a real build; without one the app closes as soon as a map opens.
+    android: { ...config.android, ...(hasFirebaseFile ? { googleServicesFile: file } : {}), ...(mapsKey ? { config: { ...(config.android?.config ?? {}), googleMaps: { apiKey: mapsKey } } } : {}) },
     plugins: [
       ...(config.plugins ?? []),
       // Release builds shrink the code; these rules stop it removing classes the notification and background-work libraries need at start-up.
