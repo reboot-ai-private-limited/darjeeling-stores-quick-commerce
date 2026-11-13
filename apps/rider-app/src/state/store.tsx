@@ -3,6 +3,8 @@ import Constants from "expo-constants";
 import * as Location from "expo-location";
 import { AppState } from "react-native";
 import { loadSession, setSignedOutHandler } from "../api/http";
+import { unregisterPush } from "../push";
+import { startBackgroundTracking, stopBackgroundTracking } from "../tracking";
 import {
   endShift as apiEndShift, getAppConfig, getAssignments, getCash, getMe, resumeShift, sendLocation, signOutRemote, startBreak, startShift as apiStartShift, switchWarehouse,
   type ActiveOrder, type Assignment, type AssignmentEvent, type LatLng, type RiderMe, type RiderWarehouse,
@@ -155,6 +157,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { stopped = true; if (timer) clearTimeout(timer); };
   }, [signedIn, onShift, onBreakNow]);
 
+  // On shift and not on break: keep sharing the position when the app is in the background or the phone is locked (real builds only).
+  useEffect(() => {
+    if (signedIn && onShift && !onBreakNow) void startBackgroundTracking();
+    else void stopBackgroundTracking();
+  }, [signedIn, onShift, onBreakNow]);
+
   const value = useMemo<Ctx>(() => {
     const warehouse = me?.warehouses.find(w => w.id === (me.currentShift?.warehouseId ?? me.currentWarehouseId)) ?? null;
     const shift: Shift = { on: !!me?.currentShift, onBreak: me?.status === "on_break", startedAt: me?.currentShift ? Date.parse(me.currentShift.startedAt) : null, warehouse };
@@ -172,7 +180,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       startShift: async (warehouseId, location, accuracyM) => { const r = await apiStartShift(warehouseId, location, accuracyM); await refresh(); return r.punchIn; },
       toggleBreak: async () => { if (me?.status === "on_break") await resumeShift(); else await startBreak(); await refresh(); },
       endShift: async () => { await apiEndShift(); await refresh(); },
-      signOut: async () => { await signOutRemote(); localSignOut(); },
+      signOut: async () => { await stopBackgroundTracking(); await unregisterPush(); await signOutRemote(); localSignOut(); },
       switchStore: async warehouseId => { await switchWarehouse(warehouseId); await refresh(); }, blocked,
       rememberOtp: (orderId, otp) => { otps.current[orderId] = otp; }, otpOf: orderId => otps.current[orderId] ?? null,
     };

@@ -27,7 +27,7 @@ export function TabBar({ state, emitter, navigateToTab }: BarProps) {
   const slide = useAnimatedStyle(() => ({ transform: [{ translateX: withTiming(state.index * tabW, { duration: 260, easing: Easing.out(Easing.cubic) }) }] }), [state.index, tabW]);
 
   return (
-    <View style={[s.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
+    <View style={[s.wrap, { paddingBottom: insets.bottom + 10 }]} pointerEvents="box-none">
       <View style={s.bar} onLayout={e => setW(e.nativeEvent.layout.width - 12)}>
         <Animated.View style={[s.blob, { width: tabW }, slide]}><View style={s.blobInner} /></Animated.View>
         {state.routes.map((route, i) => {

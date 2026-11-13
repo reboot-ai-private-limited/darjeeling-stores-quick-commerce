@@ -149,6 +149,18 @@ describe("picking up", () => {
     expect((await f.get("/admin/dispatch/alerts")).body.data).toEqual([]);
   });
 
+  it("cannot pick up an order that is still being packed, only once packing is done", async () => {
+    const r = await onShift();
+    const { order } = await assigned(r, { status: "PACKING" });
+    const early = await pickup(r, order.id);
+    expect(early.status).toBe(409);
+    expect(early.body.error).toMatchObject({ code: "INVALID_TRANSITION", details: { reason: "still_packing" } });
+    f.orders.setStatus(order.id, "READY");
+    await f.mods.dispatch.hooks.onOrderReady(order.id);
+    expect((await pickup(r, order.id)).status).toBe(200);
+    expect(f.orders.get(order.id).status).toBe("PICKED_UP");
+  });
+
   it("needs the items checked, an order that is the rider's own, and the right state", async () => {
     const r = await onShift();
     const other = await onShift();

@@ -136,7 +136,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
 
   it("registers every endpoint documented for F16 cancellations and refunds", () => {
     const expected = documented("F16-cancellations-and-refunds.md");
-    expect(expected).toHaveLength(10);
+    expect(expected).toHaveLength(11);
     expect(expected.filter(e => !registered.includes(e))).toEqual([]);
   });
 
@@ -151,7 +151,7 @@ describe("Dev 2 routes (catalog, stock, import and Notify Me)", () => {
       ["F04-master-catalog.md", "F05-warehouse-stock-and-pricing.md", "F06-product-import-and-admin-tree.md", "F07-notify-me.md", "F08-discovery-and-location.md", "F09-addresses.md", "F10-cart-and-quote.md", "F11-delivery-fees-and-surcharges.md", "F12-coupons-and-offers.md", "F13-order-placement-and-split-orders.md", "F14-order-lifecycle-and-packing.md", "F15-payments.md", "F16-cancellations-and-refunds.md", "F17-hours-preorders-and-ops-mode.md", "F18-dispatch-and-assignment.md", "F19-rider-app.md", "F20-eta-and-live-tracking.md", "F21-offline-and-low-network.md", "F22-rider-cash-and-settlement.md", "F23-notifications.md", "F24-media-storage.md"].flatMap(documented),
     );
     expect(registered.filter(r => !expected.has(r))).toEqual([]);
-    expect(registered).toHaveLength(205);
+    expect(registered).toHaveLength(206);
   });
 
   it("has no duplicate routes of its own and none that clash with the rest of the API", () => {

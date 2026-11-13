@@ -244,7 +244,7 @@ export function createDev2Modules(options: Dev2Options = {}) {
       riderOf: async orderId => { const id = await dispatch.field.riderOfOrder(orderId); const r = id ? await riders.service.byId(id) : null; return r && { id: r.id, name: r.name, phone: r.phone }; },
       ordersOf: riderId => dispatch.field.liveOrderIds(riderId),
     },
-    dispatch: { cancelled: orderId => dispatch.hooks.onOrderCancelled(orderId), paid: orderId => dispatch.hooks.onOrderPaid(orderId) },
+    dispatch: { cancelled: orderId => dispatch.hooks.onOrderCancelled(orderId), paid: orderId => dispatch.hooks.onOrderPaid(orderId), ready: orderId => dispatch.hooks.onOrderReady(orderId) },
     link: orderId => { try { return tracking.service.link(orderId); } catch { return null; } },
     notifier: {
       placed: async (userId, group, orderNos) => { await notifications.notify({ userId, templateKey: "customer_order_placed", channels: ["push"], vars: { orderNo: orderNos.join(", ") }, data: { type: "order", groupId: group.id }, dedupeKey: `order:${group.id}:placed` }); },
@@ -273,6 +273,8 @@ export function createDev2Modules(options: Dev2Options = {}) {
       customerCancel: (userId, orderId, reason) => orders.service.customerCancel(userId, orderId, reason),
     },
     media: { claim: async ({ mediaId, userId, orderId }) => { await media.service.claimOwned({ mediaId, userId, kind: "refund_photo", owner: { type: "order", id: orderId } }); } },
+    // Sends the money back through Razorpay. `payments` is built just below and only used once an admin presses the button.
+    gateway: { refund: input => payments.service.refundOnline(input) },
     notifier: {
       approved: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_approved", channels: ["push"], vars: { orderNo: r.orderNo, amount: String(r.amount / 100) }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:approved` }); },
       rejected: async (userId, r) => { await notifications.notify({ userId, templateKey: "customer_refund_rejected", channels: ["push"], vars: { orderNo: r.orderNo, reason: r.rejectReason ?? "" }, data: { type: "refund", refundId: r.id }, dedupeKey: `refund:${r.id}:rejected` }); },

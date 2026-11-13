@@ -16,72 +16,119 @@ const hrefOf = (b: Banner): string | null => {
   return b.linkValue;
 };
 
-/** Picture-only promo banners (no overlaid text). Two sit side by side on wider screens; the strip auto-advances until touched. */
+/**
+ * Picture-only promo banners (no overlaid text). Two sit side by side on wider screens.
+ * The strip loops forever: it holds three copies of the banners and quietly jumps back to the middle copy whenever it nears either end,
+ * so it can be swiped (or auto-advance) in the same direction without ever reaching a last banner.
+ */
 export const BannerCarousel: React.FC<BannerCarouselProps> = ({ banners }) => {
   const trackRef = useRef<HTMLDivElement>(null);
-  const touched = useRef(false);
+  const lastTouch = useRef(0);
   const [index, setIndex] = useState(0);
   useDragScroll(trackRef);
 
-  const perView = () => (typeof window !== "undefined" && window.innerWidth >= 640 ? 2 : 1);
-  const lastStart = useCallback(() => Math.max(0, banners.length - perView()), [banners.length]);
+  const n = banners.length;
+  const loop = n > 1;
+  const copies = loop ? 3 : 1;
 
-  const goTo = useCallback((i: number) => {
+  /** The distance from one banner to the next, and the width of one full copy of the banners. */
+  const measure = useCallback(() => {
     const el = trackRef.current;
-    const slide = el?.children[i] as HTMLElement | undefined;
-    if (!el || !slide) return;
-    el.scrollTo({ left: slide.offsetLeft - el.offsetLeft, behavior: "smooth" });
-    setIndex(i);
+    const first = el?.children[0] as HTMLElement | undefined;
+    if (!el || !first) return null;
+    const step = first.offsetWidth + 12;
+    return { el, step, setWidth: step * n };
+  }, [n]);
+
+  const jump = useCallback((el: HTMLElement, left: number) => {
+    // Scroll snapping would fight an instant jump, so it is paused for that moment.
+    el.style.scrollSnapType = "none";
+    el.style.scrollBehavior = "auto";
+    el.scrollLeft = left;
+    requestAnimationFrame(() => {
+      el.style.scrollSnapType = "";
+      el.style.scrollBehavior = "";
+    });
   }, []);
 
+  // Start on the middle copy, and keep there if the window is resized.
   useEffect(() => {
-    if (banners.length < 2) return;
+    if (!loop) return;
+    const place = () => {
+      const m = measure();
+      if (m) jump(m.el, m.setWidth + (m.el.scrollLeft % m.step));
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [loop, measure, jump, banners]);
+
+  // After a swipe settles near the first or last copy, move to the same picture in the middle copy.
+  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onScroll = () => {
+    const m = measure();
+    if (!m) return;
+    const { el, step, setWidth } = m;
+    const pos = Math.round((el.scrollLeft - (loop ? setWidth : 0)) / step);
+    setIndex(((pos % n) + n) % n);
+    if (!loop) return;
+    clearTimeout(settle.current);
+    settle.current = setTimeout(() => {
+      if (el.scrollLeft < setWidth * 0.5) jump(el, el.scrollLeft + setWidth);
+      else if (el.scrollLeft > setWidth * 1.5) jump(el, el.scrollLeft - setWidth);
+    }, 140);
+  };
+  useEffect(() => () => clearTimeout(settle.current), []);
+
+  // Move on by one picture every four seconds, and stay still for a few seconds after someone touches the strip.
+  useEffect(() => {
+    if (!loop) return;
     const t = setInterval(() => {
-      if (touched.current) return;
-      const max = lastStart();
-      if (max === 0) return;
-      goTo(index >= max ? 0 : index + 1);
+      if (Date.now() - lastTouch.current < 8000) return;
+      const m = measure();
+      if (m) m.el.scrollBy({ left: m.step, behavior: "smooth" });
     }, 4000);
     return () => clearInterval(t);
-  }, [banners.length, index, lastStart, goTo]);
+  }, [loop, measure]);
+
+  const goToDot = (i: number) => {
+    lastTouch.current = Date.now();
+    const m = measure();
+    if (!m) return;
+    const base = Math.floor(m.el.scrollLeft / m.setWidth) * m.setWidth;
+    m.el.scrollTo({ left: base + i * m.step, behavior: "smooth" });
+  };
 
   if (!banners || banners.length === 0) return null;
 
-  const single = banners.length === 1;
-  const dots = Math.max(1, banners.length - perView() + 1);
+  const single = n === 1;
+  const slides = Array.from({ length: copies }).flatMap((_, c) => banners.map((b) => ({ b, c })));
 
   return (
     <div style={{ position: "relative" }}>
-      <div
-        ref={trackRef}
-        className="banner-track"
-        onPointerDown={() => (touched.current = true)}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          const first = el.children[0] as HTMLElement | undefined;
-          if (first) setIndex(Math.round(el.scrollLeft / (first.offsetWidth + 12)));
-        }}
-      >
-        {banners.map((b) => {
+      <div ref={trackRef} className="banner-track" onPointerDown={() => (lastTouch.current = Date.now())} onWheel={() => (lastTouch.current = Date.now())} onScroll={onScroll}>
+        {slides.map(({ b, c }) => {
           const href = hrefOf(b);
           const img = (
             <div className="banner-slide-img" style={{ background: "var(--yellow)" }}>
               {b.imageUrl ? (
-                <img src={b.imageUrl} alt={b.title} draggable={false} />
+                <img src={b.imageUrl} alt={c === 0 || !loop ? b.title : ""} draggable={false} />
               ) : (
                 <span style={{ color: "var(--maroon)", fontWeight: 900, fontSize: 22, padding: 20, alignSelf: "flex-end" }}>{b.title}</span>
               )}
             </div>
           );
           return (
-            <div key={b.id} className={`banner-slide${single ? " single" : ""}`}>
+            <div key={`${c}-${b.id}`} className={`banner-slide${single ? " single" : ""}`} aria-hidden={loop && c !== 1 ? true : undefined}>
               {href ? (
                 href.startsWith("http") ? (
-                  <a href={href} target="_blank" rel="noopener noreferrer">
+                  <a href={href} target="_blank" rel="noopener noreferrer" tabIndex={loop && c !== 1 ? -1 : undefined}>
                     {img}
                   </a>
                 ) : (
-                  <Link href={href}>{img}</Link>
+                  <Link href={href} tabIndex={loop && c !== 1 ? -1 : undefined}>
+                    {img}
+                  </Link>
                 )
               ) : (
                 img
@@ -91,16 +138,13 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ banners }) => {
         })}
       </div>
 
-      {dots > 1 && (
+      {loop && (
         <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
-          {Array.from({ length: dots }).map((_, i) => (
+          {banners.map((b, i) => (
             <button
-              key={i}
+              key={b.id}
               aria-label={`Banner ${i + 1}`}
-              onClick={() => {
-                touched.current = true;
-                goTo(i);
-              }}
+              onClick={() => goToDot(i)}
               style={{ width: i === index ? 18 : 6, height: 6, borderRadius: 3, background: i === index ? "var(--maroon)" : "var(--line)", transition: "all .2s" }}
             />
           ))}

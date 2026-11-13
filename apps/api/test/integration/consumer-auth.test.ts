@@ -43,7 +43,14 @@ describe("customer and rider F01 endpoints", () => {
     const response = await login("9800000002", "rider");
     expect(response.status).toBe(200);
     expect(response.body.data.user.kind).toBe("rider");
-    expect((await request(app).post("/api/v1/auth/request-otp").send({ phone: "9800000002", app: "customer" })).status).toBe(403);
+    // The same number can also be a customer: a separate customer account is made, and the rider account is untouched.
+    const asCustomer = await login("9800000002", "customer");
+    expect(asCustomer.status).toBe(200);
+    expect(asCustomer.body.data.user.kind).toBe("customer");
+    expect(asCustomer.body.data.isNewUser).toBe(true);
+    expect(asCustomer.body.data.user.id).not.toBe(response.body.data.user.id);
+    expect(await db.collection("users").countDocuments({ phone: "+919800000002" })).toBe(2);
+    expect((await login("9800000002", "rider")).body.data.user.id).toBe(response.body.data.user.id);
   });
   it("consumes a login code exactly once under concurrency and stores no plaintext code", async () => {
     const phone = "9800000010";

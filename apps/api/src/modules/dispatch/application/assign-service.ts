@@ -14,6 +14,8 @@ export type GroupDispatch =
 export interface FailedResolution { action: "redispatch" | "cancel_return"; goodsCondition?: "good" | "spoiled" | undefined; note?: string | null | undefined }
 
 const POST_PICKUP = ["PICKED_UP", "OUT_FOR_DELIVERY", "ARRIVED"];
+/** An order still being prepared can be given a rider early; it becomes "assigned" the moment packing is marked done. */
+const PRE_PACK = ["CONFIRMED", "PACKING"];
 /** A message to a rider must never undo a dispatch decision that has already been made. */
 const quietly = (work: Promise<unknown>) => work.catch(() => undefined);
 
@@ -57,9 +59,13 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
     if (opts.batch && (opts.batch.status !== "planned" || opts.batch.riderId !== rider.id || !opts.batch.orderIds.includes(order.id))) {
       throw conflict("This order is not in a planned batch for this rider", { batchId: opts.batch.id, reason: "batch_mismatch" });
     }
+    const early = PRE_PACK.includes(order.status);
+    if (early && opts.batch) throw conflict("A batch can only hold ready orders", { reason: "batch_mismatch" });
     // Claim the rider's capacity first: two admins assigning at once can never put a rider over the limit.
     if (!(await riders.reserveCapacity(rider.id, settings.maxActiveOrders))) throw eligibilityError(["at_capacity"]);
-    const moved = await orders.transition(order.id, "ASSIGNED", orderActorOf(opts.who), { riderId: rider.id });
+    if (early && (await store.liveForOrder(order.id))) { await riders.releaseCapacity(rider.id); throw conflict("This order already has a rider: change or unassign them first", { reason: "already_assigned" }); }
+    // An order still being packed keeps its status; the rider is alerted now and the order turns "assigned" once packing is done.
+    const moved = early ? { ok: true as const, order } : await orders.transition(order.id, "ASSIGNED", orderActorOf(opts.who), { riderId: rider.id });
     if (!moved.ok) { await riders.releaseCapacity(rider.id); throw transitionError(moved, "ASSIGNED"); }
     const at = now();
     const assignment: Assignment = {
@@ -70,7 +76,7 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
     };
     try { await store.insertAssignment(assignment); }
     catch (error) {
-      await orders.transition(order.id, "READY", { kind: "system", id: "dispatch" });
+      if (!early) await orders.transition(order.id, "READY", { kind: "system", id: "dispatch" });
       await riders.releaseCapacity(rider.id);
       throw error;
     }
@@ -99,9 +105,10 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
     async suggestions(ctx: Ctx, orderId: string) {
       const order = await orderFor(ctx, orderId);
       const changing = order.status === "ASSIGNED" || POST_PICKUP.includes(order.status);
-      if (order.status !== "READY" && !changing) throw invalidTransition(order, "Only a ready or assigned order can be given to a rider");
+      const early = PRE_PACK.includes(order.status);
+      if (order.status !== "READY" && !changing && !early) throw invalidTransition(order, "Only an order that is confirmed, being packed, ready or assigned can be given to a rider");
       // For an order that already has a rider, suggest the others (the current rider is left out).
-      const current = changing ? await store.liveForOrder(orderId) : null;
+      const current = changing || early ? await store.liveForOrder(orderId) : null;
       const { ranked, ineligible } = await candidates(order, { ...(current && { excludeRiderId: current.riderId }), ignoreWarehouse: POST_PICKUP.includes(order.status) });
       return {
         orderId, currentRiderId: current?.riderId ?? null,
@@ -138,7 +145,7 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
     async assign(ctx: Ctx, orderId: string, input: { riderId: string; batchId: string | null }) {
       const order = await orderFor(ctx, orderId);
       const rider = await riderFor(input.riderId);
-      if (order.status !== "READY") throw invalidTransition(order, order.status === "ASSIGNED" ? "The order is already assigned: unassign it first" : "Only a ready order can be assigned");
+      if (order.status !== "READY" && !PRE_PACK.includes(order.status)) throw invalidTransition(order, order.status === "ASSIGNED" ? "The order is already assigned: unassign it first" : "Only an order that is confirmed, being packed or ready can be assigned");
       const batch = input.batchId ? await store.getBatch(input.batchId) : null;
       if (input.batchId && !batch) throw notFound("Batch");
       const done = await assignOrder(order, rider, { who: { kind: "admin", ctx }, mode: "manual", batch });
@@ -147,6 +154,13 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
 
     async unassign(ctx: Ctx, orderId: string, reason: string | null) {
       const order = await orderFor(ctx, orderId);
+      if (PRE_PACK.includes(order.status)) {
+        // Given a rider before packing was done: just take the rider back; the order itself is unchanged.
+        const early = await store.liveForOrder(orderId);
+        if (!early) throw invalidTransition(order, "The order is not assigned");
+        await takeBack(early, reason ?? "unassigned", order);
+        return { order: { id: orderId, status: order.status } };
+      }
       if (order.status !== "ASSIGNED") throw invalidTransition(order, POST_PICKUP.includes(order.status) ? "The order was already picked up: use a hand-over" : "The order is not assigned", { reason: POST_PICKUP.includes(order.status) ? "after_pickup" : "not_assigned" });
       const live = await store.liveForOrder(orderId);
       const moved = await orders.transition(orderId, "READY", { kind: "admin", id: ctx.actor.userId }, { reason });
@@ -203,7 +217,7 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
     /** Before pickup: gives an assigned order to a different rider in one step. The first rider's alarm is cancelled, the new rider's rings. */
     async reassign(ctx: Ctx, orderId: string, input: { toRiderId: string; reason?: string | null | undefined }) {
       const order = await orderFor(ctx, orderId);
-      if (order.status !== "ASSIGNED") throw invalidTransition(order, POST_PICKUP.includes(order.status) ? "The order was already picked up: use a hand-over" : "Only an assigned order can be given to another rider");
+      if (order.status !== "ASSIGNED" && !PRE_PACK.includes(order.status)) throw invalidTransition(order, POST_PICKUP.includes(order.status) ? "The order was already picked up: use a hand-over" : "Only an assigned order can be given to another rider");
       const old = await store.liveForOrder(orderId);
       if (!old) throw notFound("Assignment");
       if (old.riderId === input.toRiderId) throw validation("The order is already with that rider", { field: "toRiderId" });
@@ -305,6 +319,16 @@ export function createAssignService(deps: DispatchDeps, batches: BatchService) {
       const live = await store.liveForOrder(orderId);
       const order = await orders.get(orderId);
       if (live && order) await takeBack(live, "order_cancelled", order);
+    },
+
+    /** Packing was marked done: an order that was given a rider early now becomes assigned, so the rider can pick it up. */
+    async onOrderReady(orderId: string): Promise<void> {
+      const live = await store.liveForOrder(orderId);
+      const order = await orders.get(orderId);
+      if (!live || !order || order.status !== "READY") return;
+      const moved = await orders.transition(orderId, "ASSIGNED", { kind: "system", id: "dispatch" }, { riderId: live.riderId });
+      if (!moved.ok) return;
+      await store.appendFeed({ riderId: live.riderId, assignmentId: live.id, orderId, event: "updated", at: now() });
     },
 
     /** The customer's payment arrived: the rider must not collect cash. */

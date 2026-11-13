@@ -5,7 +5,7 @@ import { createDevOtpRoutes } from "./modules/identity/dev-otp.public.js";
 import { createAdministrationRoutes } from "./modules/identity/administration.public.js";
 import { createStaffAuthRoutes } from "./modules/identity/staff-auth.public.js";
 import { createSessionRoutes } from "./modules/identity/session.public.js";
-import { createConsumerRoutes } from "./modules/identity/consumer.public.js";
+import { createConsumerRoutes, createStartMessagingTransport } from "./modules/identity/consumer.public.js";
 import { createGeographyModule } from "./modules/geography/geography.public.js";
 import { createStaffActorResolver, trustedCookieMutation } from "./modules/identity/session.public.js";
 import { createAppConfigModule } from "./modules/settings/app-config.public.js";
@@ -34,7 +34,13 @@ async function main() {
   try {
     if (config.JWT_SECRET) additionalRoutes.push(...await createStaffAuthRoutes(mongoose.connection, config.JWT_SECRET, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
     if (config.JWT_SECRET && !config.mockOTP) additionalRoutes.push(...createSessionRoutes(mongoose.connection, config.JWT_SECRET, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
-    if (config.JWT_SECRET && !config.mockOTP) additionalRoutes.push(...await createConsumerRoutes(mongoose.connection, config.JWT_SECRET, { mode: config.NODE_ENV, mockOTP: false }, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
+    if (config.JWT_SECRET && !config.mockOTP) {
+      const transport = config.STARTMESSAGING_API_KEY && config.STARTMESSAGING_TEMPLATE_ID
+        ? createStartMessagingTransport({ apiKey: config.STARTMESSAGING_API_KEY, templateId: config.STARTMESSAGING_TEMPLATE_ID, appName: config.STARTMESSAGING_APP_NAME, baseUrl: config.STARTMESSAGING_BASE_URL })
+        : undefined;
+      if (!transport) console.warn(JSON.stringify({ event: "otp_delivery_not_configured" }));
+      additionalRoutes.push(...await createConsumerRoutes(mongoose.connection, config.JWT_SECRET, { mode: config.NODE_ENV, mockOTP: false, ...(transport && { transport }) }, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
+    }
   } catch { console.error(JSON.stringify({ event: "staff_auth_initialization_failed" })); await disconnectDatabase(); process.exitCode = 1; return; }
   try {
     const geography = createGeographyModule({

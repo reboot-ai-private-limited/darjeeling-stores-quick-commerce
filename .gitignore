@@ -8,3 +8,27 @@ coverage/
 .env.*
 !.env.example
 *.log
+
+# Secrets and credentials: never commit these
+# Firebase: the server's service-account key (has a private key) and each app's config
+*firebase-adminsdk*.json
+firebase-adminSdk*.json
+*service-account*.json
+*serviceAccount*.json
+google-services.json
+GoogleService-Info.plist
+# App signing keys and certificates
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pem
+*.mobileprovision
+credentials.json
+# Expo local state and generated native folders
+.expo/
+apps/*/android/
+apps/*/ios/
+# Local scratch and logs
+.metro*.log
+.tmp-*.log

@@ -45,7 +45,7 @@ export const OrderAgainCard: React.FC = () => {
     <div
       className="card"
       style={{
-        marginTop: 24,
+        marginTop: 12,
         padding: "16px 20px",
         display: "flex",
         alignItems: "center",

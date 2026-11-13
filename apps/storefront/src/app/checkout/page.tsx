@@ -99,7 +99,7 @@ export default function CheckoutPage() {
         const def = addrs.find((a) => a.isDefault) ?? addrs[0] ?? null;
         setSelectedAddress(def);
       })
-      .catch(() => undefined);
+      .catch((err: unknown) => setError(err instanceof Error ? `Could not load your addresses: ${err.message}` : "Could not load your addresses."));
 
     if (zone) {
       getPreorderSlots(zone.id)
@@ -111,6 +111,9 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (zone) getTipOptions(zone.id).then(setTips).catch(() => setTips(null));
   }, [zone]);
+
+  // Only a change in what is in the cart (not a price refresh from the server) asks for a new bill, so the first load makes one quote, not two.
+  const cartKey = lines.map((l) => `${l.variantId}:${l.qty}`).join("|");
 
   // Request quote whenever address, paymentMethod, tip, or slot changes
   useEffect(() => {
@@ -170,7 +173,7 @@ export default function CheckoutPage() {
     return () => {
       stale = true;
     };
-  }, [selectedAddress, paymentMethod, tipPaise, isPreorder, selectedSlot, acceptZoneChange, lines, requoteTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedAddress, paymentMethod, tipPaise, isPreorder, selectedSlot, acceptZoneChange, cartKey, requoteTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlaceOrder = async () => {
     if (!quote || !selectedAddress) return;
@@ -180,6 +183,16 @@ export default function CheckoutPage() {
     const idempotencyKey = newIdempotencyKey();
 
     try {
+      // Online orders are paid right here. Make sure the payment window can open before the order (and its stock hold) is created.
+      if (paymentMethod === "online") {
+        for (let i = 0; i < 50 && !window.Razorpay; i++) await new Promise((r) => setTimeout(r, 100));
+        if (!window.Razorpay) {
+          setPlacing(false);
+          setError("The payment window could not load. Check your connection and try again.");
+          return;
+        }
+      }
+
       const res = await placeOrder(
         {
           quoteId: quote.id,
@@ -192,8 +205,13 @@ export default function CheckoutPage() {
       clearCart();
 
       // If COD or no online payment needed
-      if (paymentMethod === "cod" || !res.payment) {
+      if (paymentMethod === "cod") {
         router.push(`/order-placed?id=${res.group.id}`);
+        return;
+      }
+      // An online order is never "placed" until it is paid. If the payment could not be started, the pay page tries again.
+      if (!res.payment) {
+        router.push(`/pay/${res.group.id}`);
         return;
       }
 
@@ -223,7 +241,8 @@ export default function CheckoutPage() {
                 razorpayPaymentId: resp.razorpay_payment_id,
                 razorpaySignature: resp.razorpay_signature,
               });
-              router.push(`/order-placed?id=${res.group.id}`);
+              // The bank's answer is only provisional. The pay page waits for the server to confirm the payment, then opens "order placed".
+              router.push(`/pay/${res.group.id}`);
             } catch {
               router.push(`/pay/${res.group.id}`);
             }
@@ -289,7 +308,7 @@ export default function CheckoutPage() {
 
   return (
     <main className="page-container" style={{ padding: "20px 16px 40px", maxWidth: 980, margin: "0 auto" }}>
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <Link href="/cart" style={{ color: "var(--maroon)", display: "flex" }}>
@@ -523,9 +542,15 @@ export default function CheckoutPage() {
                     <span style={{ fontSize: 14, fontWeight: 800 }}>Cash on Delivery</span>
                   </div>
                   <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                    {quote?.payment.codAllowed
-                      ? `Pay exact amount ${rupees(quote?.pricing.total ?? subtotal)} in cash at the door`
-                      : "Cash on delivery not available for this address or order value"}
+                    {!quote
+                      ? !selectedAddress ? "Choose a delivery address to see if cash on delivery is available" : quoting ? "Checking cash on delivery…" : "Cash on delivery is shown once the bill is ready. See the message below if it could not be calculated"
+                      : quote.payment.codAllowed
+                        ? `Pay exact amount ${rupees(quote.pricing.total)} in cash at the door`
+                        : quote.payment.codMaxAmount === 0
+                          ? "Cash on delivery is turned off for this area"
+                          : quote.payment.codMaxAmount !== undefined && quote.pricing.total > quote.payment.codMaxAmount
+                            ? `Cash on delivery is available only up to ${rupees(quote.payment.codMaxAmount)}. Pay online for this order`
+                            : "Cash on delivery is turned off for your account. Pay online instead"}
                   </p>
                 </div>
               </label>
@@ -603,6 +628,13 @@ export default function CheckoutPage() {
                 </div>
               )}
 
+              {!quote && selectedAddress && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Delivery fee</span>
+                  <span style={{ color: "var(--muted)" }}>Calculating…</span>
+                </div>
+              )}
+
               {quote && !quote.pricing.charges.some((c) => c.type === "delivery_fee") && (
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: "var(--muted)" }}>Delivery fee</span>
@@ -676,15 +708,25 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <Button
-              variant="primary"
-              onClick={handlePlaceOrder}
-              disabled={!selectedAddress || !quote || quoting}
-              loading={placing}
-              style={{ width: "100%", padding: "16px 20px", marginTop: 20, fontSize: 16 }}
-            >
-              {paymentMethod === "cod" ? "Confirm & Place COD Order" : `Pay ${rupees(quote?.pricing.total ?? subtotal)} & Place Order`}
-            </Button>
+            {selectedAddress ? (
+              <Button
+                variant="primary"
+                onClick={handlePlaceOrder}
+                disabled={!quote || quoting}
+                loading={placing}
+                style={{ width: "100%", padding: "16px 20px", marginTop: 20, fontSize: 16 }}
+              >
+                {paymentMethod === "cod" ? "Confirm & Place COD Order" : `Pay ${rupees(quote?.pricing.total ?? subtotal)} & Place Order`}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => setAddressModalOpen(true)}
+                style={{ width: "100%", padding: "16px 20px", marginTop: 20, fontSize: 16 }}
+              >
+                Add delivery address to continue
+              </Button>
+            )}
           </div>
         </div>
       </div>

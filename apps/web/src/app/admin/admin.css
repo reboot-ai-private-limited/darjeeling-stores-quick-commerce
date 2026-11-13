@@ -237,3 +237,10 @@
 
 /* Visually hidden, still read by screen readers */
 .admin-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* "Low stock only" and similar checkbox filters: tick box beside its text, level with the other filter controls */
+.admin-staff-filters label.admin-check { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; min-height: 44px; min-width: 0; white-space: nowrap; cursor: pointer; }
+.admin-staff-filters label.admin-check input[type="checkbox"] { width: 18px; min-height: 18px; height: 18px; padding: 0; margin: 0; flex: 0 0 auto; accent-color: var(--admin-accent); }
+
+/* Warehouse picker sitting in the page's top row */
+.admin-heading .admin-wh-picker { margin: 0; padding: 0; border-bottom: 0; }

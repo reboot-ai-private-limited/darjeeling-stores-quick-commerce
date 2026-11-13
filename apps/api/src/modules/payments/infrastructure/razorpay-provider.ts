@@ -9,11 +9,11 @@ export function createRazorpayProvider(config: RazorpayConfig): PaymentProvider 
   const base = config.baseUrl ?? "https://api.razorpay.com/v1";
   const call = config.fetch ?? fetch;
   const auth = `Basic ${Buffer.from(`${config.keyId}:${config.keySecret}`).toString("base64")}`;
-  async function api<T>(path: string, init: { method?: "GET" | "POST"; body?: unknown } = {}): Promise<T> {
+  async function api<T>(path: string, init: { method?: "GET" | "POST"; body?: unknown; headers?: Record<string, string> } = {}): Promise<T> {
     let response: Response;
     try {
       response = await call(`${base}${path}`, {
-        method: init.method ?? "GET", headers: { Authorization: auth, "Content-Type": "application/json" },
+        method: init.method ?? "GET", headers: { Authorization: auth, "Content-Type": "application/json", ...init.headers },
         ...(init.body !== undefined && { body: JSON.stringify(init.body) }), signal: AbortSignal.timeout(10_000),
       });
     } catch { throw new AppError("SERVICE_UNAVAILABLE", "The payment service is not reachable. Please try again."); }
@@ -37,6 +37,12 @@ export function createRazorpayProvider(config: RazorpayConfig): PaymentProvider 
       });
       return { id: link.id, url: link.short_url, upiIntentUrl: link.short_url.startsWith("upi://") ? link.short_url : null };
     },
+    async refund({ paymentId, amount, key, notes }) {
+      const refund = await api<{ id: string }>(`/payments/${encodeURIComponent(paymentId)}/refund`, {
+        method: "POST", headers: { "X-Refund-Idempotency": key }, body: { amount, speed: "normal", ...(notes && { notes }) },
+      });
+      return { id: refund.id };
+    },
     async capturesOn(from, to) {
       const out: ProviderCapture[] = [];
       for (let skip = 0; skip < 5000; skip += 100) {
@@ -57,6 +63,7 @@ export const unconfiguredProvider: PaymentProvider = {
   verifyWebhook: () => false,
   createPaymentLink: async () => { throw new AppError("SERVICE_UNAVAILABLE", "Online payment is not set up yet"); },
   capturesOn: async () => { throw new AppError("SERVICE_UNAVAILABLE", "Online payment is not set up yet"); },
+  refund: async () => { throw new AppError("SERVICE_UNAVAILABLE", "Online payment is not set up yet"); },
 };
 
 export function razorpayFromEnv(env: Record<string, string | undefined>): PaymentProvider {

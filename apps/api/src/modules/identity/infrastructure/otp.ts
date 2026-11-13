@@ -14,6 +14,9 @@ type Challenge = { _id: string; nonce: string; phone: string; app: "customer" | 
   consumedAt: Date | null; sent: boolean };
 const ttlSeconds = 300, maxAttempts = 5, maxPerHour = 5;
 /** A fixed demo customer for testing. Like the development owner it is exempt from the code request limit, and it only exists while the development login (mockOTP) is on. */
+/** A phone number can hold one account per kind (customer, rider, staff), so the same person can sign in to either app with one number. */
+const kindOf = (app: "customer" | "rider" | "admin") => (app === "admin" ? "staff" : app) as "customer" | "rider" | "staff";
+
 export const DEMO_CUSTOMER_PHONE = "+919000000002";
 type Failure = { error: IdentityError };
 
@@ -74,7 +77,7 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
     const developmentOwner = options.mockOTP && input.app === "admin";
     const demoCustomer = options.mockOTP && input.app === "customer" && input.phone === DEMO_CUSTOMER_PHONE && !user;
     if (!developmentOwner && !demoCustomer) await quota(input.phone, ip, user?._id);
-    const existing = await users.findOne({ phone: input.phone });
+    const existing = await users.findOne({ phone: input.phone, kind: kindOf(input.app) });
     if (user) {
       if (existing) throw new IdentityError(409, "CONFLICT", "Phone number is already in use");
     } else if (input.app === "admin") {
@@ -126,7 +129,7 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
       if (customer) {
         const user = await activeCustomer(token!, session);
         if (String(user._id) !== String(challenge.userId) || user.phone !== challenge.sourcePhone || (user.credentialRevision ?? 0) !== challenge.revision) return { error: new IdentityError(401, "INVALID_OTP", "Request a new phone-change code") } satisfies Failure;
-        if (await users.findOne({ phone: input.phone }, { session })) return { error: new IdentityError(409, "CONFLICT", "Phone number is already in use") } satisfies Failure;
+        if (await users.findOne({ phone: input.phone, kind: "customer" }, { session })) return { error: new IdentityError(409, "CONFLICT", "Phone number is already in use") } satisfies Failure;
         await users.updateOne({ _id: user._id }, { $set: { phone: input.phone, updatedAt: new Date() }, $inc: { credentialRevision: 1 } }, { session });
         await challenges.deleteMany({ userId: user._id, _id: { $ne: id } }, { session });
         await sessions.revokeOtherSessions(user._id, token!, session);
@@ -135,7 +138,7 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
       const roleRow = await connection.collection("roles").findOne({ name: challenge.app === "admin" ? "super_admin" : challenge.app }, { session });
       const role = roleRow ? await access.lockRole(roleRow._id, session) : null;
       if (!role || !role.isSystem || (challenge.app !== "admin" && role.permissions.includes("*"))) throw new IdentityError(403, "FORBIDDEN", "Account unavailable");
-      let user = await users.findOneAndUpdate({ phone: input.phone }, { $inc: { authorizationRevision: 1 } }, { session, returnDocument: "after" });
+      let user = await users.findOneAndUpdate({ phone: input.phone, kind: kindOf(challenge.app) }, { $inc: { authorizationRevision: 1 } }, { session, returnDocument: "after" });
       const isNewUser = !user;
       if (!user && challenge.app === "customer") {
         user = { _id: new Types.ObjectId(), kind: "customer", roleId: role._id, phone: input.phone, name: "", status: "active", scope: { all: false, warehouseIds: [] }, devMockAccount: options.mockOTP, credentialRevision: 0, createdAt: new Date(), updatedAt: new Date() };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
@@ -15,6 +15,8 @@ export default function PaymentStatusPage({ params }: { params: Promise<{ id: st
   const [status, setStatus] = useState<string>("confirming");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [scriptReady, setScriptReady] = useState(false);
+  const autoOpened = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -46,12 +48,14 @@ export default function PaymentStatusPage({ params }: { params: Promise<{ id: st
     };
   }, [groupId, router]);
 
-  const handleRetry = async () => {
+  const openCheckout = async () => {
     setRetrying(true);
     setErrorMsg(null);
     try {
       const checkoutData = await retryPayment(groupId);
-      if (window.Razorpay) {
+      if (!window.Razorpay) {
+        setErrorMsg("The payment window is still loading. Please try again in a moment.");
+      } else {
         const rzp = new window.Razorpay({
           key: checkoutData.razorpayKeyId,
           order_id: checkoutData.razorpayOrderId,
@@ -85,9 +89,16 @@ export default function PaymentStatusPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  // Someone who closed the payment window, or arrived before it was ready, lands here still unpaid: open it for them once.
+  useEffect(() => {
+    if (status !== "awaiting_payment" || !scriptReady || autoOpened.current) return;
+    autoOpened.current = true;
+    void openCheckout();
+  }, [status, scriptReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <main className="page-container" style={{ textAlign: "center", padding: "80px 16px", maxWidth: 480, margin: "0 auto" }}>
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />
 
       {status === "confirming" && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
@@ -105,6 +116,21 @@ export default function PaymentStatusPage({ params }: { params: Promise<{ id: st
           <p style={{ color: "var(--muted)", fontSize: 14 }}>
             Please wait while we verify transaction details with your bank and confirm your fresh groceries order.
           </p>
+        </div>
+      )}
+
+      {status === "awaiting_payment" && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <h2 className="title">Complete your payment</h2>
+          <p style={{ color: "var(--muted)", fontSize: 14 }}>
+            {errorMsg ?? "Your order is placed and your items are held for you. Pay now to confirm it."}
+          </p>
+          <Button variant="primary" onClick={openCheckout} loading={retrying} style={{ width: "100%", padding: "14px", marginTop: 8 }}>
+            Pay now
+          </Button>
+          <Link href={`/orders/${groupId}`} style={{ fontSize: 14, fontWeight: 700, color: "var(--maroon)", marginTop: 8 }}>
+            View Order Details →
+          </Link>
         </div>
       )}
 
@@ -131,7 +157,7 @@ export default function PaymentStatusPage({ params }: { params: Promise<{ id: st
 
           <Button
             variant="primary"
-            onClick={handleRetry}
+            onClick={openCheckout}
             loading={retrying}
             style={{ width: "100%", padding: "14px", marginTop: 8 }}
           >

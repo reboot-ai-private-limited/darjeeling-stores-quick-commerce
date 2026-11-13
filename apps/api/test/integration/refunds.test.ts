@@ -289,6 +289,42 @@ describe("the admin's refunds", () => {
     expect(results.map(r => r.status).sort()).toEqual([200, 409, 409]);
   });
 
+  describe("sending the money back through Razorpay", () => {
+    async function prepaidCancelled(captured = true) {
+      const o = await order(tomatoes(2), "online");
+      const refund = (await cancelOwn(o.id)).body.data.refund as { id: string; amount: number };
+      if (captured) {
+        await col("payments").insertOne({ _id: "9".repeat(23) + "a", groupId: o.group.id, userId: CUSTOMER_A, method: "razorpay", amount: refund.amount, status: "captured", attempt: 1, razorpayOrderId: "order_x", razorpayPaymentId: "pay_x", razorpayLinkId: null, linkUrl: null, signatureVerified: true, failureReason: null, flag: null, expiresAt: null, capturedAt: new Date(), createdAt: new Date(), updatedAt: new Date() } as never);
+      }
+      return { o, refund };
+    }
+
+    it("refunds the captured payment, records the Razorpay refund id, and a second click refunds nothing more", async () => {
+      const { o, refund } = await prepaidCancelled();
+      const res = await post(`/admin/refunds/${refund.id}/pay-via-razorpay`);
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(res.body.data).toMatchObject({ status: "done", method: "razorpay_api", reference: expect.stringMatching(/^rfnd_/) });
+      expect(f.razorpay.refunds).toEqual([{ id: res.body.data.reference, paymentId: "pay_x", amount: refund.amount, key: refund.id }]);
+      expect((await col("orders").findOne({ _id: o.id as never }))?.refundStatus).toBe("done");
+      expect((await post(`/admin/refunds/${refund.id}/pay-via-razorpay`)).status).toBe(409);
+      expect(f.razorpay.refunds).toHaveLength(1);
+    });
+
+    it("does not call Razorpay for a cash order, a missing payment, a viewer, or when Razorpay is down", async () => {
+      const cash = (await waiting()).refund;
+      expect((await post(`/admin/refunds/${cash.id}/pay-via-razorpay`)).body.error).toMatchObject({ code: "CONFLICT", details: { reason: "not_online" } });
+      const missing = (await prepaidCancelled(false)).refund;
+      expect((await post(`/admin/refunds/${missing.id}/pay-via-razorpay`)).body.error).toMatchObject({ details: { reason: "no_captured_payment" } });
+      const { refund } = await prepaidCancelled();
+      expect((await post(`/admin/refunds/${refund.id}/pay-via-razorpay`, undefined, viewer)).status).toBe(403);
+      f.razorpay.state.fail = true;
+      expect((await post(`/admin/refunds/${refund.id}/pay-via-razorpay`)).status).toBe(500);
+      f.razorpay.state.fail = false;
+      expect(f.razorpay.refunds).toEqual([]);
+      expect((await col("refunds").findOne({ _id: refund.id as never }))?.status).toBe("requested");
+    });
+  });
+
   it("rejects with a reason, which closes it and tells the customer", async () => {
     const d = await delivered();
     const asked = await ask(d.id, { reason: "damaged_item", items: [{ orderItemIndex: 0, qty: 1 }], photoMediaIds: [await photo()] });

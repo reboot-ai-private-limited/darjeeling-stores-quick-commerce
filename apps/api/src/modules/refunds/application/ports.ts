@@ -34,9 +34,12 @@ export interface RefundNotifier {
   done(userId: string, refund: Refund): Promise<void>;
 }
 
+/** Sends a refund back through the payment gateway (Razorpay). */
+export interface RefundGateway { refund(input: { groupId: string; amount: number; key: string }): Promise<{ id: string }> }
+
 export interface RefundSettings { refundWindowHours: number; refundPhotoRequired: boolean; maxPhotos: number }
 export const DEFAULT_REFUND_SETTINGS: RefundSettings = { refundWindowHours: 24, refundPhotoRequired: true, maxPhotos: 3 };
 
 export interface RefundDeps {
-  store: RefundStore; orders: OrderAccess; media: RefundMedia; eligibility: Eligibility; notifier: RefundNotifier; settings: RefundSettings; now: () => Date; newId: () => string;
+  store: RefundStore; orders: OrderAccess; media: RefundMedia; eligibility: Eligibility; notifier: RefundNotifier; gateway: RefundGateway; settings: RefundSettings; now: () => Date; newId: () => string;
 }

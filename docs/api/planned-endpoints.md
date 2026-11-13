@@ -283,6 +283,7 @@ Start with [00-conventions.md](00-conventions.md) (envelopes, auth, errors, pagi
 | `POST` | `/admin/refunds` | Admin `refunds:manage` | Create a refund by hand 🔒 |
 | `POST` | `/admin/refunds/:id/approve` | Admin `refunds:manage` | Approve a customer request 🔒 |
 | `POST` | `/admin/refunds/:id/reject` | Admin `refunds:manage` | Reject with a reason 🔒 |
+| `POST` | `/admin/refunds/:id/pay-via-razorpay` | Admin `refunds:manage` | Send the money back through Razorpay and close the refund 🔒 |
 | `POST` | `/admin/refunds/:id/mark-done` | Admin `refunds:manage` | Record that it was paid 🔒 |
 
 ### F17 · Hours, Pre-orders & Ops Mode

@@ -30,7 +30,7 @@ export const silentOrderNotifier: OrderNotifier = {
 };
 export const noRidersOnOrders: Riders = { riderOf: async () => null, ordersOf: async () => [] };
 export const noSlots: SlotPort = { hold: async () => undefined, release: async () => undefined };
-export const noDispatchHooks: DispatchHooks = { cancelled: async () => undefined, paid: async () => undefined };
+export const noDispatchHooks: DispatchHooks = { cancelled: async () => undefined, paid: async () => undefined, ready: async () => undefined };
 
 export interface OrdersModuleOptions {
   connection: Connection;

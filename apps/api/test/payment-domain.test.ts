@@ -52,6 +52,15 @@ describe("the Razorpay connection", () => {
     expect(await provider.capturesOn(new Date("2026-11-05T00:00:00Z"), new Date("2026-11-06T00:00:00Z"))).toEqual([{ paymentId: "pay_1", orderId: "order_1", amount: 100, status: "captured" }]);
     expect(calls[0]!.url).toContain("/payments?from=1793836800&to=1793923200&count=100&skip=0");
   });
+  it("refunds a payment through Razorpay once, using the key to stop a repeat", async () => {
+    calls.length = 0;
+    const provider = make(respond({ id: "rfnd_1" }));
+    expect(await provider.refund({ paymentId: "pay_9", amount: 4000, key: "refund-abc", notes: { groupId: "g" } })).toEqual({ id: "rfnd_1" });
+    expect(calls[0]!.url).toContain("/payments/pay_9/refund");
+    expect((calls[0]!.init.headers as Record<string, string>)["X-Refund-Idempotency"]).toBe("refund-abc");
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ amount: 4000, speed: "normal", notes: { groupId: "g" } });
+    await expect(unconfiguredProvider.refund({ paymentId: "p", amount: 1, key: "k" })).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+  });
   it("says the service is unavailable when it fails or cannot be reached", async () => {
     await expect(make(respond({}, false)).createOrder({ amount: 1, receipt: "r" })).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
     await expect(make((async () => { throw new Error("offline"); }) as unknown as typeof fetch).createOrder({ amount: 1, receipt: "r" })).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });

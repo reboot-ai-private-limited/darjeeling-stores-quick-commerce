@@ -522,6 +522,13 @@ h3, .subhead {
   flex-direction: column;
   position: relative;
   min-width: 0;
+  background: #ffffff;
+  border: 1px solid #e2ded7;
+  border-radius: var(--radius-md);
+}
+
+.product-card .product-meta {
+  padding: 0 8px 8px;
 }
 
 .product-card.is-out .product-img-wrap,
@@ -533,8 +540,8 @@ h3, .subhead {
   width: 100%;
   height: 124px;
   background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -959,7 +966,7 @@ h3, .subhead {
   display: flex;
   gap: 14px;
   overflow-x: auto;
-  padding: 8px 2px 24px;
+  padding: 6px 2px 8px;
   scrollbar-width: none;
 }
 

@@ -50,7 +50,7 @@ describe("staff sign-in and the temporary-password change", () => {
     expect((await post(owner, "/admin/auth/change-password", { newPassword: "Owner-Temporary-1!" })).status).toBe(400);
     const changed = await post(owner, "/admin/auth/change-password", { newPassword: "Owner-Permanent-1!" });
     expect(changed.status).toBe(200);
-    expect(changed.body.data.user).toMatchObject({ kind: "staff", role: "super_admin" });
+    expect(changed.body.data.user).toMatchObject({ kind: "staff", role: "admin" });
     expect(changed.body.data).not.toHaveProperty("accessToken");
     expect((await owner.get("/api/v1/admin/staff")).status).toBe(200);
     expect((await owner.get("/api/v1/admin/auth/status")).status).toBe(401);
@@ -62,7 +62,7 @@ describe("staff sign-in and the temporary-password change", () => {
     const agent = request.agent(app);
     const login = await post(agent, "/admin/auth/login", { email: "owner@example.com", password: "Owner-Permanent-1!" });
     expect(login.status).toBe(200);
-    expect(login.body.data.user.role).toBe("super_admin");
+    expect(login.body.data.user.role).toBe("admin");
     expect((await agent.get("/api/v1/admin/staff")).status).toBe(200);
   });
   it("changes a staff temporary password, restores sessions, then enforces an admin password reset", async () => {

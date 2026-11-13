@@ -63,7 +63,8 @@ describe("staff management", () => {
   });
   it("requires current staff:manage and enforces CSRF", async () => {
     expect((await request(app).get("/api/v1/admin/staff")).status).toBe(401);
-    const created = await create("no-grant@example.com");
+    const staffRoleId = String((await db.collection("roles").findOne({ name: "staff" }))!._id);
+    const created = await create("no-grant@example.com", { roleId: staffRoleId });
     const pair = await issueReady(createSessionStore(db, key), new mongoose.Types.ObjectId(created.body.data.id));
     expect((await request(app).get("/api/v1/admin/staff").set("Authorization", `Bearer ${pair.accessToken}`)).status).toBe(403);
     expect((await request(app).post("/api/v1/admin/staff").set("Authorization", auth).set("Origin", "https://evil.example").send({})).status).toBe(403);

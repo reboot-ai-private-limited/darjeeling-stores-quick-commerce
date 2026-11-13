@@ -2,13 +2,13 @@ import { Tabs } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CartBar } from "../../components/shop";
-import { TabBar, TAB_BAR_H, type BarProps } from "../../components/TabBar";
+import { TabBar, TAB_BAR_GAP, TAB_BAR_H, type BarProps } from "../../components/TabBar";
 import { colors } from "../../theme";
 
 /** Floating pill tabs (same as the rider app): Home, Categories, Orders, Account. The cart bar floats just above them. */
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const barTop = TAB_BAR_H + Math.max(insets.bottom, 12);
+  const barTop = TAB_BAR_H + insets.bottom + TAB_BAR_GAP;
   return (
     <View style={{ flex: 1, backgroundColor: colors.cream }}>
       <Tabs

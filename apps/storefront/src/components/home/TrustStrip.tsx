@@ -11,7 +11,7 @@ export const TrustStrip: React.FC = () => {
   return (
     <div
       style={{
-        marginTop: 40,
+        marginTop: 24,
         marginBottom: 20,
         padding: "24px 16px",
         background: "var(--card)",

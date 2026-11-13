@@ -24,7 +24,7 @@ export const createBody = z.object({
 export const rejectBody = z.object({ reason: note.min(1) }).strict();
 export const doneBody = z.object({ method: z.enum(["razorpay_dashboard", "upi", "cash"]), reference: z.string().trim().min(1).max(100).nullish(), note: note.nullish() }).strict();
 
-/** The 10 endpoints of docs/api/F16-cancellations-and-refunds.md. Paths are relative to the API prefix. */
+/** The 11 endpoints of docs/api/F16-cancellations-and-refunds.md. Paths are relative to the API prefix. */
 export function refundRoutes(
   refunds: RefundService, cancelOwn: (userId: string, orderId: string, reason: string) => Promise<unknown>, staff: AuthResolver, customer: CustomerResolver,
 ): Route[] {
@@ -52,6 +52,7 @@ export function refundRoutes(
     { method: "get", path: "/admin/refunds/:id", handler: manage(async (ctx, req, res) => sendData(res, await refunds.get(ctx, pathId(req, "id", "Refund")))) },
     { method: "post", path: "/admin/refunds/:id/approve", handler: manage(async (ctx, req, res) => sendData(res, await refunds.approve(ctx, pathId(req, "id", "Refund")))) },
     { method: "post", path: "/admin/refunds/:id/reject", handler: manage(async (ctx, req, res) => sendData(res, await refunds.reject(ctx, pathId(req, "id", "Refund"), parse(rejectBody, req.body).reason))) },
+    { method: "post", path: "/admin/refunds/:id/pay-via-razorpay", handler: manage(async (ctx, req, res) => sendData(res, await refunds.payViaGateway(ctx, pathId(req, "id", "Refund")))) },
     { method: "post", path: "/admin/refunds/:id/mark-done", handler: manage(async (ctx, req, res) => {
       const body = parse(doneBody, req.body);
       sendData(res, await refunds.markDone(ctx, pathId(req, "id", "Refund"), { method: body.method, reference: body.reference ?? null, note: body.note ?? null }));

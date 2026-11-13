@@ -45,8 +45,18 @@ describe("push through Firebase", () => {
     expect(JSON.parse(String(calls[1]!.init.body))).toEqual({ message: {
       token: "tok-1", data: { type: "back_in_stock", productId: "p1" },
       notification: { title: "Back in stock", body: "Tomato is back", image: "https://cdn/320.webp" },
-      android: { priority: "HIGH" }, apns: { headers: { "apns-priority": "10" } },
+      android: { priority: "HIGH", notification: { channel_id: "default" } }, apns: { headers: { "apns-priority": "10" } },
     } });
+  });
+
+  it("rings a rider's phone for a new assignment: loudest channel, ring sound, shown on the lock screen", async () => {
+    const { calls, impl } = sequence(login(), json({ name: "m1" }));
+    const push = createFcmPush({ ...account, fetch: impl, now: () => NOW });
+    await push.send({ token: "rider-1", title: "New order assigned", body: "Order DS-1 is assigned to you.", data: { type: "assignment", assignmentId: "a1" }, priority: "high" });
+    expect(JSON.parse(String(calls[1]!.init.body)).message.android).toEqual({
+      priority: "HIGH", ttl: "120s",
+      notification: { channel_id: "new_delivery", sound: "new_delivery", notification_priority: "PRIORITY_MAX", visibility: "PUBLIC" },
+    });
   });
 
   it("sends a data-only message at normal priority when there is no text, and reuses the login", async () => {

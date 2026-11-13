@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { CartProvider } from "../state/cart";
+import { listenForPush, registerPush, type PushData } from "../push";
 import { StoreProvider, useStore } from "../state/store";
 import { colors } from "../theme";
 
@@ -16,6 +17,22 @@ function BlockedGate() {
   return null;
 }
 
+/** Once signed in: tells the server this phone's notification address, and opens the right screen when a notification is tapped. */
+function PushGate() {
+  const { signedIn, booting } = useStore();
+  useEffect(() => {
+    if (booting || !signedIn) return;
+    void registerPush();
+    return listenForPush((data: PushData) => {
+      const group = typeof data.groupId === "string" ? data.groupId : null;
+      if (data.type === "refund") router.push("/refunds");
+      else if (group) router.push({ pathname: "/order/[id]", params: { id: group } });
+      else router.push("/(tabs)/orders");
+    });
+  }, [booting, signedIn]);
+  return null;
+}
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.cream }}>
@@ -23,6 +40,7 @@ export default function RootLayout() {
         <StoreProvider><CartProvider>
           <StatusBar style="dark" />
           <BlockedGate />
+          <PushGate />
           <OfflineBanner />
           <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", animationDuration: 320, contentStyle: { backgroundColor: colors.cream } }}>
             <Stack.Screen name="index" options={{ animation: "fade" }} />

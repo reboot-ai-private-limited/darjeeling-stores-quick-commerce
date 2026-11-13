@@ -4,6 +4,7 @@ import { getAppConfig, resolveLocation, type Zone } from "../api/app";
 import { loadSession, setSignedOutHandler } from "../api/http";
 import { signOutRemote } from "../api/auth";
 import { kv } from "../api/kv";
+import { unregisterPush } from "../push";
 
 export type Blocked = { kind: "update" | "maintenance"; message: string; url?: string; support?: string };
 export type Place = { label: string; lat: number; lng: number };
@@ -78,7 +79,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const markWelcomed = useCallback(() => { setWelcomed(true); void kv.set(WELCOME_KEY, "1"); }, []);
   const onSignedIn = useCallback(() => setSignedIn(true), []);
-  const signOut = useCallback(async () => { await signOutRemote(); setSignedIn(false); setAddressIdState(null); void kv.del(ADDRESS_KEY); }, []);
+  const signOut = useCallback(async () => { await unregisterPush(); await signOutRemote(); setSignedIn(false); setAddressIdState(null); void kv.del(ADDRESS_KEY); }, []);
   const setAddressId = useCallback((id: string | null) => { setAddressIdState(id); if (id) void kv.set(ADDRESS_KEY, id); else void kv.del(ADDRESS_KEY); }, []);
 
   const value = useMemo(() => ({ booting, signedIn, blocked, place, zone, setPlace, welcomed, markWelcomed, onSignedIn, signOut, addressId, setAddressId }), [booting, signedIn, blocked, place, zone, setPlace, welcomed, markWelcomed, onSignedIn, signOut, addressId, setAddressId]);

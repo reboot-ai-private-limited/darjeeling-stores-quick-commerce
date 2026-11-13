@@ -68,10 +68,11 @@ describe("suggesting a rider", () => {
     expect([offline.id, elsewhere.id, w2only.id].every(Boolean)).toBe(true);
   });
 
-  it("only works for a ready order the admin may see", async () => {
+  it("only works for an order that can take a rider and that the admin may see", async () => {
     await onShift();
-    const packing = ready({ status: "PACKING" });
-    expect((await f.get(`/admin/dispatch/suggestions?orderId=${packing.id}`)).status).toBe(409);
+    const unconfirmed = ready({ status: "PLACED" });
+    expect((await f.get(`/admin/dispatch/suggestions?orderId=${unconfirmed.id}`)).status).toBe(409);
+    expect((await f.get(`/admin/dispatch/suggestions?orderId=${ready({ status: "PACKING" }).id}`)).status).toBe(200);
     expect((await f.get(`/admin/dispatch/suggestions?orderId=${"9".repeat(24)}`)).status).toBe(404);
     expect((await f.get("/admin/dispatch/suggestions")).status).toBe(400);
     const order = ready();
@@ -107,11 +108,11 @@ describe("assigning an order", () => {
     })]);
   });
 
-  it("refuses an order that is not ready, or is already assigned, and an unknown order or rider", async () => {
+  it("refuses an order that is not confirmed yet, or is already assigned, and an unknown order or rider", async () => {
     const r = await onShift();
     const other = await onShift();
-    const packing = ready({ status: "PACKING" });
-    expect((await assign(packing.id, r.id)).status).toBe(409);
+    const unconfirmed = ready({ status: "PLACED" });
+    expect((await assign(unconfirmed.id, r.id)).status).toBe(409);
     const order = ready();
     expect((await assign(order.id, r.id)).status).toBe(200);
     const again = await assign(order.id, other.id);
@@ -164,6 +165,58 @@ describe("assigning an order", () => {
     expect((await assign(order.id, r.id, {}, scoped(W2))).status).toBe(403);
     expect(f.orders.get(order.id).status).toBe("READY");
     expect((await assign(order.id, r.id, {}, scoped(W1))).status).toBe(200);
+  });
+});
+
+describe("assigning before packing is done", () => {
+  it("gives a packing order a rider at once without changing its status, then makes it assigned when packing is done", async () => {
+    const r = await onShift();
+    const other = await onShift();
+    const order = ready({ status: "PACKING" });
+    const res = await assign(order.id, r.id);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.data.order).toEqual({ id: order.id, status: "PACKING" });
+    expect(f.orders.get(order.id).status).toBe("PACKING");
+    expect(await active(r)).toBe(1);
+    expect(await feedOf(r)).toEqual(["assigned"]);
+    // A second rider cannot be put on the same order.
+    const again = await assign(order.id, other.id);
+    expect(again.status).toBe(409);
+    expect(await col("assignments").countDocuments({ orderId: order.id, live: true })).toBe(1);
+    expect(await active(other)).toBe(0);
+    // Packing is marked done: the order becomes assigned to the same rider, who is not charged twice.
+    f.orders.setStatus(order.id, "READY");
+    await f.mods.dispatch.hooks.onOrderReady(order.id);
+    expect(f.orders.get(order.id).status).toBe("ASSIGNED");
+    expect(await feedOf(r)).toEqual(["assigned", "updated"]);
+    expect(await active(r)).toBe(1);
+  });
+
+  it("can be moved to another rider or taken back while the order is still being packed", async () => {
+    const r = await onShift();
+    const other = await onShift();
+    const order = ready({ status: "CONFIRMED" });
+    expect((await assign(order.id, r.id)).status).toBe(200);
+    const moved = await f.send("post", `/admin/orders/${order.id}/reassign`, { toRiderId: other.id }, admin);
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    expect(await active(r)).toBe(0);
+    expect(await active(other)).toBe(1);
+    const back = await unassign(order.id);
+    expect(back.status, JSON.stringify(back.body)).toBe(200);
+    expect(back.body.data.order).toEqual({ id: order.id, status: "CONFIRMED" });
+    expect(await active(other)).toBe(0);
+    expect(f.orders.get(order.id).status).toBe("CONFIRMED");
+  });
+
+  it("is released when the order is cancelled, and does nothing when no rider was chosen early", async () => {
+    const r = await onShift();
+    const order = ready({ status: "PACKING" });
+    await assign(order.id, r.id);
+    await f.mods.dispatch.hooks.onOrderCancelled(order.id);
+    expect(await active(r)).toBe(0);
+    const plain = ready({ status: "READY" });
+    await f.mods.dispatch.hooks.onOrderReady(plain.id);
+    expect(f.orders.get(plain.id).status).toBe("READY");
   });
 });
 
