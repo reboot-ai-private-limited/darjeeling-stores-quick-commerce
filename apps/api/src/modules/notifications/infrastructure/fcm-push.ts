@@ -59,7 +59,16 @@ export function createFcmPush(config: FcmConfig): PushProvider {
       const message = {
         token: m.token, data: m.data,
         ...((m.title || m.body) && { notification: { ...(m.title && { title: m.title }), ...(m.body && { body: m.body }), ...(m.imageUrl && { image: m.imageUrl }) } }),
-        android: { priority: m.priority === "high" ? "HIGH" : "NORMAL" },
+        // A new delivery for a rider rings like a call: the rider app makes the "new_delivery" channel (loud ringtone, shown on the lock screen).
+        // Everything else uses the normal "default" channel. If a phone has not made the channel yet, Android uses its default sound.
+        android: {
+          priority: m.priority === "high" ? "HIGH" : "NORMAL",
+          ...(m.data.type === "assignment" && { ttl: "120s" }),
+          notification: {
+            channel_id: m.data.type === "assignment" ? "new_delivery" : "default",
+            ...(m.data.type === "assignment" && { sound: "new_delivery", notification_priority: "PRIORITY_MAX", visibility: "PUBLIC" }),
+          },
+        },
         apns: { headers: { "apns-priority": m.priority === "high" ? "10" : "5" } },
       };
       let response = await post(message, await accessToken());
