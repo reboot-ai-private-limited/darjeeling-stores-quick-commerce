@@ -23,6 +23,14 @@ module.exports = ({ config }) => {
         locationWhenInUsePermission: "Darjeeling Rider uses your location to punch you in at the store and to guide your delivery.",
         isAndroidBackgroundLocationEnabled: true, isAndroidForegroundServiceEnabled: true,
       }],
+      // Release builds shrink the code; these rules stop it removing classes the notification and background-work libraries need at start-up.
+      ["expo-build-properties", { android: { extraProguardRules: [
+        // WorkManager (pulled in by notifications and background location) builds its database by name at start-up; shrinking removed it and the app closed at launch.
+        "-keep class androidx.work.** { *; }",
+        "-keep class * extends androidx.room.RoomDatabase { *; }",
+        "-keep class androidx.startup.** { *; }",
+        "-dontwarn androidx.work.**",
+      ].join("\n") } }],
       ["expo-notifications", { icon: "./assets/android-icon-monochrome.png", color: "#401815", sounds: ["./assets/sounds/new_delivery.wav"] }],
     ],
   };
