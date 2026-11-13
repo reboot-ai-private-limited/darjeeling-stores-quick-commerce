@@ -24,7 +24,7 @@ module.exports = ({ config }) => {
         isAndroidBackgroundLocationEnabled: true, isAndroidForegroundServiceEnabled: true,
       }],
       // Release builds shrink the code; these rules stop it removing classes the notification and background-work libraries need at start-up.
-      ["expo-build-properties", { android: { extraProguardRules: [
+      ["expo-build-properties", { android: { enableMinifyInReleaseBuilds: false, enableShrinkResourcesInReleaseBuilds: false, extraProguardRules: [
         // WorkManager (pulled in by notifications and background location) builds its database by name at start-up; shrinking removed it and the app closed at launch.
         "-keep class androidx.work.** { *; }",
         "-keep class * extends androidx.room.RoomDatabase { *; }",
