@@ -61,17 +61,24 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
   const child = order.children?.[0];
   const status = child?.status ?? order.status;
   const currentStep = Math.max(0, STEPS.findIndex((s) => s.match.includes(status)));
-  const canCancel = ["PLACED", "CONFIRMED"].includes(status);
+  // A customer can cancel until packing starts, including an online order that is still waiting for its payment.
+  const CANCELLABLE = ["PENDING_PAYMENT", "PLACED", "CONFIRMED"];
+  const cancellable = (order.children ?? []).filter((c) => CANCELLABLE.includes(c.status));
+  const canCancel = cancellable.length > 0 || (!order.children?.length && CANCELLABLE.includes(status));
+  const awaitingPayment = status === "PENDING_PAYMENT" && order.paymentMethod === "online";
   const isDelivered = status === "DELIVERED";
 
   const handleCancelOrder = async () => {
-    if (!child) return;
+    if (cancellable.length === 0) return;
     setCancelling(true);
     try {
-      await cancelOrder(child.id, cancelReason);
+      // A split order has one child per delivery; cancel every one that has not started packing.
+      for (const c of cancellable) await cancelOrder(c.id, cancelReason);
       setCancelModalOpen(false);
       fetchOrder();
     } catch {
+      setCancelModalOpen(false);
+      fetchOrder();
       alert("Could not cancel this order. Packing may have already begun.");
     } finally {
       setCancelling(false);
@@ -342,6 +349,12 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
 
         {/* Action Buttons: Cancel, Reorder, Refund */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {awaitingPayment && (
+            <Link href={`/pay/${order.id}`} className="btn btn-primary">
+              Pay Now
+            </Link>
+          )}
+
           {canCancel && (
             <button
               onClick={() => setCancelModalOpen(true)}

@@ -24,7 +24,7 @@ const Rail: React.FC<{ title: string; subtitle?: string | null | undefined; icon
   products,
   eta,
 }) => (
-  <section style={{ marginTop: 28 }}>
+  <section style={{ marginTop: 14 }}>
     <div className="sec-head">
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -143,7 +143,7 @@ export default function HomePage() {
   const activeTabProducts = activeCategory ? allProducts.filter((p) => p.category?.id === activeCategory.id) : [];
 
   return (
-    <main className="page-container" style={{ padding: "12px 16px 40px" }}>
+    <main className="page-container" style={{ padding: "8px 16px 32px" }}>
       {homeData && !homeData.status.accepting && (
         <Link
           href="/closed"
@@ -218,7 +218,7 @@ export default function HomePage() {
       )}
 
       {selectedCategoryTab && activeCategory && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 10 }}>
           <div className="sec-head" style={{ marginBottom: 16 }}>
             <h2 className="sec-title">{activeCategory.name}</h2>
             <Link href={`/category/${activeCategory.id}`} style={{ fontSize: 13, fontWeight: 800, color: "var(--maroon)" }}>
@@ -241,12 +241,12 @@ export default function HomePage() {
         <>
           <LiveOrderCard />
 
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 10 }}>
             <BannerCarousel banners={homeData.banners} eta={eta} />
           </div>
 
           {homeData.categories.length > 0 && (
-            <section style={{ marginTop: 28 }}>
+            <section style={{ marginTop: 14 }}>
               <h2 className="sec-title">Shop by category</h2>
               <div className="cat-grid" style={{ marginTop: 12 }}>
                 {homeData.categories.map((c, i) => (
@@ -263,7 +263,7 @@ export default function HomePage() {
           {budgetProducts.length > 0 && <Rail title="Under ₹99" products={budgetProducts} eta={eta} />}
 
           {brands.length > 0 && (
-            <section style={{ marginTop: 28 }}>
+            <section style={{ marginTop: 14 }}>
               <h2 className="sec-title" style={{ marginBottom: 12 }}>
                 Shop by brand
               </h2>
