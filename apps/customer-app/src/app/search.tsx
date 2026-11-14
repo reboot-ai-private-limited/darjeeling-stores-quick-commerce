@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from "
 import { searchProducts, type Product } from "../api/catalog";
 import { kv } from "../api/kv";
 import { Header, Icon, Press, Screen } from "../components/ui";
-import { fillRow, CartBar, ProductCard } from "../components/shop";
+import { fillRow, CartBar, GlassScene, ProductCard } from "../components/shop";
 import { useStore } from "../state/store";
 import { colors, radius, shadow, space, type } from "../theme";
 
@@ -43,7 +43,7 @@ export default function Search() {
   }, [term, zone]);
 
   return (
-    <View style={{ flex: 1 }}>
+    <GlassScene bar={<CartBar />}>
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title="Search" /></View>
         <View style={s.field}>
@@ -80,8 +80,7 @@ export default function Search() {
           renderItem={({ item }) => item ? <View style={{ flex: 1 }}><ProductCard product={item} width="100%" /></View> : <View style={{ flex: 1 }} />}
         />
       </Screen>
-      <CartBar />
-    </View>
+    </GlassScene>
   );
 }
 

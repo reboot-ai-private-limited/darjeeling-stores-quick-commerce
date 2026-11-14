@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, View } from 
 import { cachedCategories, findCategory, getCategories, getProducts, defaultVariant, type Category, type Product } from "../../api/catalog";
 import { GridSkeleton } from "../../components/Skeleton";
 import { Dropdown } from "../../components/Dropdown";
-import { fillRow, CartBar, ProductCard } from "../../components/shop";
+import { fillRow, CartBar, GlassScene, ProductCard } from "../../components/shop";
 import { Button, Chip, Header, Icon, Press, Screen } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { colors, space, type } from "../../theme";
@@ -73,7 +73,7 @@ export default function CategoryProducts() {
   const cols = children.length > 0 ? 2 : 3; // the left rail takes room, so two cards fit beside it
 
   return (
-    <View style={{ flex: 1 }}>
+    <GlassScene bar={<CartBar />}>
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}>
           <Header title={cat?.name ?? name ?? "Products"} right={<Press onPress={() => router.push("/search")} haptic style={s.iconBtn}><Icon name="search" size={20} /></Press>} />
@@ -129,8 +129,7 @@ export default function CategoryProducts() {
           </View>
         </View>
       </Screen>
-      <CartBar />
-    </View>
+    </GlassScene>
   );
 }
 

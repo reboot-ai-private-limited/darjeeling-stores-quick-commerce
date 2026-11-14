@@ -1,3 +1,4 @@
+import { isRunningInExpoGo } from "expo";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Platform } from "react-native";
 import { api } from "./api/http";
@@ -7,7 +8,7 @@ import { api } from "./api/http";
  * Expo Go cannot receive them, so there everything here quietly does nothing and the rest of the app works as usual.
  * (iPhones are not set up yet: the server sends through Firebase, which needs extra Apple keys. Android works.)
  */
-export const pushSupported = Platform.OS === "android" && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+export const pushSupported = Platform.OS === "android" && !isRunningInExpoGo() && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 type Notifications = typeof import("expo-notifications");
 let loaded: Notifications | null | undefined;

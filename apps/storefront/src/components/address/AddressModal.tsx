@@ -73,6 +73,15 @@ export const AddressModal: React.FC<AddressModalProps> = ({
           setLng(editAddress.location?.lng ?? editAddress.lng ?? defaultLng);
           setIsDefault(editAddress.isDefault ?? true);
         } else {
+          // Clear anything left over from a previous edit
+          setLabel("Home");
+          setLine1("");
+          setLandmark("");
+          setPincode("734101");
+          setDeliveryNotes("");
+          setIsDefault(true);
+          setPhotoFile(null);
+          setVoiceBlob(null);
           // Default to place if available
           const matchLoc = all.find((l) => l.id === place?.localityId || l.name === place?.label);
           if (matchLoc) {

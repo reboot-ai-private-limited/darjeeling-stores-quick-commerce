@@ -7,19 +7,19 @@ import { categoryPictures, getHome, type Home as HomeData } from "../../api/cata
 import { BadgeRails, BrandRow, BudgetRail, PopularSearches, RecentlyViewed, uniqueProducts } from "../../components/homeExtras";
 import { getStoreStatus } from "../../api/cart";
 import { CategoryFeed } from "../../components/CategoryFeed";
-import { CategoryTabs, LiveOrderCard, OffersRow, OrderAgainCard, SectionHead } from "../../components/home";
+import { CategoryTabs, LiveOrderCard, OffersRow, OrderAgainCard, SectionHead, TABS_GAP } from "../../components/home";
 import { BannerCarousel, CategoryTile, ProductCard } from "../../components/shop";
 import { HomeSkeleton } from "../../components/Skeleton";
 import { Button, Icon, Press } from "../../components/ui";
 import { useStore } from "../../state/store";
-import { colors, radius, shadow, space, type } from "../../theme";
+import { colors, radius, SECTION_GAP, shadow, space, TITLE_GAP, type } from "../../theme";
 
 /** Height of the "Delivery in … minutes" row. It slides away on scroll so only the search bar stays pinned. */
 const TITLE_H = 52;
 /** How far the header slides up: the title row plus the gaps around it, leaving a small gap under the status bar. */
 const SLIDE = TITLE_H + space.md * 2 - space.sm;
-/** Height of the category tab strip under the search bar. */
-const TABS_H = 82;
+/** Height of the category tab strip under the search bar (circle 40 + label + underline). */
+const TABS_H = 64;
 const HINTS = ["tea", "snacks", "spices", "gift boxes", "biscuits"];
 
 /** Quick-commerce home: a big delivery-time header with a pinned search bar, then banners, a dense category grid and product rows. */
@@ -35,7 +35,6 @@ export default function Home() {
   const onScroll = useAnimatedScrollHandler(e => { y.value = e.contentOffset.y; });
   const headStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -interpolate(y.value, [0, SLIDE], [0, SLIDE], Extrapolation.CLAMP) }] }));
   const titleStyle = useAnimatedStyle(() => ({ opacity: interpolate(y.value, [0, TITLE_H * 0.6], [1, 0], Extrapolation.CLAMP) }));
-  const headerH = insets.top + space.md + TITLE_H + space.md + 48 + space.sm + TABS_H + space.sm;
   const [tab, setTab] = useState<string | null>(null);
   const scroller = useRef<{ scrollTo: (o: { y: number; animated?: boolean }) => void } | null>(null);
 
@@ -53,6 +52,10 @@ export default function Home() {
   useEffect(() => { const t = setInterval(() => setHint(h => (h + 1) % HINTS.length), 2600); return () => clearInterval(t); }, []);
 
   if (!booting && !zone) return <Redirect href="/location" />;
+
+  // The header is only as tall as what it holds: the tab strip appears once the categories have loaded.
+  const hasTabs = !!data && data.categories.length > 0;
+  const headerH = insets.top + space.md + TITLE_H + space.md + 48 + (hasTabs ? TABS_GAP + TABS_H : 0) + space.md;
 
   const pics = data ? categoryPictures(data.categories, data.sections) : {};
   const all = data ? uniqueProducts(data.sections) : [];
@@ -90,9 +93,10 @@ export default function Home() {
               <View style={{ marginTop: space.lg }}><BannerCarousel banners={data.banners} eta={etaText} /></View>
 
               {data.categories.length > 0 && (
-                <View style={{ paddingHorizontal: space.sm, marginTop: space.lg }}>
-                  <Text style={[s.sectionTitle, { paddingHorizontal: space.md }]}>Shop by category</Text>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: space.md }}>
+                <View style={{ marginTop: SECTION_GAP }}>
+                  <SectionHead title="Shop by category" />
+                  {/* Tiles carry 5dp of their own padding, so pull the grid in to line the images up with the 16dp page edge */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: space.lg - 5, marginTop: TITLE_GAP - 5 }}>
                     {data.categories.map((c, i) => <CategoryTile key={c.id} category={c} picture={pics[c.id]} tint={i} />)}
                   </View>
                 </View>
@@ -106,11 +110,11 @@ export default function Home() {
               <BrandRow products={all} zoneId={zoneId} />
 
               {data.sections.map(sec => (
-                <View key={sec.categoryId} style={{ marginTop: space.xl }}>
+                <View key={sec.categoryId} style={{ marginTop: SECTION_GAP }}>
                   <SectionHead title={sec.title} onSeeAll={() => router.push({ pathname: "/category/[id]", params: { id: sec.categoryId, name: sec.title } })} />
                   <FlatList
                     horizontal data={sec.products} keyExtractor={p => p.id} showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg, gap: space.md }}
+                    contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: TITLE_GAP, gap: space.md }}
                     renderItem={({ item }) => <ProductCard product={item} eta={etaText} />}
                   />
                 </View>
@@ -155,7 +159,7 @@ export default function Home() {
 }
 
 const s = StyleSheet.create({
-  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: colors.maroon, paddingHorizontal: space.lg, paddingBottom: space.md + 2, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: colors.maroon, paddingHorizontal: space.lg, paddingBottom: space.md, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   deliver: { color: colors.white, fontSize: 24, fontWeight: "900", letterSpacing: -0.6 },
   addr: { color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: "600", flexShrink: 1 },

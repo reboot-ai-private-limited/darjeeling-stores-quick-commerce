@@ -2,8 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import { liftIn } from "../motion";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, shadow, space, type } from "../theme";
@@ -27,11 +27,61 @@ export function Stagger({ i = 0, children, style }: { i?: number; children: Reac
   return <Animated.View entering={liftIn(80 + i * 70)} style={style}>{children}</Animated.View>;
 }
 
+const SHOW = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+const HIDE = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+/** The on-screen keyboard: its height (0 when hidden) and where its top edge is on the screen. Android is edge-to-edge, so the window does not resize for us. */
+export function useKeyboard() {
+  const [kb, setKb] = useState({ height: 0, top: 0 });
+  // On Android (edge-to-edge) the reported height leaves out the navigation bar, which the keyboard also covers, so add it back.
+  const insets = useSafeAreaInsets();
+  const extra = Platform.OS === "android" ? insets.bottom : 0;
+  useEffect(() => {
+    const show = Keyboard.addListener(SHOW, e => setKb({ height: e.endCoordinates.height + extra, top: e.endCoordinates.screenY }));
+    const hide = Keyboard.addListener(HIDE, () => setKb({ height: 0, top: 0 }));
+    return () => { show.remove(); hide.remove(); };
+  }, [extra]);
+  return kb;
+}
+
+/** A ScrollView that scrolls the focused text field above the keyboard, on open and when moving to another field. `revealMargin` is the room to keep clear below the field (raise it when a bar floats above the keyboard). */
+type ScrollInstance = ComponentRef<typeof ScrollView>;
+export const KScrollView = forwardRef<ScrollInstance, ScrollViewProps & { revealMargin?: number }>(function KScrollView({ revealMargin = 24, onScroll, onTouchEnd, ...rest }, ref) {
+  const sv = useRef<ScrollInstance>(null);
+  const y = useRef(0);
+  const top = useRef(0);
+  useImperativeHandle(ref, () => sv.current as ScrollInstance);
+  const reveal = useCallback(() => {
+    const input = TextInput.State.currentlyFocusedInput();
+    if (!input || !top.current) return;
+    input.measureInWindow((_x, iy, _w, ih) => {
+      const over = iy + ih + revealMargin - top.current;
+      if (over > 0) sv.current?.scrollTo({ y: y.current + over, animated: true });
+    });
+  }, [revealMargin]);
+  useEffect(() => {
+    // The delay lets the screen finish shrinking above the keyboard before we measure how far to scroll.
+    const show = Keyboard.addListener(SHOW, e => { top.current = e.endCoordinates.screenY; setTimeout(reveal, 150); });
+    const hide = Keyboard.addListener(HIDE, () => { top.current = 0; });
+    return () => { show.remove(); hide.remove(); };
+  }, [reveal]);
+  return (
+    <ScrollView
+      ref={sv} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
+      onScroll={e => { y.current = e.nativeEvent.contentOffset.y; onScroll?.(e); }}
+      onTouchEnd={e => { onTouchEnd?.(e); if (top.current) setTimeout(reveal, 200); }}
+      {...rest}
+    />
+  );
+});
+
 export function Screen({ children, scroll = false, pad = true, bottomPad = 24, style, dark = false }: { children: ReactNode; scroll?: boolean; pad?: boolean; bottomPad?: number; style?: StyleProp<ViewStyle>; dark?: boolean }) {
   const insets = useSafeAreaInsets();
-  const base: ViewStyle = { flex: 1, backgroundColor: dark ? colors.maroon : colors.cream, paddingTop: insets.top };
-  const inner: ViewStyle = { paddingHorizontal: pad ? space.xl : 0, paddingBottom: insets.bottom + bottomPad };
-  if (scroll) return <View style={[base, style]}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={inner} keyboardShouldPersistTaps="handled">{children}</ScrollView></View>;
+  const { height: kb } = useKeyboard();
+  // With the keyboard open it already covers the bottom system bar, so it replaces that inset.
+  const base: ViewStyle = { flex: 1, backgroundColor: dark ? colors.maroon : colors.cream, paddingTop: insets.top, paddingBottom: kb };
+  const inner: ViewStyle = { paddingHorizontal: pad ? space.xl : 0, paddingBottom: (kb > 0 ? 0 : insets.bottom) + bottomPad };
+  if (scroll) return <View style={[base, style]}><KScrollView showsVerticalScrollIndicator={false} contentContainerStyle={inner}>{children}</KScrollView></View>;
   return <View style={[base, style]}><View style={[{ flex: 1 }, inner]}>{children}</View></View>;
 }
 
@@ -93,7 +143,7 @@ export function Button({ label, onPress, variant = "primary", icon, disabled, st
   const bg = { primary: colors.maroon, accent: colors.yellow, ghost: "transparent", danger: colors.red, soft: colors.creamDeep }[variant];
   const fg = { primary: colors.white, accent: colors.maroon, ghost: colors.maroon, danger: colors.white, soft: colors.maroon }[variant];
   return (
-    <Press onPress={onPress} haptic disabled={disabled} style={[s.button, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, variant === "ghost" && { borderWidth: 1.5, borderColor: colors.line }, variant === "primary" && shadow.lift, style]}>
+    <Press onPress={onPress} haptic disabled={disabled} style={[s.button, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, variant === "ghost" && { borderWidth: 1.5, borderColor: colors.line }, style]}>
       {icon && <Icon name={icon} color={fg} size={19} />}
       <Text style={[s.buttonText, { color: fg }]}>{label}</Text>
     </Press>
@@ -139,8 +189,8 @@ export const SectionTitle = ({ children, action }: { children: ReactNode; action
 
 const s = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", minHeight: 60, paddingTop: 6 },
-  iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", ...shadow.card },
-  button: { minHeight: 56, borderRadius: radius.lg, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
+button: { minHeight: 56, borderRadius: radius.lg, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   buttonText: { fontSize: 16, fontWeight: "800", letterSpacing: 0.2 },
   card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, ...shadow.card },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, height: 40, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white },

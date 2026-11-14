@@ -3,7 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Text, View } from "react-native";
 import { cachedBrands, getBrands, searchProducts, type Product } from "../../api/catalog";
-import { fillRow, CartBar, ProductCard } from "../../components/shop";
+import { fillRow, CartBar, GlassScene, ProductCard } from "../../components/shop";
 import { Header, Icon, Screen } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { colors, space, type } from "../../theme";
@@ -21,7 +21,7 @@ export default function Brand() {
     void searchProducts(zone.id, name).then(r => setItems(r.filter(p => p.brand?.id === id))).catch(e => setErr(e instanceof Error ? e.message : "Couldn't load this brand."));
   }, [zone, id, name]);
   return (
-    <View style={{ flex: 1 }}>
+    <GlassScene bar={<CartBar />}>
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title={name ?? "Brand"} subtitle={items ? `${items.length} ${items.length === 1 ? "product" : "products"}` : undefined} right={logo ? <Image source={{ uri: logo }} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: colors.yellow }} contentFit="cover" /> : undefined} /></View>
         {!items && !err && <ActivityIndicator color={colors.maroon} style={{ marginTop: 60 }} />}
@@ -35,7 +35,6 @@ export default function Brand() {
           />
         )}
       </Screen>
-      <CartBar />
-    </View>
+    </GlassScene>
   );
 }

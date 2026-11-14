@@ -7,6 +7,7 @@ import Script from "next/script";
 import {
   ApiError,
   createQuote,
+  deleteAddress,
   getAddresses,
   getPreorderSlots,
   newIdempotencyKey,
@@ -22,6 +23,7 @@ import { useStore } from "../../state/StoreContext";
 import { AddressModal } from "../../components/address/AddressModal";
 import { Button } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
+import { Modal } from "../../components/ui/Modal";
 
 declare global {
   interface Window {
@@ -51,6 +53,38 @@ export default function CheckoutPage() {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [addressModalOpen, setAddressModalOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Address | null>(null);
+
+  const openAddressPicker = () => {
+    if (addresses.length === 0) {
+      setEditTarget(null);
+      setAddressModalOpen(true);
+    } else {
+      setPickerOpen(true);
+    }
+  };
+
+  const handleAddressSaved = (saved: Address) => {
+    // A new default un-defaults the others, so reload the list from the server.
+    getAddresses().then(setAddresses).catch(() => undefined);
+    setSelectedAddress(saved);
+  };
+
+  const handleDeleteAddress = async (addr: Address) => {
+    if (!confirm("Are you sure you want to delete this address?")) return;
+    try {
+      await deleteAddress(addr.id);
+      const remaining = addresses.filter((a) => a.id !== addr.id);
+      setAddresses(remaining);
+      if (selectedAddress?.id === addr.id) {
+        setSelectedAddress(remaining.find((a) => a.isDefault) ?? remaining[0] ?? null);
+      }
+      if (remaining.length === 0) setPickerOpen(false);
+    } catch {
+      alert("Could not delete address. Please try again.");
+    }
+  };
 
   // Pre-order slots
   const [slots, setSlots] = useState<PreorderSlot[]>([]);
@@ -328,7 +362,7 @@ export default function CheckoutPage() {
                 <span style={{ fontSize: 15, fontWeight: 800, color: "var(--maroon)" }}>Delivery Address</span>
               </div>
               <button
-                onClick={() => setAddressModalOpen(true)}
+                onClick={openAddressPicker}
                 style={{ fontSize: 13, fontWeight: 700, color: "var(--maroon)" }}
               >
                 {selectedAddress ? "Change" : "+ Add"}
@@ -721,7 +755,7 @@ export default function CheckoutPage() {
             ) : (
               <Button
                 variant="primary"
-                onClick={() => setAddressModalOpen(true)}
+                onClick={openAddressPicker}
                 style={{ width: "100%", padding: "16px 20px", marginTop: 20, fontSize: 16 }}
               >
                 Add delivery address to continue
@@ -731,10 +765,86 @@ export default function CheckoutPage() {
         </div>
       </div>
 
+      <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} title="Choose Delivery Address">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {addresses.map((addr) => {
+            const active = selectedAddress?.id === addr.id;
+            return (
+              <div
+                key={addr.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1.5px solid ${active ? "var(--maroon)" : "var(--line)"}`,
+                  background: active ? "var(--yellow-soft)" : "var(--card)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAddress(addr);
+                    setPickerOpen(false);
+                  }}
+                  style={{ textAlign: "left", flex: 1, minWidth: 0 }}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "var(--maroon)", textTransform: "uppercase" }}>
+                    {addr.label}{addr.isDefault ? " · Default" : ""}
+                  </span>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)", marginTop: 2 }}>{addr.line1}</p>
+                  <p style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {addr.landmark} · {addr.localityName ?? addr.locality ?? ""}, {addr.pincode}
+                  </p>
+                </button>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    style={{ width: 34, height: 34 }}
+                    title="Edit"
+                    onClick={() => {
+                      setEditTarget(addr);
+                      setPickerOpen(false);
+                      setAddressModalOpen(true);
+                    }}
+                  >
+                    <Icon name="edit-2" size={15} color="var(--maroon)" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    style={{ width: 34, height: 34 }}
+                    title="Delete"
+                    onClick={() => handleDeleteAddress(addr)}
+                  >
+                    <Icon name="trash-2" size={15} color="var(--red)" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <Button
+            variant="primary"
+            onClick={() => {
+              setEditTarget(null);
+              setPickerOpen(false);
+              setAddressModalOpen(true);
+            }}
+            style={{ width: "100%", padding: "12px" }}
+          >
+            + Add New Address
+          </Button>
+        </div>
+      </Modal>
+
       <AddressModal
         isOpen={addressModalOpen}
         onClose={() => setAddressModalOpen(false)}
-        onSuccess={(saved) => setSelectedAddress(saved)}
+        editAddress={editTarget}
+        onSuccess={handleAddressSaved}
       />
     </main>
   );
