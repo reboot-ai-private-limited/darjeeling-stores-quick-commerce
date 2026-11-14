@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { StyleProp, View, ViewStyle, useWindowDimensions } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
-import { colors, radius, space } from "../theme";
+import { colors, radius, SECTION_GAP, space, TITLE_GAP } from "../theme";
 
 /** One grey placeholder block. All blocks pulse together so a screen of them reads as one calm loading state. */
 function usePulse() {
@@ -29,9 +29,9 @@ function ProductBone() {
 
 function RailBone({ title }: { title: number }) {
   return (
-    <View style={{ marginTop: space.xl }}>
+    <View style={{ marginTop: SECTION_GAP }}>
       <Bone w={title} h={20} style={{ marginLeft: space.lg }} />
-      <View style={{ flexDirection: "row", gap: space.md, paddingHorizontal: space.lg, paddingTop: space.md }}>
+      <View style={{ flexDirection: "row", gap: space.md, paddingHorizontal: space.lg, paddingTop: TITLE_GAP }}>
         {[0, 1, 2].map(i => <ProductBone key={i} />)}
       </View>
     </View>
@@ -46,12 +46,12 @@ export function HomeSkeleton() {
       <View style={{ marginTop: space.lg, paddingHorizontal: space.lg }}>
         <Bone w={width - space.lg * 2} h={150} r={radius.xl} />
       </View>
-      <View style={{ paddingHorizontal: space.sm, marginTop: space.lg }}>
-        <Bone w={150} h={20} style={{ marginLeft: space.md }} />
-        <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: space.md }}>
+      <View style={{ marginTop: SECTION_GAP }}>
+        <Bone w={150} h={20} style={{ marginLeft: space.lg }} />
+        <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: space.lg - 5, marginTop: TITLE_GAP - 5 }}>
           {Array.from({ length: 8 }, (_, i) => (
             <View key={i} style={{ width: "25%", padding: 5, alignItems: "center" }}>
-              <Bone h={(width - space.sm * 2) / 4 - 10} r={radius.lg} />
+              <Bone h={(width - (space.lg - 5) * 2) / 4 - 10} r={radius.lg} />
               <Bone w="70%" h={11} style={{ marginTop: 8 }} />
             </View>
           ))}

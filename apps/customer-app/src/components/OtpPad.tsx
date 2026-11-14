@@ -63,6 +63,6 @@ const s = StyleSheet.create({
   pad: { width: "100%", maxWidth: 360, alignSelf: "center", gap: 12 },
   padRow: { flexDirection: "row", gap: 12 },
   cell: { flex: 1, height: 62 },
-  keyFace: { height: 62, alignItems: "center", justifyContent: "center", backgroundColor: colors.white, borderRadius: radius.lg, ...shadow.card },
+  keyFace: { height: 62, alignItems: "center", justifyContent: "center", backgroundColor: colors.white, borderRadius: radius.lg },
   keyText: { fontSize: 26, fontWeight: "700", color: colors.ink },
 });

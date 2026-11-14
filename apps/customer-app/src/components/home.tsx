@@ -8,7 +8,7 @@ import { listCoupons, type CouponRow } from "../api/account";
 import { listOrders, reorder, statusInfo, STEPS, trackingHeadline, type OrderSummary } from "../api/orders";
 import { liftIn } from "../motion";
 import { useCart } from "../state/cart";
-import { colors, radius, rupees, shadow, space, type } from "../theme";
+import { colors, radius, rupees, SECTION_GAP, shadow, space, TITLE_GAP, type } from "../theme";
 import { Icon, Press, type IconName } from "./ui";
 
 /** A soft "live" dot: a ring that slowly grows and fades. */
@@ -64,9 +64,9 @@ export function OffersRow({ zoneId, signedIn }: { zoneId?: string; signedIn: boo
   useEffect(() => { if (signedIn && zoneId) void listCoupons(zoneId, subtotal).then(r => setRows(r.filter(c => c.applicable).slice(0, 8))).catch(() => setRows([])); else setRows([]); }, [signedIn, zoneId]); // eslint-disable-line react-hooks/exhaustive-deps
   if (rows.length === 0) return null;
   return (
-    <View style={{ marginTop: space.xl }}>
+    <View style={{ marginTop: SECTION_GAP }}>
       <View style={s.head}><Text style={s.title}>Offers for you</Text><Press onPress={() => router.push("/coupons")}><Text style={s.link}>View all</Text></Press></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingVertical: space.sm, gap: space.md }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: TITLE_GAP, gap: space.md }}>
         {rows.map((c, i) => {
           const [bg, fg] = OFFER_TINTS[i % OFFER_TINTS.length];
           return (
@@ -98,7 +98,7 @@ export function OrderAgainCard({ signedIn }: { signedIn: boolean }) {
     try { const r = await reorder(last.children[0].id); setFromServer(r.cart.items); router.push("/cart"); } catch { router.push({ pathname: "/order/[id]", params: { id: last.groupId } }); } finally { setBusy(false); }
   };
   return (
-    <Animated.View entering={liftIn(0)} style={{ marginHorizontal: space.lg, marginTop: space.xl }}>
+    <Animated.View entering={liftIn(0)} style={{ marginHorizontal: space.lg, marginTop: SECTION_GAP }}>
       <Press haptic onPress={() => void go()} style={s.again}>
         <View style={s.againIcon}><Icon name="rotate-ccw" size={20} color={colors.maroon} /></View>
         <View style={{ flex: 1 }}>
@@ -124,9 +124,9 @@ const s = StyleSheet.create({
   liveSub: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
   track: { flexDirection: "row", gap: 4, marginVertical: 2 },
   seg: { flex: 1, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.2)" },
-  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg },
+  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, minHeight: 28 },
   title: { fontSize: 19, fontWeight: "900", letterSpacing: -0.4, color: colors.ink },
-  link: { fontSize: 13, fontWeight: "800", color: colors.maroon },
+  link: { fontSize: 13, fontWeight: "800", color: colors.maroon, paddingVertical: 6, paddingLeft: space.md },
   offer: { width: 170, borderRadius: radius.lg, padding: space.md, gap: 6 },
   offerIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   offerDesc: { fontSize: 14, fontWeight: "800", minHeight: 36, lineHeight: 18 },
@@ -138,6 +138,9 @@ const s = StyleSheet.create({
   againBtn: { backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 14, height: 34, alignItems: "center", justifyContent: "center" },
   againBtnText: { fontWeight: "900", color: colors.maroon, fontSize: 13 },
 });
+
+/** Space between the search bar and the tab strip under it. The home header adds the same amount to its height. */
+export const TABS_GAP = space.lg;
 
 /** Blinkit-style tab strip under the search bar: "All" and each top category. Sits on the maroon header. */
 export function CategoryTabs({ categories, pics, active, onPick }: { categories: Category[]; pics: Record<string, { uri: string; product: boolean }>; active: string | null; onPick: (id: string | null) => void }) {
@@ -154,7 +157,7 @@ export function CategoryTabs({ categories, pics, active, onPick }: { categories:
     );
   };
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: space.sm }} contentContainerStyle={{ gap: space.xs, paddingRight: space.lg }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: TABS_GAP }} contentContainerStyle={{ gap: space.xs, paddingRight: space.lg }}>
       {tab(null, "All", "grid")}
       {categories.map(c => tab(c.id, c.name, "shopping-bag", pics[c.id]?.uri))}
     </ScrollView>

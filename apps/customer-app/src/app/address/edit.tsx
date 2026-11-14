@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createAddress, deleteAddress, listAddresses, updateAddress, type Address } from "../../api/addresses";
 import { getCities, getLocalities, type Locality } from "../../api/app";
 import { getMe } from "../../api/auth";
@@ -8,7 +9,7 @@ import { ApiError } from "../../api/http";
 import { uploadMessage, uploadPhoto, uploadVoice } from "../../api/media";
 import { PhotoPicker, VoiceRecorder, type Picked, type Voice } from "../../components/Attach";
 import { MapPicker, type Point } from "../../components/MapPicker";
-import { Button, Chip, Header, Icon, Screen } from "../../components/ui";
+import { Button, Chip, Header, Icon, KScrollView, Screen, useKeyboard } from "../../components/ui";
 import { useStore } from "../../state/store";
 import { colors, radius, shadow, space, type } from "../../theme";
 
@@ -21,6 +22,8 @@ export default function EditAddress() {
   const { id, pick } = useLocalSearchParams<{ id?: string; pick?: string }>();
   const editing = !!id;
   const { place, setAddressId } = useStore();
+  const insets = useSafeAreaInsets();
+  const { height: kb } = useKeyboard();
 
   const [areas, setAreas] = useState<Locality[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,14 +124,14 @@ export default function EditAddress() {
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title={editing ? "Edit address" : "Add address"} /></View>
         {loading ? <ActivityIndicator color={colors.maroon} style={{ marginTop: 80 }} /> : (
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={{ flex: 1 }}>
             {!isWeb && (
               <View style={s.map}>
                 <MapPicker initial={pin} target={target} onChange={setPin} />
                 <View pointerEvents="none" style={s.mapHint}><Text style={s.mapHintText}>Move the map so the pin sits on your door</Text></View>
               </View>
             )}
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: space.lg, paddingBottom: 150, gap: space.md }}>
+            <KScrollView revealMargin={130} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: space.lg, paddingBottom: 150 + insets.bottom, gap: space.md }}>
               <Text style={type.label}>Save as</Text>
               <View style={{ flexDirection: "row", gap: space.sm }}>{LABELS.map(l => <Chip key={l} label={l} active={label === l} onPress={() => setLabel(l)} />)}</View>
 
@@ -154,12 +157,12 @@ export default function EditAddress() {
 
               {error && <View style={s.errBox}><Icon name="alert-circle" size={16} color={colors.red} /><Text style={[type.small, { color: colors.red, flex: 1 }]}>{error}</Text></View>}
               {editing && <Button label={confirmDelete ? "Tap again to delete" : "Delete address"} variant="ghost" icon="trash-2" onPress={() => void remove()} disabled={busy} />}
-            </ScrollView>
-          </KeyboardAvoidingView>
+            </KScrollView>
+          </View>
         )}
       </Screen>
       {!loading && (
-        <View style={s.bar}><Button label={busy ? "Saving…" : "Save address"} onPress={() => void save()} disabled={busy} /></View>
+        <View style={[s.bar, { bottom: kb, paddingBottom: (kb > 0 ? 0 : insets.bottom) + space.md }]}><Button label={busy ? "Saving…" : "Save address"} onPress={() => void save()} disabled={busy} /></View>
       )}
     </View>
   );
@@ -187,5 +190,5 @@ const s = StyleSheet.create({
   err: { color: colors.red, fontSize: 12, fontWeight: "700" },
   errBox: { flexDirection: "row", gap: space.sm, alignItems: "center", backgroundColor: colors.redSoft, borderRadius: radius.md, padding: space.md },
   switchRow: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.white, borderRadius: radius.md, padding: space.lg, ...shadow.card },
-  bar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: space.lg, paddingBottom: space.xl, backgroundColor: colors.cream },
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.lg, paddingTop: space.md, backgroundColor: colors.cream },
 });

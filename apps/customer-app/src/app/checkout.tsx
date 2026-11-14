@@ -2,14 +2,14 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { addressLine, listAddresses, type Address } from "../api/addresses";
 import { getStoreStatus, syncCart, toServerLines, type StoreStatus } from "../api/cart";
 import { ApiError } from "../api/http";
 import { getSlots, slotMessage, type Slot } from "../api/preorder";
 import { checkoutMessage, createQuote, getTipOptions, newKey, placeOrder, type PaymentMethod, type Quote, type TipOptions } from "../api/orders";
-import { Button, Header, Icon, Press, Screen, tap, type IconName } from "../components/ui";
+import { Button, Header, Icon, KScrollView, Press, Screen, tap, useKeyboard, type IconName } from "../components/ui";
 import { BillSkeleton, Bone, CheckoutSkeleton } from "../components/Skeleton";
 import { useCart } from "../state/cart";
 import { useStore } from "../state/store";
@@ -22,6 +22,7 @@ export default function Checkout() {
   const { zone, signedIn, addressId } = useStore();
   const { lines, count, subtotal, savings, clear, applyServer } = useCart();
   const insets = useSafeAreaInsets();
+  const { height: kb } = useKeyboard();
 
   const [address, setAddress] = useState<Address | null | undefined>(undefined); // undefined = loading
   const [tips, setTips] = useState<TipOptions | null>(null);
@@ -127,8 +128,8 @@ export default function Checkout() {
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title="Checkout" /></View>
         {address === undefined ? <CheckoutSkeleton /> : (
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 170 + insets.bottom, gap: space.lg }}>
+          <View style={{ flex: 1 }}>
+            <KScrollView revealMargin={130} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 170 + insets.bottom, gap: space.lg }}>
 
               {/* Hero: when it arrives and where */}
               <LinearGradient colors={[colors.maroon, colors.maroonSoft]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
@@ -286,13 +287,13 @@ export default function Checkout() {
               </View>
 
               {error && <View style={s.errBox}><Icon name="alert-circle" size={16} color={colors.red} /><Text style={[type.small, { color: colors.red, flex: 1 }]}>{error}</Text></View>}
-            </ScrollView>
-          </KeyboardAvoidingView>
+            </KScrollView>
+          </View>
         )}
       </Screen>
 
       {address && (
-        <View style={[s.bar, { paddingBottom: insets.bottom + space.md }]}>
+        <View style={[s.bar, { bottom: kb, paddingBottom: (kb > 0 ? 0 : insets.bottom) + space.md }]}>
           <View style={{ flex: 1 }}>
             {quoting && !quote ? <Bone w={80} h={22} style={{ marginBottom: 4 }} /> : <Text style={s.barTotal}>{quote ? rupees(total) : "—"}</Text>}
             <Text style={type.small}>Cash on delivery</Text>

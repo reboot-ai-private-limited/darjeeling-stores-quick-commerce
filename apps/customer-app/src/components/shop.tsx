@@ -1,14 +1,15 @@
+import { BlurTargetView, BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { FlatList, StyleSheet, Text, View, useWindowDimensions, Linking } from "react-native";
+import { createContext, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from "react";
+import { FlatList, StyleSheet, Text, View, useWindowDimensions, Linking, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { SlideInDown } from "react-native-reanimated";
 import { liftIn } from "../motion";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cardImage, defaultVariant, type Banner, type Category, type Product } from "../api/catalog";
 import { useCart } from "../state/cart";
-import { colors, radius, rupees, shadow, space, type } from "../theme";
+import { colors, radius, rupees, space, type } from "../theme";
 import { Icon, Press, tap } from "./ui";
 
 /** Pads a list with empty slots so the last row of a grid keeps its column width (a lone item no longer stretches across the screen). */
@@ -144,24 +145,45 @@ export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: strin
   );
 }
 
-/** Slides up from the bottom once the cart has something in it. */
+type BlurTarget = RefObject<ComponentRef<typeof View> | null>;
+const GlassTargetContext = createContext<BlurTarget | null>(null);
+
+/** Wraps a page so the cart bar can blur what scrolls behind it. On Android the blur needs the content it blurs marked as a target, with the bar beside it, not inside. */
+export function GlassScene({ children, bar, style }: { children: ReactNode; bar: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const target = useRef<ComponentRef<typeof View>>(null);
+  return (
+    <GlassTargetContext.Provider value={target}>
+      <View style={[{ flex: 1 }, style]}>
+        <BlurTargetView ref={target} style={{ flex: 1 }}>{children}</BlurTargetView>
+        {bar}
+      </View>
+    </GlassTargetContext.Provider>
+  );
+}
+
+/** Frosted-glass bar that slides up from the bottom once the cart has something in it. */
 export function CartBar({ eta, onPress, bottom = 0 }: { eta?: string; onPress?: () => void; bottom?: number }) {
   const { count, subtotal } = useCart();
   const insets = useSafeAreaInsets();
+  const target = useContext(GlassTargetContext);
   if (count === 0) return null;
   return (
     <Animated.View entering={SlideInDown.duration(280)} style={[s.bar, { bottom: bottom + insets.bottom + space.sm }]}>
+      <BlurView intensity={70} tint="dark" blurMethod="dimezisBlurView" blurTarget={target ?? undefined} style={StyleSheet.absoluteFill} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(48,16,14,0.80)" }]} />
+      <LinearGradient pointerEvents="none" colors={["rgba(255,201,51,0.34)", "rgba(255,201,51,0.07)", "rgba(255,201,51,0)"]} style={s.barSheen} />
+      <View style={s.barIcon}><Icon name="shopping-bag" size={20} color={colors.yellow} /></View>
       <View style={{ flex: 1 }}>
         <Text style={s.barTop}>{count} {count === 1 ? "item" : "items"} · {rupees(subtotal)}</Text>
-        {eta ? <Text style={s.barSub}>Arriving in {eta}</Text> : null}
+        {eta ? <Text style={s.barSub}>Arriving in {eta}</Text> : <Text style={s.barSub}>Ready to checkout</Text>}
       </View>
-      <Press onPress={onPress ?? (() => router.push("/cart"))} haptic style={s.barBtn}><Text style={s.barBtnText}>View cart</Text><Icon name="arrow-right" size={14} color={colors.maroon} /></Press>
+      <Press onPress={onPress ?? (() => router.push("/cart"))} haptic style={s.barBtn}><Text style={s.barBtnText}>View cart</Text><Icon name="arrow-right" size={15} color={colors.maroon} /></Press>
     </Animated.View>
   );
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 62, height: 32, borderRadius: 10, borderWidth: 1.5, borderColor: colors.maroon, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", ...shadow.card },
+  addBtn: { width: 62, height: 32, borderRadius: 10, borderWidth: 1.5, borderColor: colors.maroon, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
   addText: { color: colors.maroon, fontWeight: "900", fontSize: 13, letterSpacing: 0.5 },
   addPos: { position: "absolute", right: 6, bottom: -14 },
   stepper: { width: 74, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.maroon, borderRadius: 10, height: 32 },
@@ -189,9 +211,11 @@ const s = StyleSheet.create({
   dots: { position: "absolute", bottom: 10, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.6)" },
   dotOn: { width: 18, backgroundColor: colors.yellow },
-  bar: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", alignItems: "center", backgroundColor: colors.maroon, borderRadius: radius.lg, paddingVertical: 8, paddingLeft: space.lg, paddingRight: 8, ...shadow.lift },
-  barTop: { color: colors.white, fontWeight: "800", fontSize: 13 },
-  barSub: { color: "rgba(255,255,255,0.7)", fontSize: 11, marginTop: 1 },
-  barBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 14, height: 36 },
-  barBtnText: { fontWeight: "900", color: colors.maroon, fontSize: 13 },
+  bar: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", alignItems: "center", gap: space.md, overflow: "hidden", borderRadius: radius.xl, borderWidth: 1.5, borderColor: "rgba(255,201,51,0.45)", paddingVertical: 10, paddingLeft: space.md, paddingRight: 10 },
+  barSheen: { position: "absolute", top: 0, left: 0, right: 0, height: "70%" },
+  barIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,201,51,0.16)", borderWidth: 1, borderColor: "rgba(255,201,51,0.4)", alignItems: "center", justifyContent: "center" },
+  barTop: { color: colors.white, fontWeight: "900", fontSize: 15 },
+  barSub: { color: "rgba(255,255,255,0.78)", fontSize: 12, marginTop: 1 },
+  barBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 18, height: 44, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)" },
+  barBtnText: { fontWeight: "900", color: colors.maroon, fontSize: 14 },
 });
