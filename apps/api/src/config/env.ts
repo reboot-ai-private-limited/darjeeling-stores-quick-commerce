@@ -37,6 +37,10 @@ const schema = sessionSettings.extend({
   /** Road travel times for ETAs (Google Routes). Without it the straight-line estimate is used. */
   GOOGLE_MAPS_API_KEY: z.string().trim().min(10).max(200).optional(),
   /** Sends login codes by SMS through StartMessaging. Both the key and the template id are needed; without them code delivery answers 503. */
+  /** Demo logins for store review (for example Google Play): these phones always accept REVIEW_OTP and are never sent an SMS. Set the code and at least one phone. */
+  REVIEW_OTP: z.string().trim().regex(/^\d{6}$/, "Use exactly 6 digits").optional(),
+  REVIEW_CUSTOMER_PHONE: z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Use international format such as +919000000111").optional(),
+  REVIEW_RIDER_PHONE: z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Use international format such as +919000000112").optional(),
   STARTMESSAGING_API_KEY: z.string().trim().min(10).max(200).optional(),
   STARTMESSAGING_TEMPLATE_ID: z.string().trim().min(1).max(100).optional(),
   /** The {{appName}} the template shows in the message. */
@@ -57,6 +61,8 @@ const schema = sessionSettings.extend({
 }).superRefine((config, context) => {
   if (config.mockOTP && config.NODE_ENV !== "development") context.addIssue({ code: "custom", path: ["mockOTP"], message: "Mock OTP requires development mode" });
   if (config.mockOTP && !config.JWT_SECRET) context.addIssue({ code: "custom", path: ["JWT_SECRET"], message: "JWT signing key required" });
+  if (Boolean(config.REVIEW_OTP) !== Boolean(config.REVIEW_CUSTOMER_PHONE || config.REVIEW_RIDER_PHONE)) context.addIssue({ code: "custom", path: ["REVIEW_OTP"], message: "Set REVIEW_OTP together with REVIEW_CUSTOMER_PHONE and/or REVIEW_RIDER_PHONE" });
+  if (config.REVIEW_CUSTOMER_PHONE && config.REVIEW_CUSTOMER_PHONE === config.REVIEW_RIDER_PHONE) context.addIssue({ code: "custom", path: ["REVIEW_RIDER_PHONE"], message: "The customer and rider demo phones must differ" });
   if (Boolean(config.STARTMESSAGING_API_KEY) !== Boolean(config.STARTMESSAGING_TEMPLATE_ID)) context.addIssue({ code: "custom", path: ["STARTMESSAGING_TEMPLATE_ID"], message: "Set the StartMessaging key and template id together" });
   if (config.UPI_VPA && !config.UPI_PAYEE_NAME) context.addIssue({ code: "custom", path: ["UPI_PAYEE_NAME"], message: "Name the UPI payee together with the UPI address" });
   if (durationSeconds(config.ACCESS_TOKEN_TTL) >= durationSeconds(config.REFRESH_TOKEN_TTL)) context.addIssue({ code: "custom", path: ["REFRESH_TOKEN_TTL"], message: "Refresh lifetime must exceed access lifetime" });
