@@ -1,12 +1,12 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Linking, StyleSheet, Text, TextInput, View } from "react-native";
-import { requestDeletion } from "../api/account";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import { getAppConfig } from "../api/app";
+import { SUPPORT_PHONE } from "../api/config";
 import { Button, Card, Header, Icon, Press, Screen, SectionTitle } from "../components/ui";
 import { useStore } from "../state/store";
-import { colors, radius, space, type } from "../theme";
+import { colors, space, type } from "../theme";
 
 const FAQS: [string, string][] = [
   ["How long does delivery take?", "Most orders arrive within the time shown at checkout. You can follow your delivery partner live from the order screen."],
@@ -19,17 +19,9 @@ const FAQS: [string, string][] = [
 /** Screen 37: support contact, FAQs, account deletion and sign out. */
 export default function Help() {
   const { signedIn, signOut } = useStore();
-  const [support, setSupport] = useState<string | null>(null);
+  const [support, setSupport] = useState<string | null>(SUPPORT_PHONE);
   const [open, setOpen] = useState<number | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [reason, setReason] = useState(""); const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
-  useEffect(() => { void getAppConfig(Constants.expoConfig?.version ?? "0.0.0").then(c => setSupport(c.supportNumber ?? null)).catch(() => undefined); }, []);
-
-  const deleteAccount = async () => {
-    setBusy(true); setErr("");
-    try { await requestDeletion(reason.trim() || undefined); await signOut(); router.replace("/welcome"); }
-    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't send the request."); setBusy(false); }
-  };
+  useEffect(() => { void getAppConfig(Constants.expoConfig?.version ?? "0.0.0").then(c => setSupport(c.supportNumber ?? SUPPORT_PHONE)).catch(() => undefined); }, []);
 
   return (
     <Screen scroll>
@@ -63,17 +55,7 @@ export default function Help() {
           <SectionTitle>Account</SectionTitle>
           <Card style={{ gap: space.sm }}>
             <Button label="Sign out" variant="ghost" icon="log-out" onPress={() => void signOut().then(() => router.replace("/welcome"))} />
-            {!confirming ? (
-              <Press onPress={() => setConfirming(true)} style={{ alignItems: "center", padding: space.sm }}><Text style={{ color: colors.red, fontWeight: "700" }}>Delete my account</Text></Press>
-            ) : (
-              <View style={{ gap: space.sm }}>
-                <Text style={type.small}>This signs you out everywhere and asks us to delete your account and data. It can't be undone once we finish.</Text>
-                <TextInput value={reason} onChangeText={setReason} placeholder="Reason (optional)" style={s.input} />
-                {!!err && <Text style={[type.small, { color: colors.red }]}>{err}</Text>}
-                <Button label={busy ? "Sending…" : "Yes, delete my account"} variant="danger" disabled={busy} onPress={() => void deleteAccount()} />
-                <Button label="Keep my account" variant="soft" onPress={() => setConfirming(false)} />
-              </View>
-            )}
+            <Press onPress={() => router.push("/delete-account")} style={{ alignItems: "center", padding: space.sm }}><Text style={{ color: colors.red, fontWeight: "700" }}>Delete my account</Text></Press>
           </Card>
         </>
       )}
@@ -85,5 +67,4 @@ export default function Help() {
 
 const s = StyleSheet.create({
   faq: { padding: space.lg },
-  input: { backgroundColor: colors.cream, borderRadius: radius.md, paddingHorizontal: space.md, height: 48, fontSize: 15, color: colors.ink },
 });

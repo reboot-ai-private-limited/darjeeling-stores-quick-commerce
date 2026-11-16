@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { rememberViewed } from "../../components/homeExtras";
 import { getProduct, getProducts, notifyMe, type Product, type ProductDetail } from "../../api/catalog";
 import { ProductCard } from "../../components/shop";
+import { ProductPageSkeleton } from "../../components/Skeleton";
 import { ApiError } from "../../api/http";
 import { Button, Icon, Press, tap } from "../../components/ui";
 import { useFavourites } from "../../api/favourites";
@@ -43,7 +44,7 @@ export default function ProductScreen() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!zone || !p) return;
-    void getProducts(zone.id, p.categoryId).then(r => setSimilar(r.items.filter(x => x.id !== p.id).slice(0, 12))).catch(() => setSimilar([]));
+    void getProducts(zone.id, p.categoryId, null, 13).then(r => setSimilar(r.items.filter(x => x.id !== p.id).slice(0, 12))).catch(() => setSimilar([]));
   }, [zone, p]);
 
   const v = p ? p.variants[vi] ?? p.variants[0] : undefined;
@@ -76,7 +77,7 @@ export default function ProductScreen() {
       {error ? (
         <View style={s.center}><Icon name="alert-circle" size={40} color={colors.faint} /><Text style={[type.body, { textAlign: "center", color: colors.muted }]}>{error}</Text><Button label="Try again" variant="soft" onPress={() => void load()} /></View>
       ) : !p ? (
-        <ActivityIndicator color={colors.maroon} style={{ marginTop: 160 }} />
+        <ProductPageSkeleton />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 92 + insets.bottom }}>
                 {/* Gallery: main picture on white, with a thumbnail strip underneath */}

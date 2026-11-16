@@ -2,11 +2,11 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { FlatList, StyleSheet, Text, View, useWindowDimensions, Linking } from "react-native";
-import Animated, { SlideInDown } from "react-native-reanimated";
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, Linking } from "react-native";
+import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
 import { liftIn } from "../motion";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { cardImage, defaultVariant, type Banner, type Category, type Product } from "../api/catalog";
+import { cardImage, defaultVariant, type Banner, type Category, type Product, type Variant } from "../api/catalog";
 import { useCart } from "../state/cart";
 import { colors, radius, rupees, space, type } from "../theme";
 import { Icon, Press, tap } from "./ui";
@@ -14,11 +14,98 @@ import { Icon, Press, tap } from "./ui";
 /** Pads a list with empty slots so the last row of a grid keeps its column width (a lone item no longer stretches across the screen). */
 export const fillRow = <T,>(items: T[], cols: number): (T | null)[] => (items.length % cols === 0 ? items : [...items, ...Array.from({ length: cols - (items.length % cols) }, () => null)]);
 
-/** Outlined "ADD" button that turns into a − n + stepper once the item is in the cart (quick-commerce style). */
+/** A − n + stepper for one size of a product (one per size in the options sheet). */
+function SizeStepper({ product, v }: { product: Product; v: Variant }) {
+  const { qtyOf, add, remove } = useCart();
+  const qty = qtyOf(v.variantId);
+  if (!v.available) return <Text style={s.sold}>Sold out</Text>;
+  if (qty === 0) return <Press haptic onPress={() => add(product, v)} style={s.addBtn}><Text style={s.addText}>ADD</Text></Press>;
+  return (
+    <View style={s.stepper}>
+      <Press onPress={() => { tap(); remove(v.variantId); }} style={s.stepBtn}><Icon name="minus" size={15} color={colors.white} /></Press>
+      <Text style={s.stepQty}>{qty}</Text>
+      <Press disabled={qty >= v.maxQty} onPress={() => { tap(); add(product, v); }} style={[s.stepBtn, qty >= v.maxQty && { opacity: 0.4 }]}><Icon name="plus" size={15} color={colors.white} /></Press>
+    </View>
+  );
+}
+
+/** Bottom sheet that lists every size of a product as its own card with its price and an ADD button. */
+function OptionsSheet({ product, visible, onClose }: { product: Product; visible: boolean; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const { qtyOf, count, subtotal } = useCart();
+  const img = cardImage(product);
+  const inCart = product.variants.reduce((n, v) => n + qtyOf(v.variantId), 0);
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <View style={s.sheetRoot}>
+        <Animated.View entering={FadeIn.duration(180)} style={s.backdrop}>
+          <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close" />
+        </Animated.View>
+        <Animated.View entering={SlideInDown.duration(260)} style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+          <View style={s.sheetHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetTitle} numberOfLines={2}>{product.name}</Text>
+              <Text style={s.sheetSub}>{product.variants.length} options</Text>
+            </View>
+            <Press onPress={onClose} style={s.sheetClose}><Icon name="x" size={18} color={colors.ink} /></Press>
+          </View>
+          <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: space.md, paddingBottom: space.sm }} showsVerticalScrollIndicator={false}>
+            {product.variants.map(v => (
+              <View key={v.variantId} style={[s.optCard, !v.available && { opacity: 0.55 }]}>
+                <View style={s.optImg}>{img ? <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} contentFit="contain" /> : <Icon name="package" size={26} color={colors.faint} />}</View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={s.optLabel} numberOfLines={1}>{v.label}</Text>
+                  <View style={s.priceRow}>
+                    <Text style={s.price}>{rupees(v.price)}</Text>
+                    {v.mrp > v.price && <Text style={s.mrp}>{rupees(v.mrp)}</Text>}
+                  </View>
+                  {v.discountPercent > 0 && <Text style={s.optOff}>{v.discountPercent}% OFF</Text>}
+                </View>
+                <SizeStepper product={product} v={v} />
+              </View>
+            ))}
+          </ScrollView>
+          {inCart > 0 && (
+            <Press haptic onPress={() => { onClose(); router.push("/cart"); }} style={s.sheetCart}>
+              <Text style={s.sheetCartText}>{count} {count === 1 ? "item" : "items"} · {rupees(subtotal)}</Text>
+              <Text style={s.sheetCartGo}>View cart</Text>
+            </Press>
+          )}
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+/**
+ * Outlined "ADD" button that turns into a − n + stepper once the item is in the cart (quick-commerce style).
+ * A product with several sizes shows "ADD" with "N options" under it; tapping opens a sheet with a card for each size.
+ */
 export function AddButton({ product }: { product: Product }) {
   const { qtyOf, add, remove } = useCart();
+  const [open, setOpen] = useState(false);
   const v = defaultVariant(product);
   if (!v) return null;
+  if (product.variants.length > 1) {
+    const total = product.variants.reduce((n, x) => n + qtyOf(x.variantId), 0);
+    return (
+      <>
+        {total === 0 ? (
+          <Press haptic onPress={() => setOpen(true)} style={s.optBtn}>
+            <Text style={s.addText}>ADD</Text>
+            <Text style={s.optCount}>{product.variants.length} options</Text>
+          </Press>
+        ) : (
+          <Press haptic onPress={() => setOpen(true)} style={s.optBtnOn}>
+            <Icon name="minus" size={14} color={colors.white} />
+            <Text style={s.stepQty}>{total}</Text>
+            <Icon name="plus" size={14} color={colors.white} />
+          </Press>
+        )}
+        <OptionsSheet product={product} visible={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
   const qty = qtyOf(v.variantId);
   if (qty === 0) {
     return (
@@ -103,27 +190,46 @@ export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: strin
   const [i, setI] = useState(0);
   // The greeting slide is only a fallback for a store with no banners yet; once an admin adds banners they are all that shows.
   const slides: (Banner | "eta")[] = banners.length > 0 ? banners : ["eta"];
+  const n = slides.length;
+  const step = w + space.md;
+  // Endless loop: a copy of the last slide sits before the first and a copy of the first after the last. Swiping onto a copy
+  // jumps (without animation, unseen) to the real slide it copies, so the banner never reaches an end. `pos` counts the copies too.
+  const looped = n > 1 ? [slides[n - 1]!, ...slides, slides[0]!] : slides;
   const ref = useRef<FlatList>(null);
   const touched = useRef(false);
   const resume = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const iRef = useRef(0); iRef.current = i;
+  const pos = useRef(n > 1 ? 1 : 0);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const part = dayPart();
+  /** Called when a scroll comes to rest on position `p`: updates the dots, and silently jumps off a copy onto the real slide. */
+  const settle = (p: number) => {
+    if (n < 2) return;
+    let at = p;
+    if (p <= 0) at = n; else if (p >= n + 1) at = 1;
+    if (at !== p) ref.current?.scrollToOffset({ offset: at * step, animated: false });
+    pos.current = at; setI(at - 1);
+  };
   useEffect(() => {
-    if (slides.length < 2) return;
+    if (n < 2) return;
+    pos.current = 1; setI(0);
+    const start = setTimeout(() => ref.current?.scrollToOffset({ offset: step, animated: false }), 0); // begin on the real first slide
     const t = setInterval(() => {
       if (touched.current) return;
-      const next = (iRef.current + 1) % slides.length;
-      ref.current?.scrollToOffset({ offset: next * (w + space.md), animated: true }); setI(next);
+      const next = pos.current + 1;
+      ref.current?.scrollToOffset({ offset: next * step, animated: true });
+      // The animation's end is not always reported, so settle on our own a moment after it should have finished.
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      settleTimer.current = setTimeout(() => { if (!touched.current) settle(next); }, 600);
     }, 3500);
-    return () => { clearInterval(t); if (resume.current) clearTimeout(resume.current); };
-  }, [slides.length, w]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { clearTimeout(start); clearInterval(t); if (resume.current) clearTimeout(resume.current); if (settleTimer.current) clearTimeout(settleTimer.current); };
+  }, [n, w]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <View>
       <FlatList
         ref={ref} onScrollBeginDrag={() => { touched.current = true; if (resume.current) clearTimeout(resume.current); }}
-        onScrollEndDrag={() => { if (resume.current) clearTimeout(resume.current); resume.current = setTimeout(() => { touched.current = false; }, 5000); }} data={slides} horizontal pagingEnabled snapToInterval={w + space.md} decelerationRate="fast" showsHorizontalScrollIndicator={false}
-        keyExtractor={(b) => (b === "eta" ? "eta" : b.id)} contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.md }}
-        onMomentumScrollEnd={e => setI(Math.round(e.nativeEvent.contentOffset.x / (w + space.md)))}
+        onScrollEndDrag={() => { if (resume.current) clearTimeout(resume.current); resume.current = setTimeout(() => { touched.current = false; }, 5000); }} data={looped} horizontal pagingEnabled snapToInterval={step} decelerationRate="fast" showsHorizontalScrollIndicator={false}
+        keyExtractor={(b, k) => (b === "eta" ? "eta" : b.id) + (n > 1 && (k === 0 || k === n + 1) ? "-copy" : "")} getItemLayout={(_, k) => ({ length: step, offset: step * k + space.lg, index: k })} contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.md }}
+        onMomentumScrollEnd={e => { if (settleTimer.current) clearTimeout(settleTimer.current); settle(Math.round(e.nativeEvent.contentOffset.x / step)); }}
         renderItem={({ item }) => item === "eta" ? (
           <LinearGradient colors={[colors.maroon, colors.maroonSoft]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.banner, { width: w }]}>
             <View style={s.etaBadge}><Icon name="zap" size={14} color={colors.maroon} /><Text style={s.etaBadgeText}>{eta}</Text></View>
@@ -139,7 +245,7 @@ export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: strin
           </Press>
         )}
       />
-      {slides.length > 1 && <View pointerEvents="none" style={s.dots}>{slides.map((_, k) => <View key={k} style={[s.dot, k === i && s.dotOn]} />)}</View>}
+      {n > 1 && <View pointerEvents="none" style={s.dots}>{slides.map((_, k) => <View key={k} style={[s.dot, k === i && s.dotOn]} />)}</View>}
     </View>
   );
 }
@@ -175,6 +281,23 @@ const s = StyleSheet.create({
   addBtn: { width: 62, height: 32, borderRadius: 10, borderWidth: 1.5, borderColor: colors.green, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
   addText: { color: colors.green, fontWeight: "900", fontSize: 13, letterSpacing: 0.5 },
   addPos: { position: "absolute", right: 6, bottom: -14 },
+  optBtn: { width: 66, height: 42, borderRadius: 10, borderWidth: 1.5, borderColor: colors.green, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
+  optBtnOn: { width: 74, height: 32, borderRadius: 10, backgroundColor: colors.green, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8 },
+  optCount: { color: colors.muted, fontWeight: "700", fontSize: 9.5, marginTop: -1 },
+  sheetRoot: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { ...StyleSheet.absoluteFill as object, backgroundColor: "rgba(15,40,30,0.45)" },
+  sheet: { backgroundColor: colors.cream, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.lg, gap: space.md },
+  sheetHead: { flexDirection: "row", alignItems: "center", gap: space.md },
+  sheetTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
+  sheetSub: { fontSize: 12, fontWeight: "600", color: colors.muted, marginTop: 2 },
+  sheetClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line },
+  optCard: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.white, borderRadius: radius.lg, padding: space.md, borderWidth: 1, borderColor: colors.line },
+  optImg: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.cream, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  optLabel: { fontSize: 14, fontWeight: "700", color: colors.ink },
+  optOff: { fontSize: 11, fontWeight: "800", color: colors.green },
+  sheetCart: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: radius.lg, paddingHorizontal: space.lg, height: 50 },
+  sheetCartText: { color: colors.white, fontWeight: "800", fontSize: 14 },
+  sheetCartGo: { color: colors.white, fontWeight: "900", fontSize: 14 },
   stepper: { width: 74, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: 10, height: 32 },
   stepBtn: { width: 24, height: 32, alignItems: "center", justifyContent: "center" },
   stepQty: { color: colors.white, fontWeight: "900", fontSize: 14, textAlign: "center" },

@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
-import { cachedCategories, findCategory, getCategories, getProducts, defaultVariant, type Category, type Product } from "../../api/catalog";
+import { cachedCategories, findCategory, getCategories, getProducts, PAGE_SIZE, defaultVariant, type Category, type Product, type ProductSort } from "../../api/catalog";
 import { GridSkeleton } from "../../components/Skeleton";
 import { Dropdown } from "../../components/Dropdown";
 import { fillRow, CartBar, ProductCard } from "../../components/shop";
@@ -34,37 +34,36 @@ export default function CategoryProducts() {
   useEffect(() => { if (zoneId) void getCategories(zoneId).then(setTree).catch(() => undefined); }, [zoneId]);
   const cat = useMemo(() => findCategory(tree, id), [tree, id]);
   const target = sub ?? id;
+  // Sorting is done by the server, so it covers the whole category and every page, not just what has loaded.
+  const apiSort: ProductSort = sort === "low" ? "price_asc" : sort === "high" ? "price_desc" : sort === "discount" ? "discount" : "relevance";
 
   const load = useCallback(async () => {
     if (!zoneId) return;
     setLoading(true); setError(null);
-    try { const r = await getProducts(zoneId, target); setItems(r.items); setNext(r.nextCursor); }
+    try { const r = await getProducts(zoneId, target, null, PAGE_SIZE, apiSort); setItems(r.items); setNext(r.nextCursor); }
     catch (e) { setError(e instanceof Error ? e.message : "Couldn't load products."); }
     finally { setLoading(false); }
-  }, [zoneId, target]);
+  }, [zoneId, target, apiSort]);
   useEffect(() => { void load(); }, [load]);
 
   const loadMore = async () => {
     if (!zoneId || !next || more) return;
     setMore(true);
-    try { const r = await getProducts(zoneId, target, next); setItems(p => [...p, ...r.items]); setNext(r.nextCursor); }
+    try { const r = await getProducts(zoneId, target, next, PAGE_SIZE, apiSort); setItems(p => [...p, ...r.items]); setNext(r.nextCursor); }
     catch { /* keep what we have; scrolling again retries */ }
     finally { setMore(false); }
   };
 
+  // Filters apply to what has loaded so far; when they leave too few cards to fill the screen, fetch the next ten so scrolling can continue.
   const shown = useMemo(() => {
     let list = inStock ? items.filter(p => p.availability === "in_stock") : items;
     if (food === "veg") list = list.filter(p => p.foodType === "veg" || p.foodType === "vegan");
     if (food === "non_veg") list = list.filter(p => p.foodType === "non_veg" || p.foodType === "egg");
     if (brand) list = list.filter(p => p.brand?.id === brand);
     if (under) list = list.filter(p => (defaultVariant(p)?.price ?? 0) <= under * 100);
-    const price = (p: Product) => defaultVariant(p)?.price ?? 0;
-    const off = (p: Product) => defaultVariant(p)?.discountPercent ?? 0;
-    if (sort === "low") list = [...list].sort((a, b) => price(a) - price(b));
-    else if (sort === "high") list = [...list].sort((a, b) => price(b) - price(a));
-    else if (sort === "discount") list = [...list].sort((a, b) => off(b) - off(a));
     return list;
-  }, [items, sort, inStock, food, brand, under]);
+  }, [items, inStock, food, brand, under]);
+  useEffect(() => { if (!loading && !more && next && shown.length < 6) void loadMore(); }, [loading, more, next, shown.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const hasFood = useMemo(() => items.some(p => p.foodType === "veg" || p.foodType === "vegan" || p.foodType === "non_veg" || p.foodType === "egg"), [items]);
   const brands = useMemo(() => { const m = new Map<string, string>(); items.forEach(p => { if (p.brand) m.set(p.brand.id, p.brand.name); }); return [...m.entries()]; }, [items]);
   const filtered = inStock || !!food || !!brand || !!under;

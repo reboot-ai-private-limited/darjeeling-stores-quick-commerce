@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getAppConfig, resolveLocation, type Zone } from "../api/app";
+import { SUPPORT_PHONE } from "../api/config";
 import { loadSession, setSignedOutHandler } from "../api/http";
 import { signOutRemote } from "../api/auth";
 import { kv } from "../api/kv";
@@ -60,8 +61,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const version = Constants.expoConfig?.version ?? "0.0.0";
         const cfg = await getAppConfig(version);
-        if (cfg.maintenance?.active) setBlocked({ kind: "maintenance", message: cfg.maintenance.message ?? "We're making things better. Back shortly.", support: cfg.supportNumber });
-        else if (cfg.forceUpdate || (cfg.minSupportedVersion && older(version, cfg.minSupportedVersion))) setBlocked({ kind: "update", message: "Please update the app to keep ordering.", url: cfg.downloadUrl, support: cfg.supportNumber });
+        if (cfg.maintenance?.active) setBlocked({ kind: "maintenance", message: cfg.maintenance.message ?? "We're making things better. Back shortly.", support: cfg.supportNumber ?? SUPPORT_PHONE });
+        else if (cfg.forceUpdate || (cfg.minSupportedVersion && older(version, cfg.minSupportedVersion))) setBlocked({ kind: "update", message: "Please update the app to keep ordering.", url: cfg.downloadUrl, support: cfg.supportNumber ?? SUPPORT_PHONE });
       } catch { /* offline at launch: carry on, individual calls explain network trouble */ }
       if (live) setBooting(false);
     })();
