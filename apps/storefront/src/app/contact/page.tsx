@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SUPPORT_PHONE_LABEL, SUPPORT_PHONE_TEL, whatsappLink } from "../../lib/contact";
 import { Icon } from "../../components/ui/Icon";
 
 export const metadata: Metadata = { title: "Contact Us — Darjeeling Stores" };
 
 /** Same number the Help page and footer use. */
-const PHONE_LABEL = "+91 90000 00002";
-const PHONE_TEL = "+919000000002";
-const WHATSAPP = "https://wa.me/919000000002?text=Hi%20Darjeeling%20Stores,%20I%20need%20help";
+const PHONE_LABEL = SUPPORT_PHONE_LABEL;
+const PHONE_TEL = SUPPORT_PHONE_TEL;
+const WHATSAPP = whatsappLink();
 
 const TOPICS = [
   { title: "Track or change an order", text: "Open your order from My orders to follow it live, cancel before packing, or report a problem.", href: "/account/orders", cta: "My orders" },

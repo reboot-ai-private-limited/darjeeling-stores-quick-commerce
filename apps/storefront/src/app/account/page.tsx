@@ -135,6 +135,12 @@ export default function AccountPage() {
         ))}
       </div>
 
+      <div style={{ marginTop: 16, textAlign: "center" }}>
+        <Link href="/delete-account" style={{ fontSize: 13, fontWeight: 700, color: "var(--red)" }}>
+          Delete my account
+        </Link>
+      </div>
+
       {/* Sign Out Button */}
       <div style={{ marginTop: 24, textAlign: "center" }}>
         <button

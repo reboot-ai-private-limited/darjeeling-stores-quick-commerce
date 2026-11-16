@@ -35,7 +35,7 @@ const Rail: React.FC<{ title: string; subtitle?: string | null | undefined; icon
       </div>
       {href && (
         <Link href={href} style={{ fontSize: 13, fontWeight: 800, color: "var(--maroon)" }}>
-          See all
+          See all →
         </Link>
       )}
     </div>
@@ -222,7 +222,7 @@ export default function HomePage() {
           <div className="sec-head" style={{ marginBottom: 16 }}>
             <h2 className="sec-title">{activeCategory.name}</h2>
             <Link href={`/category/${activeCategory.id}`} style={{ fontSize: 13, fontWeight: 800, color: "var(--maroon)" }}>
-              View full category →
+              View all →
             </Link>
           </div>
           {activeTabProducts.length > 0 ? (

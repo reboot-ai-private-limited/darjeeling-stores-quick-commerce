@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { SUPPORT_PHONE_LABEL, SUPPORT_PHONE_TEL, whatsappLink } from "../../lib/contact";
 import { usePathname } from "next/navigation";
 import { getCategories } from "../../lib/api";
 import type { Category } from "../../lib/types";
@@ -9,9 +10,9 @@ import { useStore } from "../../state/StoreContext";
 import { Icon } from "../ui/Icon";
 
 /** Same number the Help page uses for WhatsApp and calls. */
-const SUPPORT_PHONE = "+91 90000 00002";
-const SUPPORT_TEL = "+919000000002";
-const WHATSAPP = "https://wa.me/919000000002?text=Hi%20Darjeeling%20Stores,%20I%20need%20help";
+const SUPPORT_PHONE = SUPPORT_PHONE_LABEL;
+const SUPPORT_TEL = SUPPORT_PHONE_TEL;
+const WHATSAPP = whatsappLink();
 
 /** Pages where a footer would only get in the way of finishing an order. */
 const HIDE_ON = ["/checkout", "/pay/", "/tracking/"];
@@ -204,6 +205,9 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <Link href="/privacy">Privacy policy</Link>
+              </li>
+              <li>
+                <Link href="/delete-account">Delete your account</Link>
               </li>
               <li>
                 <Link href="/refund-policy">Refund policy</Link>

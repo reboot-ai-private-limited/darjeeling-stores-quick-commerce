@@ -39,7 +39,7 @@ export const MapPinPicker: React.FC<MapPinPickerProps> = ({
         // Custom Leaflet pin icon
         const icon = L.divIcon({
           className: "custom-map-pin",
-          html: `<div style="background: #401815; color: #ffc933; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(64,24,21,0.3); border: 2px solid #ffffff;"><div style="transform: rotate(45deg); width: 10px; height: 10px; background: #ffc933; border-radius: 50%;"></div></div>`,
+          html: `<div style="background: #0F5B43; color: #CFB264; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(15,91,67,0.3); border: 2px solid #ffffff;"><div style="transform: rotate(45deg); width: 10px; height: 10px; background: #CFB264; border-radius: 50%;"></div></div>`,
           iconSize: [34, 34],
           iconAnchor: [17, 34],
         });

@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
+import { LEGAL_URLS } from "../../api/config";
 import { getMe, type Me } from "../../api/auth";
 import { Button, Card, Icon, Press, Row, Screen, type IconName } from "../../components/ui";
 import { useStore } from "../../state/store";
@@ -49,6 +50,19 @@ export default function Account() {
           ))}
         </Card>
       )}
+      <Card style={{ marginTop: space.md, padding: 0, overflow: "hidden" }}>
+        <Press onPress={() => void Linking.openURL(LEGAL_URLS.privacy)} style={s.link}>
+          <Icon name="shield" size={19} color={colors.maroon} /><Text style={[type.body, { flex: 1, fontWeight: "600" }]}>Privacy policy</Text><Icon name="external-link" size={17} color={colors.faint} />
+        </Press>
+        <Press onPress={() => void Linking.openURL(LEGAL_URLS.terms)} style={[s.link, { borderTopWidth: 1, borderTopColor: colors.line }]}>
+          <Icon name="file-text" size={19} color={colors.maroon} /><Text style={[type.body, { flex: 1, fontWeight: "600" }]}>Terms &amp; conditions</Text><Icon name="external-link" size={17} color={colors.faint} />
+        </Press>
+        {signedIn && (
+          <Press onPress={() => router.push("/delete-account")} style={[s.link, { borderTopWidth: 1, borderTopColor: colors.line }]}>
+            <Icon name="trash-2" size={19} color={colors.red} /><Text style={[type.body, { flex: 1, fontWeight: "600", color: colors.red }]}>Delete account</Text><Icon name="chevron-right" size={18} color={colors.faint} />
+          </Press>
+        )}
+      </Card>
       <View style={{ marginTop: space.xl, gap: space.sm }}>
         <Button label="Change location" variant="soft" icon="map-pin" onPress={() => router.push("/location")} />
         <Button label="Help & support" variant="soft" icon="help-circle" onPress={() => router.push("/help")} />

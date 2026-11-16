@@ -15,3 +15,14 @@ function devHost(): string {
 
 export const API_ORIGIN = process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, "") ?? `http://${devHost()}:4000`;
 export const API_URL = `${API_ORIGIN}/api/v1`;
+
+/** The store's support number (phone and WhatsApp). The server can override it with its own `supportNumber`; this is the built-in fallback. */
+export const SUPPORT_PHONE = "+917547996919";
+
+/**
+ * The public website (the storefront) that hosts the policy pages.
+ * - Set EXPO_PUBLIC_WEB_URL (for example https://www.darjeelingstores.in) in release builds. These are the links to give Google Play.
+ * - In development it is the storefront on the same PC, port 3001.
+ */
+export const WEB_ORIGIN = process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/+$/, "") ?? `http://${devHost()}:3001`;
+export const LEGAL_URLS = { privacy: `${WEB_ORIGIN}/privacy`, terms: `${WEB_ORIGIN}/terms`, deleteAccount: `${WEB_ORIGIN}/delete-account` };

@@ -10,7 +10,7 @@
     "android": {
       "package": "in.darjeelingstores.rider",
       "adaptiveIcon": {
-        "backgroundColor": "#401815",
+        "backgroundColor": "#0F5B43",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -29,7 +29,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "backgroundColor": "#401815",
+          "backgroundColor": "#F6FBF4",
           "imageWidth": 200
         }
       ],

@@ -92,7 +92,7 @@ export async function startFixture(databaseName: string, options: { realOrders?:
     push: msg.push, whatsapp: msg.whatsapp, sms: msg.sms, contacts: msg.contacts, devices: msg.devices, audience: msg.audience,
     webhook: { verifyToken: "verify-me", appSecret: "app-secret" },
     geography: geo.geography, banners: { forZone: async () => banners }, storeSettings: { forZone: async () => storeValue },
-    discoverySettings: { maxChanges: 6 },
+    discoverySettings: { maxChanges: 6, cacheMs: Number(process.env.TEST_CACHE_MS ?? 0) },
     ...(options.realOrders ? {} : { orders: orders.port }), ...(options.realMoney ? {} : { money: money.port }), paymentProvider: paymentsFake.provider, riderIdentity: accounts.identity, rider: riderFromHeader,
     trackingTokenSecret: "test-secret", syncSettings: { upi: { vpa: "darjeelingstores@bank", payeeName: "Darjeeling Stores" }, otpIterations: 1000 },
     connection: h.connection, auth: actorFromHeader, customer: customerFromHeader,

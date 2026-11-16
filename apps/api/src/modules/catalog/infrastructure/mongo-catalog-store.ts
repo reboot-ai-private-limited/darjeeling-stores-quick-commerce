@@ -56,7 +56,11 @@ export function createMongoCatalogStore(connection: Connection): CatalogStore {
       async listBrands() { return (await brands().find({}, opts).sort({ sortOrder: 1, name: 1 }).toArray()).map(toBrand); },
       countProductsOfBrand(id) { return products().countDocuments({ brandId: id }, opts); },
       async getProduct(id) { const doc = await products().findOne({ _id: id }, opts); return doc ? toProduct(doc) : null; },
-      async getProducts(ids) { return (await products().find({ _id: { $in: [...ids] } }, opts).toArray()).map(toProduct); },
+      async getProducts(ids, options) {
+        // A slim read skips the long text fields; they come back empty (toProduct fills the missing ones).
+        const projection = options?.slim ? { description: 0, highlights: 0, keyInfo: 0, nutrition: 0, infoSections: 0 } : undefined;
+        return (await products().find({ _id: { $in: [...ids] } }, { ...opts, ...(projection && { projection }) }).toArray()).map(doc => toProduct({ ...doc, description: doc.description ?? "" }));
+      },
       async listProducts(query: ProductQuery) {
         const filter: Record<string, unknown> = {};
         if (query.status) filter.status = query.status;

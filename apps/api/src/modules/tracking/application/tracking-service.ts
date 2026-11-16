@@ -10,6 +10,8 @@ export interface TrackingDeps {
   store: TrackingStore; orders: OrdersPort; settings: TrackingSettings; eta: EtaProvider; signer: TokenSigner; now: () => Date;
   /** The road to draw on the rider's map. Without it the rider gets a straight line. */
   routePath?: RoutePathProvider;
+  /** Also write every position to the history collection. Off by default: only the rider's latest position is kept (on the rider). */
+  keepHistory?: boolean;
   riders: { byId(id: string): Promise<Rider | null>; recordLocation(riderId: string, location: { lat: number; lng: number }, at: Date): Promise<boolean> };
   relations: { riderOfOrder(orderId: string): Promise<string | null>; liveOrderIds(riderId: string): Promise<string[]> };
 }
@@ -66,7 +68,7 @@ export function createTrackingService(deps: TrackingDeps) {
         .filter(p => p.at.getTime() >= oldest)
         .map(p => ({ riderId: rider.id, at: p.at.getTime() > t.getTime() + FUTURE_SLACK_MS ? t : p.at, location: p.location, accuracyM: p.accuracyM ?? null, speedKmh: p.speedKmh ?? null }));
       if (kept.length > 0) {
-        await store.insertPoints(kept);
+        if (deps.keepHistory) await store.insertPoints(kept);
         const latest = kept.reduce((a, b) => (b.at.getTime() > a.at.getTime() ? b : a));
         await riders.recordLocation(rider.id, latest.location, latest.at);
         await refreshEtas(rider.id);

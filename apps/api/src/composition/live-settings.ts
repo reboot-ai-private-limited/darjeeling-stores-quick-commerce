@@ -4,7 +4,7 @@ import type { MediaSettings } from "../modules/media/media.public.js";
 import type { OrderSettings } from "../modules/orders/orders.public.js";
 import type { PaymentSettings } from "../modules/payments/payments.public.js";
 import type { RefundSettings } from "../modules/refunds/refunds.public.js";
-import { DEFS, type Group, type SettingsService, type SettingValue } from "../modules/settings/settings.public.js";
+import { DEFS, fixedValue, type Group, type SettingsService, type SettingValue } from "../modules/settings/settings.public.js";
 import type { SyncSettings } from "../modules/sync/sync.public.js";
 import type { TrackingSettings } from "../modules/tracking/tracking.public.js";
 
@@ -28,7 +28,7 @@ export function createLiveSettings(service: SettingsService, fixed: FixedValues 
   }
   service.onChange(refresh);
 
-  const read = (group: Group, key: string): SettingValue => cache.get(group)?.[key] ?? DEFS.get(`${group}.${key}`)!.default;
+  const read = (group: Group, key: string): SettingValue => cache.get(group)?.[key] ?? DEFS.get(`${group}.${key}`)?.default ?? fixedValue(group, key)!;
   const n = (group: Group, key: string) => Number(read(group, key));
   const b = (group: Group, key: string) => read(group, key) === true;
   const s = <T extends string>(group: Group, key: string) => String(read(group, key)) as T;
@@ -69,7 +69,7 @@ export function createLiveSettings(service: SettingsService, fixed: FixedValues 
     unattachedHours: () => n("media", "unattachedHours"), maxPendingPerUser: () => n("media", "maxPendingPerUser"),
   });
   const discovery = live<DiscoverySettings>({
-    showOutOfStockItems: () => b("store", "showOutOfStockItems"), maxChanges: () => n("store", "maxChangesPerSync"), maxQtyPerItem: () => n("orders", "maxQtyPerItem"),
+    showOutOfStockItems: () => b("store", "showOutOfStockItems"), maxChanges: () => n("store", "maxChangesPerSync"), maxQtyPerItem: () => n("orders", "maxQtyPerItem"), cacheMs: () => 10_000,
   });
 
   let timer: NodeJS.Timeout | undefined;

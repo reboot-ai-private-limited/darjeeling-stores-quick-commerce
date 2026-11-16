@@ -29,7 +29,7 @@ module.exports = ({ config }) => {
         "-keep class androidx.startup.** { *; }",
         "-dontwarn androidx.work.**",
       ].join("\n") } }],
-      ["expo-notifications", { icon: "./assets/android-icon-monochrome.png", color: "#401815", sounds: [] }],
+      ["expo-notifications", { icon: "./assets/android-icon-monochrome.png", color: "#0F5B43", sounds: [] }],
     ],
   };
 };

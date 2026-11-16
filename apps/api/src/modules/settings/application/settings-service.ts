@@ -1,7 +1,7 @@
 import type { Ctx } from "../../catalog/catalog.public.js";
 import { forbidden, notFound, validation } from "../../catalog/catalog.public.js";
 import {
-  changeProblems, defsOf, dependencyProblems, DEFS, isGroup, REGISTRY, resolveKey, type Group, type ScopeRef, type SettingValue, type Source,
+  changeProblems, defsOf, dependencyProblems, DEFS, fixedValuesOf, isGroup, REGISTRY, resolveKey, type Group, type ScopeRef, type SettingValue, type Source,
 } from "../domain/registry.js";
 import type { HistoryQuery, HistoryRow, SettingChange, SettingsStore } from "./ports.js";
 
@@ -98,7 +98,8 @@ export function createSettingsService({ store, now }: SettingsDeps) {
     /** The settings a module should use, with no permission check. Other modules call this on each request, so a change applies at once. */
     async effectiveValues(group: Group, scope: ScopeRef = { type: "global", id: null }): Promise<Record<string, SettingValue>> {
       const view = await effective(group, scope);
-      return Object.fromEntries(view.values.map(v => [v.key, v.value]));
+      // The fixed values (not editable in admin) come first and the editable ones on top, so a module always finds every key it reads.
+      return { ...fixedValuesOf(group), ...Object.fromEntries(view.values.map(v => [v.key, v.value])) };
     },
   };
 }

@@ -112,12 +112,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   if (loading) {
     return (
       <main className="page-container pd-wrap">
-        <div className="pd-grid">
-          <div className="skeleton" style={{ aspectRatio: "1", borderRadius: 20 }} />
+        <div className="pd-grid" role="progressbar" aria-label="Loading product">
+          <div>
+            <div className="skeleton" style={{ aspectRatio: "1", borderRadius: 20 }} />
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ width: 64, height: 64, borderRadius: 12 }} />)}
+            </div>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="skeleton" style={{ height: 14, width: 90 }} />
             <div className="skeleton" style={{ height: 34, width: "70%" }} />
-            <div className="skeleton" style={{ height: 44, width: "40%" }} />
-            <div className="skeleton" style={{ height: 52 }} />
+            <div className="skeleton" style={{ height: 18, width: "35%" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6 }}>
+              <div className="skeleton" style={{ height: 36, width: 120 }} />
+              <div className="skeleton" style={{ height: 20, width: 70 }} />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {[0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 52, width: 104, borderRadius: 12 }} />)}
+            </div>
+            <div className="skeleton" style={{ height: 52, borderRadius: 14 }} />
+            <div className="skeleton" style={{ height: 20, width: "30%", marginTop: 12 }} />
+            <div className="skeleton" style={{ height: 14 }} />
+            <div className="skeleton" style={{ height: 14, width: "90%" }} />
+            <div className="skeleton" style={{ height: 14, width: "65%" }} />
           </div>
         </div>
       </main>

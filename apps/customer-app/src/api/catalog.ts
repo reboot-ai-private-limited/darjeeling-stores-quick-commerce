@@ -61,8 +61,16 @@ export const categoryPictures = (cats: Category[], sections: Home["sections"]): 
 };
 
 export type ProductList = { items: Product[]; nextCursor: string | null };
-export const getProducts = (zoneId: string, categoryId: string, cursor?: string | null) =>
-  api<Product[]>("GET", `/catalog/products?zoneId=${zoneId}&categoryId=${categoryId}&limit=40${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, undefined, { auth: false })
+/** Products load 10 at a time (the next ten when the list is scrolled to its end). */
+export const PAGE_SIZE = 10;
+export type ProductSort = "relevance" | "price_asc" | "price_desc" | "discount";
+export const getProducts = (zoneId: string, categoryId: string, cursor?: string | null, limit = PAGE_SIZE, sort: ProductSort = "relevance") =>
+  api<Product[]>("GET", `/catalog/products?zoneId=${zoneId}&categoryId=${categoryId}&limit=${limit}&sort=${sort}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, undefined, { auth: false })
+    .then(r => ({ items: r.data, nextCursor: (r.meta?.nextCursor as string | null | undefined) ?? null }) as ProductList);
+
+/** One brand's products, 10 at a time. */
+export const getBrandProducts = (zoneId: string, brandId: string, cursor?: string | null, limit = PAGE_SIZE) =>
+  api<Product[]>("GET", `/catalog/products?zoneId=${zoneId}&brandId=${brandId}&limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, undefined, { auth: false })
     .then(r => ({ items: r.data, nextCursor: (r.meta?.nextCursor as string | null | undefined) ?? null }) as ProductList);
 
 export type ProductDetail = Product & {

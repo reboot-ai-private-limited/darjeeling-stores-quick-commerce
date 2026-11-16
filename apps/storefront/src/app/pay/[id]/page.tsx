@@ -62,7 +62,7 @@ export default function PaymentStatusPage({ params }: { params: Promise<{ id: st
           amount: checkoutData.amount,
           currency: checkoutData.currency,
           name: "Darjeeling Stores",
-          theme: { color: "#401815" },
+          theme: { color: "#0F5B43" },
           handler: async (resp: {
             razorpay_order_id: string;
             razorpay_payment_id: string;

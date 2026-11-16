@@ -11,7 +11,7 @@ export default function TabsLayout() {
   return (
     <Tabs
       tabBar={props => <TabBar {...(props as unknown as BarProps)} />}
-      screenOptions={{ headerShown: false, animation: "none", sceneStyle: { backgroundColor: "#f7f3ea" } }}
+      screenOptions={{ headerShown: false, animation: "none", sceneStyle: { backgroundColor: "#F7FCF6" } }}
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="orders" />

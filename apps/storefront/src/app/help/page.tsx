@@ -2,12 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { apiFetch } from "../../lib/api";
-import { useStore } from "../../state/StoreContext";
-import { Button } from "../../components/ui/Button";
+import { SUPPORT_PHONE_TEL, whatsappLink } from "../../lib/contact";
 import { Icon } from "../../components/ui/Icon";
-import { Modal } from "../../components/ui/Modal";
 
 const FAQS = [
   {
@@ -29,27 +25,7 @@ const FAQS = [
 ];
 
 export default function HelpPage() {
-  const router = useRouter();
-  const { signedIn, signOut } = useStore();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deleteReason, setDeleteReason] = useState("");
-  const [deleting, setDeleting] = useState(false);
-
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
-
-  const handleDeleteAccount = async () => {
-    setDeleting(true);
-    try {
-      await apiFetch("POST", "/me/delete-request", { reason: deleteReason || "User requested deletion" });
-      await signOut();
-      alert("Account deletion request submitted. You have been signed out.");
-      router.push("/");
-    } catch {
-      alert("Failed to submit account deletion request. Please contact support.");
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   return (
     <main className="page-container" style={{ padding: "20px 16px 60px", maxWidth: 640, margin: "0 auto" }}>
@@ -70,7 +46,7 @@ export default function HelpPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
             <a
-              href="https://wa.me/919000000002?text=Hi%20Darjeeling%20Stores,%20I%20need%20help%20with%20my%20order"
+              href={whatsappLink("Hi Darjeeling Stores, I need help with my order")}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-primary"
@@ -81,7 +57,7 @@ export default function HelpPage() {
             </a>
 
             <a
-              href="tel:+919000000002"
+              href={`tel:${SUPPORT_PHONE_TEL}`}
               className="btn btn-outline"
               style={{ padding: "12px", fontSize: 13, gap: 8 }}
             >
@@ -134,50 +110,14 @@ export default function HelpPage() {
           </div>
         </div>
 
-        {/* Delete Account (Mandatory compliance) */}
-        {signedIn && (
-          <div style={{ textAlign: "center", marginTop: 20 }}>
-            <button
-              onClick={() => setDeleteModalOpen(true)}
-              style={{ fontSize: 13, color: "var(--muted)", textDecoration: "underline" }}
-            >
-              Request to delete my account
-            </button>
-          </div>
-        )}
+        {/* Delete account: one place for everyone, signed in or not */}
+        <div style={{ textAlign: "center", marginTop: 20 }}>
+          <Link href="/delete-account" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "underline" }}>
+            Delete my account
+          </Link>
+        </div>
       </div>
 
-      <Modal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        title="Delete Your Account"
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <p style={{ fontSize: 14, color: "var(--muted)" }}>
-            This will permanently remove your profile, saved addresses, and order history from Darjeeling Stores.
-          </p>
-          <textarea
-            rows={3}
-            placeholder="Reason for leaving (Optional)"
-            value={deleteReason}
-            onChange={(e) => setDeleteReason(e.target.value)}
-            style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream)", outline: "none", resize: "none" }}
-          />
-          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-            <Button variant="outline" onClick={() => setDeleteModalOpen(false)} style={{ flex: 1 }}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleDeleteAccount}
-              loading={deleting}
-              style={{ flex: 1, background: "var(--red)", borderColor: "var(--red)" }}
-            >
-              Confirm Delete
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </main>
   );
 }

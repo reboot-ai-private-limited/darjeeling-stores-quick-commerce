@@ -45,18 +45,56 @@ export function createZoneCatalogService(deps: {
     return ids.length === 0 ? {} : media.urls(ids);
   }
 
-  /** Every product the zone sells, resolved, in shelf order. Loaded once per request. */
+  interface ZoneData { rev: number; at: number; offerings: Offering[]; products: Map<string, Product> }
+  const cache = new Map<string, ZoneData>();
+  const loading = new Map<string, Promise<ZoneData>>();
+  async function loadZoneData(zoneId: string, rev: number): Promise<ZoneData> {
+    const offerings = await source.zoneOfferings({ zoneId });
+    const products = await catalog.getProducts([...new Set(offerings.map(o => o.productId))], { slim: true });
+    return { rev, at: Date.now(), offerings, products: new Map(products.map(p => [p.id, p])) };
+  }
+  /**
+   * The zone's offerings and slim products. With the cache on, a request reuses them while the offerings revision is unchanged and they
+   * are younger than `cacheMs`; requests that arrive while one is loading share that load instead of each reading the database.
+   */
+  async function zoneData(zoneId: string): Promise<ZoneData> {
+    if (settings.cacheMs <= 0) return loadZoneData(zoneId, 0);
+    const rev = await source.currentRevision();
+    const hit = cache.get(zoneId);
+    if (hit && hit.rev === rev && Date.now() - hit.at < settings.cacheMs) return hit;
+    let pending = loading.get(zoneId);
+    if (!pending || (await pending.then(d => d.rev, () => -1)) !== rev) {
+      pending = loadZoneData(zoneId, rev).finally(() => { loading.delete(zoneId); });
+      loading.set(zoneId, pending);
+    }
+    const data = await pending;
+    cache.set(zoneId, data);
+    return data;
+  }
+
+  /** Every product the zone sells, resolved, in shelf order. Cheap parts are recomputed per request (hours, sales); the reads are cached. */
   async function snapshot(zoneId: string) {
     const zone = await zoneOrThrow(zoneId);
     const ctx = await contextFor(zoneId);
-    const offerings = byProduct(await source.zoneOfferings({ zoneId }));
+    const data = await zoneData(zoneId);
+    const offerings = byProduct(data.offerings);
     const sold = [...offerings.entries()].filter(([, list]) => sellersOf(list, ctx).length > 0).map(([id]) => id);
-    const products = (await catalog.getProducts(sold)).filter(p => p.status === "active");
-    const urls = await imageUrls(products);
+    // Slim read and no image links: the list only needs enough to decide what is sold and in what order. The few products
+    // that are actually returned get their long text (never shown in lists) skipped and their image links added by `hydrate`.
+    const products = sold.flatMap(id => { const p = data.products.get(id); return p && p.status === "active" ? [p] : []; });
+    const urls: Record<string, Record<string, string>> = {};
     const resolved = products
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1))
       .flatMap(product => { const entry = resolveProduct(product, offerings.get(product.id) ?? [], ctx, urls); return entry ? [{ product, entry }] : []; });
     return { zone, ctx, resolved };
+  }
+
+  /** Adds image links to just the products being returned (one lookup for all of them). */
+  async function hydrate<T extends { images: ZoneProduct["images"] }>(entries: readonly T[]): Promise<T[]> {
+    const ids = [...new Set(entries.flatMap(e => e.images.map(i => i.mediaId)))];
+    if (ids.length === 0) return [...entries];
+    const urls = await media.urls(ids);
+    return entries.map(e => ({ ...e, images: e.images.map(i => ({ ...i, urls: urls[i.mediaId] ?? {} })) }));
   }
 
   /** A product belongs to its main category and to any extra ones. */
@@ -100,11 +138,15 @@ export function createZoneCatalogService(deps: {
       const [categories, store, bannerList] = await Promise.all([catalog.listCategories(), storeSettings.forZone(zoneId), banners.forZone(zoneId)]);
       const { tree } = await categoryView(categories, resolved);
       const bannerUrls = await imageUrls([], bannerList.map(b => b.imageMediaId));
-      const sections = tree.slice(0, HOME_SECTIONS).flatMap(root => {
+      const picked = tree.slice(0, HOME_SECTIONS).flatMap(root => {
         const ids = subtree(categories, root.id);
         const products = resolved.filter(r => inCategories(r.entry, ids) && visible(r.entry)).slice(0, SECTION_SIZE).map(r => r.entry);
         return products.length > 0 ? [{ title: root.name, categoryId: root.id, products }] : [];
       });
+      // Image links for the (at most 6 x 10) products on the home screen only.
+      const withImages = await hydrate(picked.flatMap(s => s.products));
+      let at = 0;
+      const sections = picked.map(s => ({ ...s, products: withImages.slice(at, (at += s.products.length)) }));
       return {
         zone: { id: zone.id, name: zone.name },
         status: { accepting: ctx.zoneOpen && !zone.isPaused, etaMinMinutes: store.etaMinMinutes, etaMaxMinutes: store.etaMaxMinutes },
@@ -122,6 +164,7 @@ export function createZoneCatalogService(deps: {
 
     async products(zoneId: string, query: {
       categoryId?: string | undefined; brandId?: string | undefined; foodType?: FoodType | undefined; limit?: number | undefined; cursor?: string | undefined; inStockOnly?: boolean | undefined;
+      sort?: "relevance" | "price_asc" | "price_desc" | "discount" | undefined;
     }) {
       const { resolved } = await snapshot(zoneId);
       let list = resolved;
@@ -134,6 +177,12 @@ export function createZoneCatalogService(deps: {
       if (query.brandId !== undefined) list = list.filter(r => r.product.brandId === query.brandId);
       if (query.foodType !== undefined) list = list.filter(r => r.product.foodType === query.foodType);
       list = list.filter(r => visible(r.entry) && (!query.inStockOnly || r.entry.available));
+      // The size a card shows is the first one that can be bought (else the first); sorting follows that size. Equal values keep shelf order,
+      // so the order is the same on every request and the cursor (the last product shown) finds its place again.
+      const shown = (e: ZoneProduct) => e.variants.find(v => v.available) ?? e.variants[0];
+      if (query.sort === "price_asc") list = [...list].sort((a, b) => (shown(a.entry)?.price ?? 0) - (shown(b.entry)?.price ?? 0));
+      else if (query.sort === "price_desc") list = [...list].sort((a, b) => (shown(b.entry)?.price ?? 0) - (shown(a.entry)?.price ?? 0));
+      else if (query.sort === "discount") list = [...list].sort((a, b) => (shown(b.entry)?.discountPercent ?? 0) - (shown(a.entry)?.discountPercent ?? 0));
       let start = 0;
       if (query.cursor !== undefined) {
         const after = decodeCursor(query.cursor);
@@ -143,7 +192,7 @@ export function createZoneCatalogService(deps: {
       }
       const limit = query.limit ?? DEFAULT_LIMIT;
       const page = list.slice(start, start + limit);
-      return { items: page.map(r => r.entry), nextCursor: start + limit < list.length ? encodeCursor(page[page.length - 1]!.product.id) : null };
+      return { items: await hydrate(page.map(r => r.entry)), nextCursor: start + limit < list.length ? encodeCursor(page[page.length - 1]!.product.id) : null };
     },
 
     /** The brands that have something to sell in the zone, for a brand page. Switched-off brands are left out. */
@@ -179,8 +228,8 @@ export function createZoneCatalogService(deps: {
         if (p.variants.some(v => v.sku.toLowerCase().includes(lower))) return 3;
         return 9;
       };
-      return resolved.filter(r => visible(r.entry)).map(r => ({ r, s: score(r.product) })).filter(x => x.s < 9)
-        .sort((a, b) => a.s - b.s || a.r.product.name.localeCompare(b.r.product.name)).slice(0, limit).map(x => x.r.entry);
+      return hydrate(resolved.filter(r => visible(r.entry)).map(r => ({ r, s: score(r.product) })).filter(x => x.s < 9)
+        .sort((a, b) => a.s - b.s || a.r.product.name.localeCompare(b.r.product.name)).slice(0, limit).map(x => x.r.entry));
     },
 
     /**

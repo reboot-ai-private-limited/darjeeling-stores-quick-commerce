@@ -19,19 +19,15 @@ type GroupView = { group: string; scope: { type: ScopeType; id: string | null };
 type HistoryRow = { group: string; key: string; scope: { type: ScopeType; id: string | null }; oldValue: unknown; newValue: unknown; by: string; at: string };
 
 const GROUP_LABEL: Record<string, [string, string]> = {
-  orders: ["Orders & checkout", "Cart limits, quote time, confirmation, cancellation"],
-  payments: ["Payments & refunds", "Cash limit, pay links, refund rules"],
-  delivery: ["Delivery, riders & tips", "Rider tips, delivery codes, location updates"],
-  assignment: ["Dispatch", "Assignment mode, rider limits, delay alerts"],
-  eta: ["Delivery time", "Packing and travel time, tracking links"],
+  orders: ["Orders & checkout", "Confirmation, cancellation, cart limits, minimum order"],
+  payments: ["Payments & refunds", "Cash-on-delivery limit, refund window"],
+  delivery: ["Delivery & tips", "Rider tips, delivery code"],
+  assignment: ["Dispatch", "Assignment mode, orders per rider"],
+  eta: ["Delivery time", "Extra minutes on every ETA"],
   discounts: ["Surcharges", "Surcharge cap and rain-mode defaults"],
-  stock: ["Stock", "Low-stock levels and the same-zone price rule"],
-  hours: ["Opening hours defaults", "Used when a warehouse leaves them out"],
-  preOrder: ["Pre-order defaults", "Booking cutoff and packing lead"],
-  store: ["Store & catalogue", "What customers see in lists"],
-  media: ["Photos & voice notes", "Size limits and how long files are kept"],
-  tax: ["Tax", "How prices are shown"],
+  store: ["Store & catalogue", "Show or hide sold-out items"],
 };
+// Everything else (packing time, low-stock levels, hours defaults, media limits, tax and so on) is fixed in the API code, so it is not listed here.
 const SCOPE_LABEL: Record<ScopeType, string> = { global: "Everywhere", zone: "A zone", warehouse: "One warehouse" };
 const SOURCE_LABEL: Record<string, string> = { default: "Built-in default", global: "Everywhere", zone: "Zone", warehouse: "Warehouse" };
 
@@ -71,6 +67,12 @@ function StoreSettings({ session }: { session: AdminSession }) {
   useEffect(() => { void api<{ data: Def[] }>("settings/registry").then(r => setRegistry(r.data), cause => setNotice({ kind: "error", text: errorText(cause) })); }, []);
   const groups = useMemo(() => (registry ? [...new Set(registry.map(d => d.group))].filter(g => GROUP_LABEL[g]) : []), [registry]);
   const defs = useMemo(() => (registry ?? []).filter(d => d.group === group), [registry, group]);
+  // Offer only the places some setting can actually be set at (today none can be set per warehouse), and only the ones this person may use.
+  const scopeOptions = useMemo(() => {
+    const wanted = (["global", "zone", "warehouse"] as ScopeType[]).filter(sc => (everywhere || sc === "warehouse") && (registry ?? []).some(d => d.scopes.includes(sc)));
+    return wanted.length > 0 ? wanted : [everywhere ? "global" : "warehouse"] as ScopeType[];
+  }, [registry, everywhere]);
+  useEffect(() => { if (!scopeOptions.includes(scopeType)) setScopeType(scopeOptions[0]!); }, [scopeOptions, scopeType]);
 
   // Pick a sensible place when the scope type changes.
   useEffect(() => {
@@ -126,7 +128,7 @@ function StoreSettings({ session }: { session: AdminSession }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <label style={{ fontSize: 14 }}>Applies to{" "}
               <select value={scopeType} onChange={e => setScopeType(e.target.value as ScopeType)} style={inputStyle} aria-label="Where the setting applies">
-                {(everywhere ? (["global", "zone", "warehouse"] as ScopeType[]) : (["warehouse"] as ScopeType[])).map(s => <option key={s} value={s}>{SCOPE_LABEL[s]}</option>)}
+                {scopeOptions.map(s => <option key={s} value={s}>{SCOPE_LABEL[s]}</option>)}
               </select>
             </label>
             {scopeType === "zone" && <select value={scopeId} onChange={e => setScopeId(e.target.value)} style={inputStyle} aria-label="Zone">{zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}</select>}
@@ -135,7 +137,7 @@ function StoreSettings({ session }: { session: AdminSession }) {
         </div>
         <div style={{ padding: "0 20px 16px" }}>
           <p style={{ fontSize: 14, color: "var(--admin-muted)", margin: "0 0 12px" }}>
-            A value set for a warehouse wins over its zone, which wins over &ldquo;Everywhere&rdquo;, which wins over the built-in default. Changes apply to the next request.
+            A value set for a zone wins over &ldquo;Everywhere&rdquo;, which wins over the built-in default. Changes apply to the next request.
           </p>
           {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
           {changed.length > 0 && <Notice kind="info">You have unsaved changes. Save them before switching to another group or place, or they are discarded.</Notice>}

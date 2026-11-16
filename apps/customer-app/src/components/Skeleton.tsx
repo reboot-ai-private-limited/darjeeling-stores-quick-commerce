@@ -84,6 +84,31 @@ export function GridSkeleton({ cols = 2 }: { cols?: number }) {
   );
 }
 
+/** Stand-in for a product page while it loads: the big picture with thumbnails, then name, price, size chips and the add button. */
+export function ProductPageSkeleton() {
+  const { width } = useWindowDimensions();
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading product" style={{ flex: 1 }}>
+      <View style={{ backgroundColor: colors.white, paddingTop: 96, paddingBottom: space.lg, alignItems: "center", gap: space.md }}>
+        <Bone w={Math.min(width - space.lg * 2, 340)} h={Math.min(width - space.lg * 2, 340)} r={radius.lg} />
+        <View style={{ flexDirection: "row", gap: space.sm }}>{[0, 1, 2].map(i => <Bone key={i} w={52} h={52} r={radius.md} />)}</View>
+      </View>
+      <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg, gap: space.md }}>
+        <Bone w={70} h={14} r={6} />
+        <Bone w="85%" h={24} />
+        <Bone w="45%" h={16} />
+        <View style={{ flexDirection: "row", gap: space.md, alignItems: "center", marginTop: space.sm }}>
+          <Bone w={90} h={28} /><Bone w={60} h={18} />
+        </View>
+        <View style={{ flexDirection: "row", gap: space.sm, marginTop: space.sm }}>{[0, 1, 2].map(i => <Bone key={i} w={92} h={46} r={radius.md} />)}</View>
+        <Bone h={52} r={radius.lg} style={{ marginTop: space.md }} />
+        <Bone w="35%" h={18} style={{ marginTop: space.lg }} />
+        <Bone h={13} /><Bone w="92%" h={13} /><Bone w="70%" h={13} />
+      </View>
+    </View>
+  );
+}
+
 /** Stand-in for the Categories tab: a grid of round-cornered tiles with a name line under each, four to a row. */
 export function CategoryGridSkeleton({ count = 16 }: { count?: number }) {
   const { width } = useWindowDimensions();

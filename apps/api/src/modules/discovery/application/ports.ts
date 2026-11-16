@@ -3,7 +3,7 @@ import type { Offering } from "../../offerings/offerings.public.js";
 
 /** What discovery reads from the catalog module. */
 export interface CatalogReader {
-  getProducts(ids: readonly string[]): Promise<Product[]>;
+  getProducts(ids: readonly string[], options?: { slim?: boolean }): Promise<Product[]>;
   listCategories(): Promise<Category[]>;
   listBrands(): Promise<Brand[]>;
 }
@@ -50,5 +50,11 @@ export interface DiscoverySettings {
   maxQtyPerItem: number | null;
   /** More changed products than this since the customer's last visit and the app reloads everything instead. */
   maxChanges: number;
+  /**
+   * Keep each zone's offerings and products in memory this many milliseconds, so browsing does not re-read them on every request.
+   * A change to an offering (price, stock going in or out, switched on or off) is picked up at once through its revision; the wait only
+   * applies to edits to the product itself (name, photos) and to opening hours. 0 turns the cache off.
+   */
+  cacheMs: number;
 }
-export const DEFAULT_DISCOVERY_SETTINGS: DiscoverySettings = { showOutOfStockItems: true, maxQtyPerItem: null, maxChanges: 500 };
+export const DEFAULT_DISCOVERY_SETTINGS: DiscoverySettings = { showOutOfStockItems: true, maxQtyPerItem: null, maxChanges: 500, cacheMs: 0 };

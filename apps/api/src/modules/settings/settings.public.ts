@@ -5,7 +5,7 @@ import { createMongoSettingsStore } from "./infrastructure/mongo-settings-store.
 import { settingsRoutes } from "./interface/routes.js";
 
 export type { SettingsService, GroupView, SettingView } from "./application/settings-service.js";
-export { REGISTRY, GROUPS, DEFS, resolveKey, changeProblems, type Group, type ScopeRef, type SettingDef, type SettingValue } from "./domain/registry.js";
+export { REGISTRY, GROUPS, DEFS, FIXED_VALUES, fixedValue, resolveKey, changeProblems, type Group, type ScopeRef, type SettingDef, type SettingValue } from "./domain/registry.js";
 
 export interface SettingsModuleOptions { connection: Connection; auth?: AuthResolver }
 

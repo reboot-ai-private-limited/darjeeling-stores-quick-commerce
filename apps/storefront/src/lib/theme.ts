@@ -5,22 +5,22 @@
  */
 
 export const colors = {
-  maroon: "#401815",
-  maroonDeep: "#2a0f0d",
-  maroonSoft: "#5a2622",
+  maroon: "#0F5B43",
+  maroonDeep: "#0A3F2E",
+  maroonSoft: "#1A7457",
   red: "#c62828",
   redSoft: "#fdeceb",
-  yellow: "#ffc933",
-  yellowSoft: "#fff4d1",
-  cream: "#f7f3ea",
-  creamDeep: "#efe8d8",
+  yellow: "#CFB264",
+  yellowSoft: "#D7EFD9",
+  cream: "#F7FCF6",
+  creamDeep: "#D7EFD9",
   card: "#ffffff",
-  ink: "#231815",
-  muted: "#7a6f66",
-  faint: "#b3a99d",
-  line: "#ece6da",
-  green: "#1f9d62",
-  greenSoft: "#e2f5ec",
+  ink: "#17302A",
+  muted: "#5F7468",
+  faint: "#9DB2A5",
+  line: "#CFE6D1",
+  green: "#63A96E",
+  greenSoft: "#D7EFD9",
   amber: "#d98a00",
   amberSoft: "#fff1d6",
   blue: "#2f6fdb",
@@ -37,8 +37,8 @@ export const radius = {
 };
 
 export const shadows = {
-  card: "0 8px 22px rgba(64, 24, 21, 0.08)",
-  lift: "0 14px 32px rgba(64, 24, 21, 0.18)",
+  card: "0 8px 22px rgba(15,91,67, 0.08)",
+  lift: "0 14px 32px rgba(15,91,67, 0.18)",
 };
 
 /** Formats whole paise into Indian Rupee display (e.g. 19900 -> ₹199). */
@@ -52,18 +52,18 @@ export const rupees = (paise: number) => {
 
 /** Category tile background tints (same 6 pastel tints as mobile app) */
 export const CATEGORY_TINTS = [
-  "#f3f1ed",
-  "#f3f1ed",
-  "#f3f1ed",
-  "#f3f1ed",
-  "#f3f1ed",
-  "#f3f1ed",
+  "#D7EFD9",
+  "#D7EFD9",
+  "#D7EFD9",
+  "#D7EFD9",
+  "#D7EFD9",
+  "#D7EFD9",
 ];
 
 /** Coupon offer card tints [background, accentForeground] */
 export const OFFER_TINTS: [string, string][] = [
-  ["#fff4d1", "#d98a00"],
-  ["#e2f5ec", "#1f9d62"],
+  ["#D7EFD9", "#d98a00"],
+  ["#D7EFD9", "#63A96E"],
   ["#fde8e6", "#c62828"],
   ["#e5eefc", "#2f6fdb"],
 ];

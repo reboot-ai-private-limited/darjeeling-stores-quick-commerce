@@ -130,7 +130,7 @@ export default function TrackingPage({ params }: { params: Promise<{ id: string 
       if (!mapRef.current) {
         const map = L.map(mapEl.current).setView([door.lat, door.lng], 15);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap", maxZoom: 19 }).addTo(map);
-        L.marker([door.lat, door.lng], { icon: L.divIcon({ className: "door-pin", html: pin("#1f9d62", "#fff", "🏠", 32), iconSize: [32, 32], iconAnchor: [16, 16] }) })
+        L.marker([door.lat, door.lng], { icon: L.divIcon({ className: "door-pin", html: pin("#63A96E", "#fff", "🏠", 32), iconSize: [32, 32], iconAnchor: [16, 16] }) })
           .addTo(map)
           .bindPopup("Your delivery address");
         mapRef.current = map;
@@ -142,7 +142,7 @@ export default function TrackingPage({ params }: { params: Promise<{ id: string 
         const ll: [number, number] = [riderPos.lat, riderPos.lng];
         if (riderMarker.current) riderMarker.current.setLatLng(ll);
         else
-          riderMarker.current = L.marker(ll, { icon: L.divIcon({ className: "rider-pin", html: pin("#ffc933", "#401815", "🛵", 36), iconSize: [36, 36], iconAnchor: [18, 18] }) })
+          riderMarker.current = L.marker(ll, { icon: L.divIcon({ className: "rider-pin", html: pin("#CFB264", "#0F5B43", "🛵", 36), iconSize: [36, 36], iconAnchor: [18, 18] }) })
             .addTo(map)
             .bindPopup(tracking?.rider?.name ?? "Delivery partner");
         map.fitBounds(L.latLngBounds([[door.lat, door.lng], ll]), { padding: [40, 40], maxZoom: 16 });
