@@ -39,7 +39,7 @@ async function main() {
         ? createStartMessagingTransport({ apiKey: config.STARTMESSAGING_API_KEY, templateId: config.STARTMESSAGING_TEMPLATE_ID, appName: config.STARTMESSAGING_APP_NAME, baseUrl: config.STARTMESSAGING_BASE_URL })
         : undefined;
       if (!transport) console.warn(JSON.stringify({ event: "otp_delivery_not_configured" }));
-      additionalRoutes.push(...await createConsumerRoutes(mongoose.connection, config.JWT_SECRET, { mode: config.NODE_ENV, mockOTP: false, ...(transport && { transport }) }, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
+      additionalRoutes.push(...await createConsumerRoutes(mongoose.connection, config.JWT_SECRET, { mode: config.NODE_ENV, mockOTP: false, ...(transport && { transport }), ...(config.REVIEW_OTP && (config.REVIEW_CUSTOMER_PHONE || config.REVIEW_RIDER_PHONE) && { reviewAccount: { code: config.REVIEW_OTP, phones: { ...(config.REVIEW_CUSTOMER_PHONE && { customer: config.REVIEW_CUSTOMER_PHONE }), ...(config.REVIEW_RIDER_PHONE && { rider: config.REVIEW_RIDER_PHONE }) } } }) }, config.CORS_ORIGINS, config.AUTH_COOKIE_SECURE, config));
     }
   } catch { console.error(JSON.stringify({ event: "staff_auth_initialization_failed" })); await disconnectDatabase(); process.exitCode = 1; return; }
   try {

@@ -3,7 +3,7 @@ import type { ClientSession, Connection, Types } from "mongoose";
 export type IdentityUser = {
   _id: Types.ObjectId; kind: "staff" | "customer" | "rider"; roleId: Types.ObjectId; status: string; name: string;
   email?: string; phone?: string; scope?: { all: boolean; warehouseIds: Types.ObjectId[] };
-  devMockAccount?: boolean; credentialRevision?: number; defaultAddressId?: Types.ObjectId | null; codAllowed?: boolean;
+  devMockAccount?: boolean; reviewAccount?: boolean; credentialRevision?: number; defaultAddressId?: Types.ObjectId | null; codAllowed?: boolean;
   notificationPrefs?: { promoPush: boolean; promoWhatsApp: boolean; cartReminders: boolean };
   deletionRequest?: { reason: string | null; requestedAt: Date }; lastLoginAt?: Date; createdAt?: Date; updatedAt?: Date;
 };

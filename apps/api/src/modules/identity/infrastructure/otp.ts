@@ -7,7 +7,12 @@ import { createSessionStore } from "./sessions.js";
 import { readProfile, type IdentityUser } from "./profile.js";
 
 export interface OtpTransport { send(input: { phone: string; code: string; channel: "sms" | "whatsapp"; signal: AbortSignal }): Promise<void> }
-export type ConsumerOptions = { mode: string; mockOTP: boolean; transport?: OtpTransport };
+/**
+ * Demo logins for store review (for example Google Play): a customer phone and/or a rider phone that always accept one fixed code and are never sent an SMS.
+ * Off unless configured. Each number must be a dedicated demo account: a number that a real person already uses is refused.
+ */
+export type ReviewAccount = { code: string; phones: { customer?: string; rider?: string } };
+export type ConsumerOptions = { mode: string; mockOTP: boolean; transport?: OtpTransport; reviewAccount?: ReviewAccount };
 type Challenge = { _id: string; nonce: string; phone: string; app: "customer" | "rider" | "admin";
   purpose: "login" | "phone_change"; userId: Types.ObjectId | null; sourcePhone: string | null; revision: number;
   hash: string; mock: boolean; attempts: number; expiresAt: Date; purgeAt: Date; lockedUntil: Date | null;
@@ -29,7 +34,10 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
   const sessions = createSessionStore(connection, jwtSecret, settings);
   const hash = (value: string) => createHmac("sha256", Buffer.from(jwtSecret, "hex")).update(`consumer-otp:${value}`).digest("hex");
   const challengeId = (purpose: string, phone: string, userId?: Types.ObjectId) => hash(`${purpose}:${userId ?? ""}:${phone}`);
-  const unavailable = () => { if (!options.mockOTP && !options.transport) throw new IdentityError(503, "OTP_DELIVERY_UNAVAILABLE", "OTP delivery is not configured"); };
+  /** True for a demo phone (customer or rider app): it gets the fixed code and no SMS. */
+  const isReviewPhone = (phone: string, app: Challenge["app"]) => !!options.reviewAccount && (app === "customer" || app === "rider") && phone === options.reviewAccount.phones[app];
+  const isReview = (phone: string, app: Challenge["app"], user?: unknown) => !user && isReviewPhone(phone, app);
+  const unavailable = (review = false) => { if (!options.mockOTP && !options.transport && !review) throw new IdentityError(503, "OTP_DELIVERY_UNAVAILABLE", "OTP delivery is not configured"); };
   async function transaction<T>(work: (session: ClientSession) => Promise<T>) {
     const session = await connection.startSession();
     try { return await session.withTransaction(() => work(session)); }
@@ -73,11 +81,14 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
     return user;
   }
   async function request(input: { phone: string; app: Challenge["app"]; channel: "sms" | "whatsapp" }, ip: string, user?: IdentityUser) {
-    unavailable();
+    const review = isReview(input.phone, input.app, user);
+    unavailable(review);
     const developmentOwner = options.mockOTP && input.app === "admin";
     const demoCustomer = options.mockOTP && input.app === "customer" && input.phone === DEMO_CUSTOMER_PHONE && !user;
-    if (!developmentOwner && !demoCustomer) await quota(input.phone, ip, user?._id);
+    if (!developmentOwner && !demoCustomer && !review) await quota(input.phone, ip, user?._id);
     const existing = await users.findOne({ phone: input.phone, kind: kindOf(input.app) });
+    // Never let the fixed code open a real person's account: a demo number must be a dedicated demo account.
+    if (review && existing && !existing.reviewAccount) throw new IdentityError(403, "OTP_REQUEST_REJECTED", "Account unavailable");
     if (user) {
       if (existing) throw new IdentityError(409, "CONFLICT", "Phone number is already in use");
     } else if (input.app === "admin") {
@@ -89,12 +100,12 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
     const id = challengeId(purpose, input.phone, user?._id);
     const previous = await challenges.findOne({ _id: id });
     if (previous?.lockedUntil && previous.lockedUntil.getTime() > Date.now()) throw new IdentityError(429, "OTP_LOCKED", "Too many wrong codes. Try again later.");
-    if (previous && !previous.consumedAt && previous.expiresAt.getTime() > Date.now()) throw new IdentityError(429, "RATE_LIMITED", "A code is already active. Wait for it to expire.");
-    const code = options.mockOTP ? "000000" : String(randomInt(1, 1000000)).padStart(6, "0");
+    if (!review && previous && !previous.consumedAt && previous.expiresAt.getTime() > Date.now()) throw new IdentityError(429, "RATE_LIMITED", "A code is already active. Wait for it to expire.");
+    const code = review ? options.reviewAccount!.code : options.mockOTP ? "000000" : String(randomInt(1, 1000000)).padStart(6, "0");
     const nonce = randomBytes(16).toString("hex");
     const challenge: Challenge = { _id: id, nonce, phone: input.phone, app: input.app, purpose,
       userId: user?._id ?? null, sourcePhone: user?.phone ?? null, revision: user?.credentialRevision ?? 0,
-      hash: hash(`${id}:${nonce}:${code}`), mock: options.mockOTP, attempts: 0, expiresAt: new Date(Date.now() + ttlSeconds * 1000),
+      hash: hash(`${id}:${nonce}:${code}`), mock: options.mockOTP, attempts: 0, expiresAt: new Date(Date.now() + (review ? 6 * 3600 : ttlSeconds) * 1000),
       purgeAt: new Date(Date.now() + 3900000), lockedUntil: null, consumedAt: null, sent: false };
     try {
       if (previous) {
@@ -105,13 +116,13 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
       throw error;
     }
     try {
-      const channel = await deliver(input.phone, code, input.channel);
+      const channel = review ? "sms" as const : await deliver(input.phone, code, input.channel);
       await challenges.updateOne({ _id: id, nonce }, { $set: { sent: true } });
       return { expiresInSeconds: ttlSeconds, channel, ...(options.mockOTP && { mockOTP: true }) };
     } catch (error) { await challenges.deleteOne({ _id: id, nonce }); throw error; }
   }
   async function verify(input: { phone: string; otp: string; deviceInfo?: string | undefined }, token?: string) {
-    unavailable();
+    unavailable(!token && (isReviewPhone(input.phone, "customer") || isReviewPhone(input.phone, "rider")));
     const customer = token !== undefined ? await activeCustomer(token) : undefined;
     const id = challengeId(customer ? "phone_change" : "login", input.phone, customer?._id);
     const result = await transaction(async session => {
@@ -141,7 +152,7 @@ export function createOtpService(connection: Connection, jwtSecret: string, opti
       let user = await users.findOneAndUpdate({ phone: input.phone, kind: kindOf(challenge.app) }, { $inc: { authorizationRevision: 1 } }, { session, returnDocument: "after" });
       const isNewUser = !user;
       if (!user && challenge.app === "customer") {
-        user = { _id: new Types.ObjectId(), kind: "customer", roleId: role._id, phone: input.phone, name: "", status: "active", scope: { all: false, warehouseIds: [] }, devMockAccount: options.mockOTP, credentialRevision: 0, createdAt: new Date(), updatedAt: new Date() };
+        user = { _id: new Types.ObjectId(), kind: "customer", roleId: role._id, phone: input.phone, name: "", status: "active", scope: { all: false, warehouseIds: [] }, devMockAccount: options.mockOTP, ...(isReview(input.phone, challenge.app) && { reviewAccount: true }), credentialRevision: 0, createdAt: new Date(), updatedAt: new Date() };
         await users.insertOne(user, { session });
       }
       const allowed = user && user.status === "active" && (!user.devMockAccount || options.mockOTP) && String(user.roleId) === String(role._id) && (challenge.app === "admin"
