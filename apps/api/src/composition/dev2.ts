@@ -234,6 +234,18 @@ export function createDev2Modules(options: Dev2Options = {}) {
       },
     },
     stock: offerings.stock, coupons: pricing.service,
+    images: {
+      urlsOf: async ids => {
+        const products = await catalog.store.getProducts(ids, { slim: true });
+        const mediaIds = products.map(p => [...p.images].sort((a, b) => a.sortOrder - b.sortOrder)[0]?.mediaId).filter((m): m is string => !!m);
+        const urls = mediaIds.length ? await media.service.urls(mediaIds) : {};
+        return Object.fromEntries(products.map(p => {
+          const first = [...p.images].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+          const u = first ? urls[first.mediaId] : undefined;
+          return [p.id, u ? (u["320"] ?? u["640"] ?? u["160"] ?? u["1080"] ?? null) : null];
+        }));
+      },
+    },
     slots: { hold: (orderId, warehouseId, window) => hours.service.hold(orderId, warehouseId, window), release: async orderId => { await hours.service.release(orderId); } },
     media: {
       copyToOrder: async ({ sourceMediaId, orderId }) => { try { return await media.service.copyToOrder({ sourceMediaId, orderId }); } catch { return null; } },

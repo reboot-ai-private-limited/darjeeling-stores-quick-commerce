@@ -110,10 +110,10 @@ export const itemView = (i: OrderItem, index: number, imageUrl: string | null = 
 });
 
 /** A child order for the customer who placed it. */
-export function customerOrderView(o: Order, rider: { name: string; phone: string } | null, timeline: { status: OrderStatus; at: Date }[], voiceExpired: boolean) {
+export function customerOrderView(o: Order, rider: { name: string; phone: string } | null, timeline: { status: OrderStatus; at: Date }[], voiceExpired: boolean, images: Record<string, string | null> = {}) {
   return {
     id: o.id, orderNo: o.orderNo, groupId: o.groupId, warehouseId: o.warehouseId, status: o.status, paymentStatus: o.paymentStatus, refundStatus: o.refundStatus,
-    items: o.items.map(i => ({ productId: i.productId, variantId: i.variantId, name: i.name, variantLabel: i.variantLabel, unitPrice: i.unitPrice, qty: i.qty, lineTotal: i.lineTotal, status: i.status, ...(i.unavailableReason && { unavailableReason: i.unavailableReason }), imageUrl: null as string | null })),
+    items: o.items.map(i => ({ productId: i.productId, variantId: i.variantId, name: i.name, variantLabel: i.variantLabel, unitPrice: i.unitPrice, qty: i.qty, lineTotal: i.lineTotal, status: i.status, ...(i.unavailableReason && { unavailableReason: i.unavailableReason }), imageUrl: images[i.productId] ?? null })),
     itemsSubtotal: o.itemsSubtotal, amountDue: o.amountDue, promisedAt: o.promisedAt.toISOString(), scheduledWindow: o.scheduledWindow ? { start: o.scheduledWindow.start.toISOString(), end: o.scheduledWindow.end.toISOString() } : null,
     rider, voiceNoteExpired: voiceExpired, timeline: timeline.map(t => ({ status: t.status, at: t.at.toISOString() })),
   };

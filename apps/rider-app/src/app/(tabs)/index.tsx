@@ -90,7 +90,7 @@ export default function Home() {
         )}
         {breakError ? <Text style={{ color: colors.red, fontWeight: "700", fontSize: 13, marginTop: 10 }}>{breakError}</Text> : null}
         {ringing ? (
-          <Press onPress={() => router.push("/new-delivery")} haptic style={{ marginTop: picking ? 12 : 52 }}>
+          <Press onPress={() => router.push("/new-delivery")} haptic style={{ marginTop: picking ? 12 : -34 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.yellow, borderRadius: 20, padding: 16 }}>
               <Icon name="bell" size={24} color={colors.maroon} />
               <View style={{ flex: 1 }}>
@@ -101,7 +101,8 @@ export default function Home() {
             </View>
           </Press>
         ) : null}
-        <View style={s.stats}>
+        {/* The stat cards normally overlap the green header; with the banner above them it takes that spot and the cards get a plain gap, so nothing covers the banner. */}
+        <View style={[s.stats, ringing ? { marginTop: 14 } : null]}>
           <Stat i={2} icon="check-circle" label="Delivered today" value={String(delivered)} tint={colors.greenSoft} />
           <Stat i={3} icon="credit-card" label="Cash in hand" value={`₹${cash.toLocaleString("en-IN")}`} tint={colors.yellowSoft} />
           <Stat i={4} icon="refresh-cw" label="To sync" value={String(pendingSync)} tint={colors.blueSoft} />
