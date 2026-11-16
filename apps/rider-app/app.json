@@ -16,6 +16,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "blockedPermissions": ["android.permission.RECORD_AUDIO", "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"],
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -34,7 +35,7 @@
         }
       ],
       "expo-secure-store",
-      "expo-audio"
+      ["expo-audio", { "recordAudioAndroid": false }]
     ]
   }
 }
