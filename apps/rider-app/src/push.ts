@@ -33,7 +33,7 @@ async function createChannels(n: Notifications) {
     enableVibrate: true,
     vibrationPattern: [0, 900, 400, 900, 400, 900, 400, 900],
     enableLights: true,
-    lightColor: "#CFB264",
+    lightColor: "#0F9D1F",
     bypassDnd: true,
     lockscreenVisibility: n.AndroidNotificationVisibility.PUBLIC,
     audioAttributes: { usage: n.AndroidAudioUsage.NOTIFICATION_RINGTONE, contentType: n.AndroidAudioContentType.SONIFICATION, flags: { enforceAudibility: true, requestHardwareAudioVideoSynchronization: false } },

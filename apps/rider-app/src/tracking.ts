@@ -67,7 +67,7 @@ export async function startBackgroundTracking(): Promise<void> {
     await Location.startLocationUpdatesAsync(TASK, {
       accuracy: Location.Accuracy.Balanced, timeInterval: 15_000, distanceInterval: 20, pausesUpdatesAutomatically: false, showsBackgroundLocationIndicator: true,
       // killServiceOnDestroy: false keeps sharing after the rider swipes the app away; it stops only when the shift ends, a break starts, or they sign out.
-      foregroundService: { notificationTitle: "You are on shift", notificationBody: "Sharing your location for deliveries.", notificationColor: "#0F5B43", killServiceOnDestroy: false },
+      foregroundService: { notificationTitle: "You are on shift", notificationBody: "Sharing your location for deliveries.", notificationColor: "#0F9D1F", killServiceOnDestroy: false },
     });
   } catch { /* the phone refused or the build has no background location: the open app still shares its position */ }
 }

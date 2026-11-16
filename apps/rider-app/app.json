@@ -10,7 +10,7 @@
     "android": {
       "package": "in.darjeelingstores.rider",
       "adaptiveIcon": {
-        "backgroundColor": "#0F5B43",
+        "backgroundColor": "#0F9D1F",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
