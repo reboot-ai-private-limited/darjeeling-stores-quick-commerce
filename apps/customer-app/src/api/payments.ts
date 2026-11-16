@@ -36,7 +36,7 @@ export const paymentMessage = (e: unknown): string => {
 export const PAYMENT_RETURN_URL = "https://example.com/darjeeling-payment-return";
 
 /** The page Razorpay's standard checkout runs in. It reports back to the app through postMessage. */
-export const checkoutHtml = (c: CheckoutData, prefill: { name?: string; phone?: string }) => `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#f7f3ea;font-family:sans-serif;display:flex;align-items:center;justify-content:center;color:#7a6f66}</style></head><body><div>Opening secure payment…</div>
+export const checkoutHtml = (c: CheckoutData, prefill: { name?: string; phone?: string }) => `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#F7FCF6;font-family:sans-serif;display:flex;align-items:center;justify-content:center;color:#5F7468}</style></head><body><div>Opening secure payment…</div>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 function send(m){window.ReactNativeWebView.postMessage(JSON.stringify(m));}
@@ -44,7 +44,7 @@ try{
   var rzp=new Razorpay({
     key:${JSON.stringify(c.razorpayKeyId)}, order_id:${JSON.stringify(c.razorpayOrderId)}, amount:${c.amount}, currency:${JSON.stringify(c.currency)},
     name:"Darjeeling Stores", prefill:{name:${JSON.stringify(prefill.name ?? "")},contact:${JSON.stringify(prefill.phone ?? "")}},
-    theme:{color:"#401815"}, redirect:true, callback_url:${JSON.stringify(PAYMENT_RETURN_URL)},
+    theme:{color:"#0F5B43"}, redirect:true, callback_url:${JSON.stringify(PAYMENT_RETURN_URL)},
     handler:function(r){send({type:"success",data:r});},
     modal:{ondismiss:function(){send({type:"dismissed"});}}
   });

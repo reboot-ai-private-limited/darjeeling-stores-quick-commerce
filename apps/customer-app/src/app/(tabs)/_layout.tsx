@@ -20,7 +20,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="orders" />
         <Tabs.Screen name="account" />
       </Tabs>
-      {/* CartBar adds the safe-area inset and a 12px gap itself, so remove the inset here and leave a small gap above the pill */}
+      {/* CartBar adds the safe-area inset and a small gap itself, so remove the inset here and leave a gap above the tab pill */}
       <CartBar bottom={barTop - insets.bottom - 4} />
     </View>
   );

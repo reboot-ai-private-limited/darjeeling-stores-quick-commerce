@@ -2,14 +2,14 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { addressLine, listAddresses, type Address } from "../api/addresses";
 import { getStoreStatus, syncCart, toServerLines, type StoreStatus } from "../api/cart";
 import { ApiError } from "../api/http";
 import { getSlots, slotMessage, type Slot } from "../api/preorder";
 import { checkoutMessage, createQuote, getTipOptions, newKey, placeOrder, type PaymentMethod, type Quote, type TipOptions } from "../api/orders";
-import { Button, Header, Icon, Press, Screen, tap, type IconName } from "../components/ui";
+import { Button, Header, Icon, KScrollView, Press, Screen, tap, useKeyboard, type IconName } from "../components/ui";
 import { BillSkeleton, Bone, CheckoutSkeleton } from "../components/Skeleton";
 import { useCart } from "../state/cart";
 import { useStore } from "../state/store";
@@ -22,6 +22,7 @@ export default function Checkout() {
   const { zone, signedIn, addressId } = useStore();
   const { lines, count, subtotal, savings, clear, applyServer } = useCart();
   const insets = useSafeAreaInsets();
+  const { height: kb } = useKeyboard();
 
   const [address, setAddress] = useState<Address | null | undefined>(undefined); // undefined = loading
   const [tips, setTips] = useState<TipOptions | null>(null);
@@ -127,8 +128,8 @@ export default function Checkout() {
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title="Checkout" /></View>
         {address === undefined ? <CheckoutSkeleton /> : (
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 170 + insets.bottom, gap: space.lg }}>
+          <View style={{ flex: 1 }}>
+            <KScrollView revealMargin={130} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 170 + insets.bottom, gap: space.lg }}>
 
               {/* Hero: when it arrives and where */}
               <LinearGradient colors={[colors.maroon, colors.maroonSoft]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
@@ -286,13 +287,13 @@ export default function Checkout() {
               </View>
 
               {error && <View style={s.errBox}><Icon name="alert-circle" size={16} color={colors.red} /><Text style={[type.small, { color: colors.red, flex: 1 }]}>{error}</Text></View>}
-            </ScrollView>
-          </KeyboardAvoidingView>
+            </KScrollView>
+          </View>
         )}
       </Screen>
 
       {address && (
-        <View style={[s.bar, { paddingBottom: insets.bottom + space.md }]}>
+        <View style={[s.bar, { bottom: kb, paddingBottom: (kb > 0 ? 0 : insets.bottom) + space.md }]}>
           <View style={{ flex: 1 }}>
             {quoting && !quote ? <Bone w={80} h={22} style={{ marginBottom: 4 }} /> : <Text style={s.barTotal}>{quote ? rupees(total) : "—"}</Text>}
             <Text style={type.small}>Cash on delivery</Text>
@@ -320,15 +321,15 @@ function Bill({ label, value, tone }: { label: string; value: string; tone?: str
 
 const s = StyleSheet.create({
   hero: { borderRadius: radius.xl, padding: space.lg, gap: 6, overflow: "hidden", ...shadow.lift },
-  heroBlob: { position: "absolute", width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(255,201,51,0.10)", top: -70, right: -60 },
+  heroBlob: { position: "absolute", width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(207,178,100,0.14)", top: -70, right: -60 },
   heroBadge: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 10, height: 24 },
   heroBadgeText: { fontSize: 10, fontWeight: "900", color: colors.maroon, letterSpacing: 0.8 },
   heroTitle: { color: colors.white, fontSize: 26, fontWeight: "900", letterSpacing: -0.7, marginTop: 4 },
   heroSub: { color: "rgba(255,255,255,0.75)", fontSize: 13 },
-  heroAddr: { flexDirection: "row", alignItems: "center", gap: space.sm, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: radius.md, padding: space.md, marginTop: space.sm },
+  heroAddr: { flexDirection: "row", alignItems: "center", gap: space.sm, backgroundColor: "rgba(207,178,100,0.14)", borderRadius: radius.md, padding: space.md, marginTop: space.sm },
   heroAddrTitle: { color: colors.white, fontSize: 13, fontWeight: "800" },
   heroAddrLine: { color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 16, marginTop: 1 },
-  change: { backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 12, height: 30, alignItems: "center", justifyContent: "center" },
+  change: { backgroundColor: colors.sun, borderRadius: radius.pill, paddingHorizontal: 12, height: 30, alignItems: "center", justifyContent: "center" },
   changeText: { fontSize: 12, fontWeight: "900", color: colors.maroon },
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: space.lg, ...shadow.card },
   section: { flexDirection: "row", alignItems: "center", gap: space.sm, marginBottom: space.sm, paddingHorizontal: 2 },
@@ -347,7 +348,7 @@ const s = StyleSheet.create({
   tipCard: { paddingVertical: space.md, paddingHorizontal: space.md },
   tipTitle: { fontSize: 14, fontWeight: "800", color: colors.ink },
   tip: { minWidth: 60, height: 32, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
-  tipOn: { backgroundColor: colors.maroon, borderColor: colors.maroon },
+  tipOn: { backgroundColor: colors.green, borderColor: colors.green },
   tipText: { fontSize: 13, fontWeight: "800", color: colors.ink },
   note: { height: 46, fontSize: 15, color: colors.ink, outlineStyle: "none" as never },
   pay: { flexDirection: "row", alignItems: "center", gap: space.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white, padding: space.md },

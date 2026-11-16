@@ -23,7 +23,7 @@ export default function Brand() {
   return (
     <View style={{ flex: 1 }}>
       <Screen pad={false} bottomPad={0}>
-        <View style={{ paddingHorizontal: space.lg }}><Header title={name ?? "Brand"} subtitle={items ? `${items.length} ${items.length === 1 ? "product" : "products"}` : undefined} right={logo ? <Image source={{ uri: logo }} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: colors.yellow }} contentFit="cover" /> : undefined} /></View>
+        <View style={{ paddingHorizontal: space.lg }}><Header title={name ?? "Brand"} subtitle={items ? `${items.length} ${items.length === 1 ? "product" : "products"}` : undefined} right={logo ? <Image source={{ uri: logo }} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: colors.maroon }} contentFit="cover" /> : undefined} /></View>
         {!items && !err && <ActivityIndicator color={colors.maroon} style={{ marginTop: 60 }} />}
         {!!err && <Text style={[type.small, { textAlign: "center", marginTop: 60 }]}>{err}</Text>}
         {items?.length === 0 && <View style={{ alignItems: "center", gap: space.sm, marginTop: 70 }}><Icon name="package" size={40} color={colors.faint} /><Text style={type.h2}>Nothing here yet</Text></View>}

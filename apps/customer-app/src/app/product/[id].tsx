@@ -230,7 +230,7 @@ function FoodMark({ kind }: { kind: string }) {
 
 const s = StyleSheet.create({
   topBtns: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", justifyContent: "space-between", zIndex: 5 },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", ...shadow.card },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingHorizontal: space.xl },
   thumbs: { flexDirection: "row", justifyContent: "center", gap: space.sm, paddingVertical: space.md },
   thumb: { width: 52, height: 52, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white, padding: 4 },
@@ -264,7 +264,7 @@ const s = StyleSheet.create({
   kv: { flexDirection: "row", gap: space.md, paddingVertical: 2 },
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", gap: space.lg, backgroundColor: colors.white, paddingHorizontal: space.lg, paddingTop: space.md, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, ...shadow.lift },
   barPrice: { fontSize: 22, fontWeight: "900", color: colors.ink },
-  stepper: { flex: 1.3, height: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.maroon, borderRadius: radius.lg },
+  stepper: { flex: 1.3, height: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: radius.lg },
   stepBtn: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
   stepQty: { color: colors.white, fontWeight: "900", fontSize: 18 },
 });

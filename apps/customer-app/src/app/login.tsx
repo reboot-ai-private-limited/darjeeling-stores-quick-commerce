@@ -1,9 +1,9 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { requestOtp } from "../api/auth";
-import { Button, Header, Icon, Screen, Stagger } from "../components/ui";
+import { Button, Header, Icon, KScrollView, Screen, Stagger } from "../components/ui";
 import { colors, radius, shadow, type } from "../theme";
 
 /** Screen 5: phone number. Guests can browse; this appears at checkout or from Account. */
@@ -24,8 +24,8 @@ export default function Login() {
   return (
     <Screen>
       <Header back={router.canGoBack()} />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <View style={{ flex: 1 }}>
+        <KScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <Stagger i={0} style={{ alignItems: "center", marginTop: 20 }}>
             <View style={s.mark}><Text style={s.markText}>ds<Text style={{ color: colors.red }}>.</Text></Text></View>
           </Stagger>
@@ -45,8 +45,8 @@ export default function Login() {
           {error ? <Animated.Text entering={FadeInDown.duration(250)} style={s.error}>{error}</Animated.Text> : null}
           <Stagger i={4} style={{ marginTop: 22 }}><Button label={busy ? "Sending…" : "Send code"} icon="arrow-right" disabled={!valid || busy} onPress={() => void send()} /></Stagger>
           <Text style={[type.small, { textAlign: "center", marginTop: 20 }]}>By continuing you agree to our Terms and Privacy Policy.</Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KScrollView>
+      </View>
     </Screen>
   );
 }

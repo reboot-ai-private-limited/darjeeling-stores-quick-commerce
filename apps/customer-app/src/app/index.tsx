@@ -50,7 +50,7 @@ export default function Splash() {
 
 const s = StyleSheet.create({
   fill: { flex: 1, alignItems: "center", justifyContent: "center" },
-  blobA: { position: "absolute", width: 380, height: 380, borderRadius: 190, backgroundColor: "rgba(255,201,51,0.08)", top: -120, right: -140 },
+  blobA: { position: "absolute", width: 380, height: 380, borderRadius: 190, backgroundColor: "rgba(207,178,100,0.12)", top: -120, right: -140 },
   blobB: { position: "absolute", width: 300, height: 300, borderRadius: 150, backgroundColor: "rgba(255,255,255,0.05)", bottom: -100, left: -110 },
   mark: { width: 128, height: 128, borderRadius: 38, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center", elevation: 14 },
   logoImg: { width: 128, height: 128, borderRadius: 38 },

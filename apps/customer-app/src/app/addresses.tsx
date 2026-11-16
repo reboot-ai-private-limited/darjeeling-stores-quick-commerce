@@ -1,7 +1,8 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
-import { addressLine, listAddresses, setDefaultAddress, type Address } from "../api/addresses";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { addressLine, deleteAddress, listAddresses, setDefaultAddress, type Address } from "../api/addresses";
 import { Button, Header, Icon, Pill, Press, Screen, tap, type IconName } from "../components/ui";
 import { useStore } from "../state/store";
 import { colors, radius, shadow, space, type } from "../theme";
@@ -11,10 +12,12 @@ const ICON: Record<Address["label"], IconName> = { Home: "home", Work: "briefcas
 /** Screen 18: saved addresses. With `?pick=1` (from the cart) tapping one chooses it for this order; otherwise tapping edits it. */
 export default function Addresses() {
   const { pick } = useLocalSearchParams<{ pick?: string }>();
+  const insets = useSafeAreaInsets();
   const picking = !!pick;
   const { signedIn, addressId, setAddressId } = useStore();
   const [items, setItems] = useState<Address[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!signedIn) return;
@@ -37,6 +40,14 @@ export default function Addresses() {
   };
   const makeDefault = async (a: Address) => { try { await setDefaultAddress(a.id); await load(); } catch { /* shown on next load */ } };
 
+  // First tap arms the trash button ("Delete?"), the second deletes.
+  const remove = async (a: Address) => {
+    if (confirmId !== a.id) { setConfirmId(a.id); return; }
+    setConfirmId(null);
+    try { await deleteAddress(a.id); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Couldn't delete the address."); }
+  };
+
   const selected = addressId ?? items?.find(a => a.isDefault)?.id;
 
   return (
@@ -56,7 +67,7 @@ export default function Addresses() {
             <Text style={[type.small, { textAlign: "center" }]}>Add where we should deliver your orders.</Text>
           </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 130, gap: space.md }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 130 + insets.bottom, gap: space.md }}>
             {items.map(a => {
               const on = picking && selected === a.id;
               return (
@@ -74,8 +85,15 @@ export default function Addresses() {
                       {!a.isDeliverable && <Text style={[type.small, { color: colors.red }]}>We don't deliver to this spot yet.</Text>}
                       {!picking && !a.isDefault && <Press onPress={() => void makeDefault(a)} haptic style={{ alignSelf: "flex-start", marginTop: 4 }}><Text style={s.link}>Make default</Text></Press>}
                     </View>
-                    {picking ? <View style={[s.radio, on && s.radioOn]}>{on && <View style={s.dot} />}</View>
-                      : <Press onPress={() => router.push({ pathname: "/address/edit", params: { id: a.id } })} haptic style={{ padding: 6 }}><Icon name="edit-2" size={18} color={colors.muted} /></Press>}
+                    <View style={{ alignItems: "center", gap: space.sm }}>
+                      {picking && <View style={[s.radio, on && s.radioOn]}>{on && <View style={s.dot} />}</View>}
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Press onPress={() => router.push({ pathname: "/address/edit", params: { id: a.id } })} haptic style={{ padding: 6 }}><Icon name="edit-2" size={18} color={colors.muted} /></Press>
+                        <Press onPress={() => void remove(a)} haptic style={{ padding: 6 }}>
+                          {confirmId === a.id ? <Text style={[s.link, { color: colors.red }]}>Delete?</Text> : <Icon name="trash-2" size={18} color={colors.red} />}
+                        </Press>
+                      </View>
+                    </View>
                   </View>
                 </Press>
               );
@@ -84,7 +102,7 @@ export default function Addresses() {
         )}
       </Screen>
       {signedIn && !error && items && (
-        <View style={s.bar}>
+        <View style={[s.bar, { paddingBottom: insets.bottom + space.md }]}>
           <Button label="Add new address" icon="plus" onPress={() => router.push({ pathname: "/address/edit", params: picking ? { pick: "1" } : {} })} />
         </View>
       )}
@@ -101,5 +119,5 @@ const s = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.line, alignItems: "center", justifyContent: "center", marginTop: 2 },
   radioOn: { borderColor: colors.maroon },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.maroon },
-  bar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: space.lg, paddingBottom: space.xl, backgroundColor: colors.cream },
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.lg, paddingTop: space.md, backgroundColor: colors.cream },
 });

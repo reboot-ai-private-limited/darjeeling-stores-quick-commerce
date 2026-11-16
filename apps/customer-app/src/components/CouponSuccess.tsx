@@ -5,7 +5,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 import { colors, radius, space, type } from "../theme";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-const PALETTE = [colors.yellow, colors.red, colors.green, colors.maroon, colors.blue, "#ff8a4c"];
+const PALETTE = ["#CFB264", colors.red, colors.green, colors.maroon, colors.blue, "#ff8a4c"];
 
 /** A tick that pops in and then draws itself. */
 function Tick({ size = 110 }: { size?: number }) {

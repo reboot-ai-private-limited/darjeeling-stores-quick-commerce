@@ -23,7 +23,7 @@ export function RazorpayCheckout({ data, prefill, onEvent }: { data: CheckoutDat
         if (/^(upi|tez|phonepe|paytmmp|gpay|intent):/i.test(req.url)) { void import("react-native").then(m => m.Linking.openURL(req.url).catch(() => undefined)); return false; }
         return true;
       }}
-      style={{ flex: 1, backgroundColor: "#f7f3ea" }}
+      style={{ flex: 1, backgroundColor: "#F7FCF6" }}
     />
   );
 }

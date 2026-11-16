@@ -133,7 +133,7 @@ export default function TrackingScreen() {
 
 const s = StyleSheet.create({
   top: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: space.lg, flexDirection: "row", alignItems: "flex-start", gap: space.md },
-  back: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", ...shadow.card },
+  back: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
   eta: { flex: 1, backgroundColor: colors.maroon, borderRadius: radius.lg, paddingHorizontal: space.lg, paddingVertical: 10, ...shadow.lift },
   etaText: { color: colors.white, fontSize: 18, fontWeight: "900", letterSpacing: -0.3 },
   etaSub: { color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 1 },

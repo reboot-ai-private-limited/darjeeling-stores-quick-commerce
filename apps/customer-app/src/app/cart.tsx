@@ -90,7 +90,7 @@ export default function CartScreen() {
             {freeAbove ? (
               <View style={s.card}>
                 <Text style={[type.body, { fontWeight: "800" }]}>{toFree > 0 ? `Add ${rupees(toFree)} more for FREE delivery` : "You've unlocked FREE delivery"}</Text>
-                <View style={s.track}><View style={[s.fill, { width: `${Math.min(100, (subtotal / freeAbove) * 100)}%`, backgroundColor: toFree > 0 ? colors.yellow : colors.green }]} /></View>
+                <View style={s.track}><View style={[s.fill, { width: `${Math.min(100, (subtotal / freeAbove) * 100)}%`, backgroundColor: toFree > 0 ? colors.maroonSoft : colors.green }]} /></View>
               </View>
             ) : null}
 
@@ -192,7 +192,7 @@ const s = StyleSheet.create({
   name: { fontSize: 14, fontWeight: "700", color: colors.ink, lineHeight: 18 },
   price: { fontSize: 15, fontWeight: "900", color: colors.ink },
   mrp: { fontSize: 12, color: colors.faint, textDecorationLine: "line-through" },
-  stepper: { width: 82, height: 34, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.maroon, borderRadius: 10 },
+  stepper: { width: 82, height: 34, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: 10 },
   stepBtn: { width: 26, height: 34, alignItems: "center", justifyContent: "center" },
   stepQty: { color: colors.white, fontWeight: "900", fontSize: 14 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: space.md, marginTop: space.sm, borderTopWidth: 1, borderTopColor: colors.line },
