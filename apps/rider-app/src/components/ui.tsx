@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { liftIn } from "../motion";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
@@ -85,10 +86,11 @@ export function Press({ children, onPress, style, haptic = false, disabled = fal
 
 type Variant = "primary" | "accent" | "ghost" | "danger" | "soft";
 export function Button({ label, onPress, variant = "primary", icon, disabled, style }: { label: string; onPress?: () => void; variant?: Variant; icon?: IconName; disabled?: boolean; style?: StyleProp<ViewStyle> }) {
-  const bg = { primary: colors.maroon, accent: colors.yellow, ghost: "transparent", danger: colors.red, soft: colors.creamDeep }[variant];
+  const bg = { primary: colors.green, accent: "transparent", ghost: "transparent", danger: colors.red, soft: colors.creamDeep }[variant];
   const fg = { primary: colors.white, accent: colors.maroon, ghost: colors.maroon, danger: colors.white, soft: colors.maroon }[variant];
   return (
     <Press onPress={onPress} haptic disabled={disabled} style={[s.button, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, variant === "ghost" && { borderWidth: 1.5, borderColor: colors.line }, variant === "primary" && shadow.lift, style]}>
+      {variant === "accent" && <LinearGradient pointerEvents="none" colors={["#FFE680", "#FFD43B", "#F7B900"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={StyleSheet.absoluteFill} />}
       {icon && <Icon name={icon} color={fg} size={19} />}
       <Text style={[s.buttonText, { color: fg }]}>{label}</Text>
     </Press>
@@ -99,7 +101,7 @@ export const Card = ({ children, style }: { children: ReactNode; style?: StylePr
 
 export function Chip({ label, active, onPress, icon }: { label: string; active?: boolean; onPress?: () => void; icon?: IconName }) {
   return (
-    <Press onPress={onPress} haptic style={[s.chip, active && { backgroundColor: colors.maroon, borderColor: colors.maroon }]}>
+    <Press onPress={onPress} haptic style={[s.chip, active && { backgroundColor: colors.green, borderColor: colors.green }]}>
       {icon && <Icon name={icon} size={15} color={active ? colors.white : colors.muted} />}
       <Text style={{ fontSize: 13, fontWeight: "700", color: active ? colors.white : colors.ink }}>{label}</Text>
     </Press>
@@ -135,7 +137,7 @@ export const SectionTitle = ({ children, action }: { children: ReactNode; action
 const s = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", minHeight: 60, paddingTop: 6 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", ...shadow.card },
-  button: { minHeight: 56, borderRadius: radius.lg, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  button: { minHeight: 56, borderRadius: radius.lg, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, overflow: "hidden" },
   buttonText: { fontSize: 16, fontWeight: "800", letterSpacing: 0.2 },
   card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, ...shadow.card },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, height: 40, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white },

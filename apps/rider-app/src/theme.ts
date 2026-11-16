@@ -2,22 +2,22 @@ import { Platform, type TextStyle, type ViewStyle } from "react-native";
 
 /** Darjeeling Stores brand: deep maroon, tea-leaf yellow, warm cream. */
 export const colors = {
-  maroon: "#401815",
-  maroonDeep: "#2a0f0d",
-  maroonSoft: "#5a2622",
+  maroon: "#0F5B43",
+  maroonDeep: "#0A3F2E",
+  maroonSoft: "#1A7457",
   red: "#c62828",
   redSoft: "#fdeceb",
-  yellow: "#ffc933",
-  yellowSoft: "#fff4d1",
-  cream: "#f7f3ea",
-  creamDeep: "#efe8d8",
+  yellow: "#CFB264",
+  yellowSoft: "#D7EFD9",
+  cream: "#F7FCF6",
+  creamDeep: "#D7EFD9",
   card: "#ffffff",
-  ink: "#231815",
-  muted: "#7a6f66",
-  faint: "#b3a99d",
-  line: "#ece6da",
-  green: "#1f9d62",
-  greenSoft: "#e2f5ec",
+  ink: "#17302A",
+  muted: "#5F7468",
+  faint: "#9DB2A5",
+  line: "#CFE6D1",
+  green: "#63A96E",
+  greenSoft: "#D7EFD9",
   amber: "#d98a00",
   amberSoft: "#fff1d6",
   blue: "#2f6fdb",
@@ -30,14 +30,14 @@ export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const shadow = {
   card: Platform.select<ViewStyle>({
-    ios: { shadowColor: "#401815", shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
+    ios: { shadowColor: "#0F5B43", shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
     android: { elevation: 3 },
-    default: { boxShadow: "0 8px 22px rgba(64,24,21,0.08)" } as ViewStyle,
+    default: { boxShadow: "0 8px 22px rgba(15,91,67,0.08)" } as ViewStyle,
   })!,
   lift: Platform.select<ViewStyle>({
-    ios: { shadowColor: "#401815", shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 12 } },
+    ios: { shadowColor: "#0F5B43", shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 12 } },
     android: { elevation: 8 },
-    default: { boxShadow: "0 14px 32px rgba(64,24,21,0.18)" } as ViewStyle,
+    default: { boxShadow: "0 14px 32px rgba(15,91,67,0.18)" } as ViewStyle,
   })!,
 };
 

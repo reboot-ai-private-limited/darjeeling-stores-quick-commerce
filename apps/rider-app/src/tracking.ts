@@ -12,6 +12,9 @@ import { sendLocation, type LocationPoint } from "./api/rider";
 export const backgroundTrackingSupported = Platform.OS === "android" && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 const TASK = "rider-background-location";
+/** Positions that failed to send (offline), kept to retry with the next batch. Capped so memory stays small. */
+const MAX_UNSENT = 200;
+let unsent: LocationPoint[] = [];
 type TaskManager = typeof import("expo-task-manager");
 let manager: TaskManager | null | undefined;
 function tasks(): TaskManager | null {
@@ -32,8 +35,11 @@ if (taskManager) {
         location: { lat: p.coords.latitude, lng: p.coords.longitude }, accuracyM: p.coords.accuracy ?? null,
         speedKmh: p.coords.speed != null && p.coords.speed >= 0 ? Math.round(p.coords.speed * 3.6) : null, at: new Date(p.timestamp).toISOString(),
       }));
-      await sendLocation(points);
-    } catch { /* offline or signed out: the next batch will try again */ }
+      // Points that could not be sent earlier (no signal) go out first, oldest to newest, so the trail has no gap.
+      const batch = [...unsent, ...points];
+      unsent = [];
+      try { await sendLocation(batch); } catch { unsent = batch.slice(-MAX_UNSENT); }
+    } catch { /* signed out: nothing to send */ }
   });
 }
 
@@ -59,8 +65,9 @@ export async function startBackgroundTracking(): Promise<void> {
   try {
     if (await Location.hasStartedLocationUpdatesAsync(TASK)) return;
     await Location.startLocationUpdatesAsync(TASK, {
-      accuracy: Location.Accuracy.Balanced, timeInterval: 15_000, distanceInterval: 20, pausesUpdatesAutomatically: false,
-      foregroundService: { notificationTitle: "You are on shift", notificationBody: "Sharing your location for deliveries.", notificationColor: "#401815" },
+      accuracy: Location.Accuracy.Balanced, timeInterval: 15_000, distanceInterval: 20, pausesUpdatesAutomatically: false, showsBackgroundLocationIndicator: true,
+      // killServiceOnDestroy: false keeps sharing after the rider swipes the app away; it stops only when the shift ends, a break starts, or they sign out.
+      foregroundService: { notificationTitle: "You are on shift", notificationBody: "Sharing your location for deliveries.", notificationColor: "#0F5B43", killServiceOnDestroy: false },
     });
   } catch { /* the phone refused or the build has no background location: the open app still shares its position */ }
 }

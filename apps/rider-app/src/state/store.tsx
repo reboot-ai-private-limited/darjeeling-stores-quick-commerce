@@ -159,8 +159,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // On shift and not on break: keep sharing the position when the app is in the background or the phone is locked (real builds only).
   useEffect(() => {
-    if (signedIn && onShift && !onBreakNow) void startBackgroundTracking();
-    else void stopBackgroundTracking();
+    if (!(signedIn && onShift && !onBreakNow)) { void stopBackgroundTracking(); return; }
+    void startBackgroundTracking();
+    // If the phone stopped the service while the app was away (battery savers do this), start it again as soon as the app is opened.
+    const sub = AppState.addEventListener("change", s => { if (s === "active") void startBackgroundTracking(); });
+    return () => sub.remove();
   }, [signedIn, onShift, onBreakNow]);
 
   const value = useMemo<Ctx>(() => {
