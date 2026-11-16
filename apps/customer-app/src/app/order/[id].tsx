@@ -73,10 +73,10 @@ export default function OrderDetail() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.cream }}>
       <Screen pad={false} bottomPad={0}>
-        <View style={{ paddingHorizontal: space.lg }}>
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
           <Header title={g.groupNo} subtitle={new Date(g.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} />
         </View>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 110 + insets.bottom, gap: space.md }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: 110 + insets.bottom, gap: space.md }}>
           {g.children.map((c, idx) => <StatusCard key={c.id} c={c} label={multi ? `Delivery ${idx + 1} of ${g.children.length}` : null} />)}
 
           {g.deliveryOtp && live && (
@@ -178,7 +178,7 @@ function StatusCard({ c, label }: { c: ChildOrder; label: string | null }) {
           {STEPS.map((st, i) => {
             const done = i <= reached; const current = i === reached && live;
             return (
-              <View key={st.key} style={{ flex: 1, alignItems: "center" }}>
+              <View key={st.key} style={{ flex: 1, alignItems: "center", minWidth: 0 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
                   <View style={[s.seg, { opacity: i === 0 ? 0 : 1 }, i <= reached && { backgroundColor: colors.green }]} />
                   <View style={[s.node, done && { backgroundColor: colors.green, borderColor: colors.green }, current && { backgroundColor: colors.yellow, borderColor: colors.maroon }]}>
@@ -186,8 +186,9 @@ function StatusCard({ c, label }: { c: ChildOrder; label: string | null }) {
                   </View>
                   <View style={[s.seg, { opacity: i === STEPS.length - 1 ? 0 : 1 }, i < reached && { backgroundColor: colors.green }]} />
                 </View>
-                <Text style={[s.stepLabel, done && { color: colors.ink, fontWeight: "800" }]} numberOfLines={1}>{SHORT[i]}</Text>
-                {times[i] && <Text style={s.stepTime}>{clock(times[i]!)}</Text>}
+                {/* Two lines allowed: five columns are narrow, and "Confirmed" or "On the way" must not be cut off. */}
+                <Text style={[s.stepLabel, done && { color: colors.ink, fontWeight: "800" }]} numberOfLines={2}>{SHORT[i]}</Text>
+                {times[i] && <Text style={s.stepTime} numberOfLines={1}>{clock(times[i]!)}</Text>}
               </View>
             );
           })}
@@ -230,7 +231,7 @@ const s = StyleSheet.create({
   arrive: { fontSize: 14, fontWeight: "800", color: colors.maroon, marginTop: 2 },
   seg: { flex: 1, height: 3, backgroundColor: colors.line },
   node: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.line, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
-  stepLabel: { fontSize: 10, fontWeight: "600", color: colors.faint, marginTop: 6, textAlign: "center" },
+  stepLabel: { fontSize: 10, lineHeight: 13, fontWeight: "600", color: colors.faint, marginTop: 6, textAlign: "center", alignSelf: "stretch" },
   stepTime: { fontSize: 10, color: colors.muted, marginTop: 1 },
   otpCard: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.yellowSoft, borderRadius: radius.lg, padding: space.lg },
   otp: { fontSize: 28, fontWeight: "900", letterSpacing: 6, color: colors.maroon },

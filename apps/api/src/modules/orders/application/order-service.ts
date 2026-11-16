@@ -32,10 +32,11 @@ export function createOrderService(deps: OrderDeps, core: OrderCore) {
 
   async function childView(order: Order) {
     const hasRider = !["PENDING_PAYMENT", "PLACED", "CONFIRMED", "PACKING", "READY"].includes(order.status);
-    const [timeline, rider, expired] = await Promise.all([
+    const [timeline, rider, expired, images] = await Promise.all([
       timelineOf(order), hasRider ? riders.riderOf(order.id) : Promise.resolve(null), order.voiceMediaId ? media.isExpired(order.voiceMediaId) : Promise.resolve(false),
+      deps.images ? deps.images.urlsOf([...new Set(order.items.map(i => i.productId))]).catch(() => ({})) : Promise.resolve({}),
     ]);
-    return customerOrderView(order, rider ? { name: rider.name, phone: rider.phone } : null, timeline, expired);
+    return customerOrderView(order, rider ? { name: rider.name, phone: rider.phone } : null, timeline, expired, images);
   }
 
   async function groupView(g: OrderGroup, showCode = true) {

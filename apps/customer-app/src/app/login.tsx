@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Keyboard, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, Keyboard, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { requestOtp } from "../api/auth";
 import { Button, Header, Icon, KScrollView, Screen, Stagger } from "../components/ui";
@@ -27,7 +27,7 @@ export default function Login() {
       <View style={{ flex: 1 }}>
         <KScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <Stagger i={0} style={{ alignItems: "center", marginTop: 20 }}>
-            <View style={s.mark}><Text style={s.markText}>ds<Text style={{ color: colors.red }}>.</Text></Text></View>
+            <View style={s.mark}><Image source={require("../../assets/logo.png")} style={{ width: 96, height: 96, borderRadius: 30 }} /></View>
           </Stagger>
           <Stagger i={1}><Text style={[type.title, { marginTop: 28 }]}>Sign in to order</Text></Stagger>
           <Stagger i={2}><Text style={[type.small, { marginTop: 6, marginBottom: 24 }]}>Enter your mobile number. We'll send a 6-digit code to confirm it's you.</Text></Stagger>
@@ -52,8 +52,7 @@ export default function Login() {
 }
 
 const s = StyleSheet.create({
-  mark: { width: 96, height: 96, borderRadius: 30, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center", ...shadow.lift },
-  markText: { fontSize: 46, fontWeight: "900", color: colors.maroon, letterSpacing: -3 },
+  mark: { width: 96, height: 96, borderRadius: 30, ...shadow.lift },
   field: { flexDirection: "row", alignItems: "center", height: 64, borderRadius: radius.lg, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.line, paddingHorizontal: 18, ...shadow.card },
   error: { color: colors.red, fontWeight: "700", fontSize: 13, marginTop: 12, lineHeight: 18 },
   cc: { fontSize: 18, fontWeight: "800", color: colors.ink },

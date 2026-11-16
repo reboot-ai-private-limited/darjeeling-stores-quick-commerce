@@ -137,7 +137,11 @@ export const DEFAULT_ORDER_SETTINGS: OrderSettings = {
   confirmMode: "auto", paymentWindowMinutes: 15, slaMinutes: { confirm: 5, pack: 15, assign: 5 }, trackingBaseUrl: null, otpKeyHex: null, otpMaxTries: 5, customerCancelUntil: "CONFIRMED",
 };
 
+/** Card photo links for products, so a customer sees the pictures of what they ordered. Optional: without it order items have no photo. */
+export interface ProductImages { urlsOf(productIds: readonly string[]): Promise<Record<string, string | null>> }
+
 export interface OrderDeps {
+  images?: ProductImages;
   store: OrderStore; quotes: QuoteSource; carts: CartPort; addresses: AddressSource; stock: StockPort; coupons: CouponPort; media: OrderMedia; riders: Riders; money: MoneyPort;
   notifier: OrderNotifier; dispatch: DispatchHooks; slots: SlotPort; geography: Geography; link: (orderId: string) => { token: string; expiresAt: Date } | null;
   settings: OrderSettings; now: () => Date; newId: () => string;

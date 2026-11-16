@@ -21,13 +21,14 @@ export default function OrderPlaced() {
 
   return (
     <Screen bottomPad={0}>
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: "center", paddingTop: space.lg, paddingBottom: space.lg, gap: space.md }}>
+      {/* The scroll area reaches the screen edges (negative margin) and the side padding lives inside it, so a scroll view's clipping never cuts the cards' shadows or corners. */}
+      <ScrollView style={{ flex: 1, marginHorizontal: -space.xl }} showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: "center", paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.lg, gap: space.md }}>
         <Animated.View entering={ZoomIn.duration(350)} style={s.tick}><Icon name="check" size={44} color={colors.white} /></Animated.View>
         <Text style={[type.title, { marginTop: space.xs }]}>Order placed!</Text>
         {!g && !failed && <ActivityIndicator color={colors.maroon} style={{ marginTop: space.lg }} />}
         {failed && <Text style={[type.body, { color: colors.muted, textAlign: "center" }]}>Your order is in. We couldn't load its details just now; you'll find it under Orders.</Text>}
         {g && (
-          <Animated.View entering={FadeInDown.duration(300)} style={{ alignSelf: "stretch", gap: space.md }}>
+          <Animated.View entering={FadeInDown.duration(300)} style={{ alignSelf: "stretch", width: "100%", gap: space.md }}>
             <Text style={[type.small, { textAlign: "center" }]}>Order {g.groupNo}</Text>
             {arrive && <View style={s.eta}><Icon name="zap" size={18} color={colors.maroon} /><Text style={s.etaText}>Arriving by {time(arrive)}</Text></View>}
             {g.deliveryOtp && (
@@ -39,7 +40,7 @@ export default function OrderPlaced() {
             )}
             <View style={s.card}>
               <Text style={[type.small, { fontWeight: "800" }]}>Delivering to</Text>
-              <Text style={type.body}>{[g.address.line1, g.address.landmark, g.address.locality, g.address.pincode].filter(Boolean).join(", ")}</Text>
+              <Text style={[type.body, { flexShrink: 1 }]}>{[g.address.line1, g.address.landmark, g.address.locality, g.address.pincode].filter(Boolean).join(", ")}</Text>
             </View>
             {g.paymentMethod === "cod" && (
               <View style={[s.card, { flexDirection: "row", alignItems: "center", gap: space.md }]}>
