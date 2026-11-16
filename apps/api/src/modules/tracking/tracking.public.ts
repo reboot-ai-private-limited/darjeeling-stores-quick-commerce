@@ -22,6 +22,8 @@ export interface TrackingModuleOptions {
   relations: TrackingDeps["relations"];
   orders?: OrdersPort;
   settings?: Partial<TrackingSettings>;
+  /** Store every position in the history collection too (default off, or KEEP_LOCATION_HISTORY=true). */
+  keepHistory?: boolean;
   /** Replaces the straight-line estimate, for example with a routes service. */
   eta?: EtaProvider;
   /** The road to draw on the rider's map (Google Routes); without it the rider gets a straight line. */
@@ -36,10 +38,13 @@ export interface TrackingModuleOptions {
 export function createTrackingModule(options: TrackingModuleOptions) {
   const { connection, riders, relations, orders = noOrders, rider = noRiders, customer = noCustomers } = options;
   const settings: TrackingSettings = liveSettings(DEFAULT_TRACKING_SETTINGS, options.settings);
-  const store = createMongoTrackingStore(connection);
+  const keepHistory = options.keepHistory ?? process.env.KEEP_LOCATION_HISTORY === "true";
+  const store = createMongoTrackingStore(connection, keepHistory);
   const eta = options.eta ?? baselineEta(settings);
   const service = createTrackingService({
     store, orders, settings, eta, signer: createTokenSigner(options.tokenSecret), now: () => new Date(), riders, relations, ...(options.routePath && { routePath: options.routePath }),
+    // Location history is off unless asked for (KEEP_LOCATION_HISTORY=true): the live map only needs the rider's latest position.
+    keepHistory,
   });
   return { store, service, settings, eta, routes: trackingRoutes(service, riders, rider, customer) };
 }

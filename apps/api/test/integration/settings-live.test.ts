@@ -50,7 +50,7 @@ describe("cart and quote follow the admin settings", () => {
     expect((await quote()).status).toBe(201);
   });
 
-  it("largest quantity of one item, and packing time per warehouse", async () => {
+  it("largest quantity of one item follows the setting; the packing time is fixed in code", async () => {
     const { put } = await cart(5);
     expect(put.body.data.cart.items[0].qty).toBe(5);
     const line = put.body.data.cart.items[0];
@@ -59,10 +59,9 @@ describe("cart and quote follow the admin settings", () => {
     expect(again.body.data.cart.items[0].qty).toBe(2);
 
     expect((await quote()).body.data.allocation[0].eta.packMinutes).toBe(5);
-    await set("eta", GLOBAL, { packMinutes: 9 });
-    expect((await quote()).body.data.allocation[0].eta.packMinutes).toBe(9);
-    await set("eta", { type: "warehouse", id: W1 }, { packMinutes: 20 });
-    expect((await quote()).body.data.allocation[0].eta.packMinutes).toBe(20);
+    // Not an editable setting any more: the request is refused and the quote still uses the built-in 5 minutes.
+    expect((await set("eta", GLOBAL, { packMinutes: 9 })).status).toBe(400);
+    expect((await quote()).body.data.allocation[0].eta.packMinutes).toBe(5);
   });
 });
 
@@ -89,48 +88,48 @@ describe("pricing follows the admin settings", () => {
 });
 
 describe("stock follows the admin settings", () => {
-  it("low-stock level, per warehouse", async () => {
+  it("the low-stock level is fixed in code (5000 g) and cannot be edited", async () => {
     const p = await f.pooledProduct("Tomato", "TOM-2");
     await f.pooledOffer(W1, p, 7_000);
     const level = async () => (await f.get(`/admin/stock/levels?warehouseId=${W1}`)).body.data.find((r: { name: string }) => r.name === "Tomato");
     expect(await level()).toMatchObject({ stock: 7000, lowStockThreshold: 5000, isLow: false });
-    await set("stock", GLOBAL, { lowStockGrams: 8_000 });
-    expect(await level()).toMatchObject({ lowStockThreshold: 8000, isLow: true });
-    await set("stock", { type: "warehouse", id: W1 }, { lowStockGrams: 1_000 });
-    expect(await level()).toMatchObject({ lowStockThreshold: 1000, isLow: false });
+    expect((await set("stock", GLOBAL, { lowStockGrams: 8_000 })).status).toBe(400);
+    expect((await set("stock", { type: "warehouse", id: W1 }, { lowStockGrams: 1_000 })).status).toBe(400);
+    expect(await level()).toMatchObject({ lowStockThreshold: 5000, isLow: false });
   });
 
-  it("the same-zone price rule can be switched between block and warn", async () => {
+  it("the same-zone price rule always blocks, and cannot be switched to warn", async () => {
     const p = await f.pooledProduct("Tomato", "TOM-3");
     await f.pooledOffer(W1, p, 10_000);
     const other = () => f.send("post", "/admin/warehouse-products", { warehouseId: W2, productId: p.id, stockGrams: 5000, variants: [{ variantId: p.v500, price: 3300, mrp: 4000 }] });
     expect((await other()).body.error.code).toBe("PRICE_CONFLICT");
-    expect((await set("stock", GLOBAL, { zonePriceConflictMode: "warn" })).status).toBe(200);
-    expect((await other()).status).toBe(201);
+    expect((await set("stock", GLOBAL, { zonePriceConflictMode: "warn" })).status).toBe(400);
+    expect((await other()).body.error.code).toBe("PRICE_CONFLICT");
   });
 });
 
 describe("hours and pre-orders follow the admin settings", () => {
-  it("fills what the admin leaves out from the settings, and keeps what the admin states", async () => {
+  it("fills what the admin leaves out from the built-in values, and keeps what the admin states", async () => {
     const days = [0, 1, 2, 3, 4, 5, 6];
     const plain = { hours: [{ days, open: "07:00", close: "20:00" }] };
     const first = await f.send("put", `/admin/warehouses/${W1}/hours`, plain);
     expect(first.status, JSON.stringify(first.body)).toBe(200);
     expect(first.body.data).toMatchObject({ lastOrderMinutesBeforeClose: 15, afterHoursMode: "closed" });
 
-    await set("hours", GLOBAL, { lastOrderMinutesBeforeClose: 30, afterHoursMode: "pre_order" });
-    await set("preOrder", GLOBAL, { cutoffMinutesBeforeSlot: 90, packLeadMinutes: 60 });
+    // These defaults are fixed in code now: trying to change them is refused and later warehouses still get the built-in values.
+    expect((await set("hours", GLOBAL, { lastOrderMinutesBeforeClose: 30, afterHoursMode: "pre_order" })).status).toBe(400);
+    expect((await set("preOrder", GLOBAL, { cutoffMinutesBeforeSlot: 90, packLeadMinutes: 60 })).status).toBe(400);
     const second = await f.send("put", `/admin/warehouses/${W2}/hours`, plain);
-    expect(second.body.data).toMatchObject({ lastOrderMinutesBeforeClose: 30, afterHoursMode: "pre_order" });
+    expect(second.body.data).toMatchObject({ lastOrderMinutesBeforeClose: 15, afterHoursMode: "closed" });
     const slot = { start: "07:00", end: "09:00", capacity: 3 };
     const slots = await f.send("put", `/admin/warehouses/${W2}/preorder`, { enabled: true, slots: [slot] });
-    expect(slots.body.data.preOrder).toMatchObject({ cutoffMinutesBeforeSlot: 90, packLeadMinutes: 60 });
+    expect(slots.body.data.preOrder).toMatchObject({ cutoffMinutesBeforeSlot: 60, packLeadMinutes: 45 });
     const explicit = await f.send("put", `/admin/warehouses/${W2}/preorder`, { enabled: true, slots: [slot], cutoffMinutesBeforeSlot: 10, packLeadMinutes: 5 });
     expect(explicit.body.data.preOrder).toMatchObject({ cutoffMinutesBeforeSlot: 10, packLeadMinutes: 5 });
   });
 });
 
 it("only staff with the right login can change settings", async () => {
-  expect((await f.send("put", "/admin/settings/eta", { scope: GLOBAL, values: { packMinutes: 7 } }, A)).status).toBe(401);
+  expect((await f.send("put", "/admin/settings/discounts", { scope: GLOBAL, values: { rainExtraMinutes: 7 } }, A)).status).toBe(401);
   expect((await f.get("/admin/settings/registry", admin)).status).toBe(200);
 });

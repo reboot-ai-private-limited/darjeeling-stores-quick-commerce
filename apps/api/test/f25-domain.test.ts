@@ -6,7 +6,7 @@ import { createAdminModules } from "../src/composition/admin.js";
 import { dev2Routes } from "../src/composition/dev2.js";
 import { escapeRegex, searchFilter } from "../src/modules/customers/domain/customer.js";
 import { addDays, csvCell, dayRange, dayStart, istDay, toCsv } from "../src/modules/reports/domain/reports.js";
-import { changeProblems, defsOf, dependencyProblems, DEFS, GROUPS, REGISTRY, resolveKey, valueProblem, type Layer } from "../src/modules/settings/domain/registry.js";
+import { changeProblems, defsOf, dependencyProblems, DEFS, FIXED_VALUES, GROUPS, REGISTRY, resolveKey, valueProblem, type Layer } from "../src/modules/settings/domain/registry.js";
 import { assertUniqueRoutes } from "../src/platform/routes.js";
 
 describe("the settings registry", () => {
@@ -29,32 +29,33 @@ describe("the settings registry", () => {
   });
   it("rejects bad values, unknown keys and keys that cannot be set at the scope", () => {
     const zone = { type: "zone" as const, id: "a".repeat(24) };
-    expect(changeProblems("eta", zone, { packMinutes: 6 })).toEqual([]);
-    expect(changeProblems("eta", zone, { packMinutes: 6.5 })[0]?.key).toBe("packMinutes");
-    expect(changeProblems("eta", zone, { packMinutes: 999 })[0]?.key).toBe("packMinutes");
-    expect(changeProblems("eta", zone, { packMinutes: "6" })[0]?.key).toBe("packMinutes");
-    expect(changeProblems("eta", zone, { nope: 1 })).toEqual([{ key: "nope", message: "Unknown setting" }]);
-    expect(changeProblems("stock", zone, { zonePriceConflictMode: "warn" })[0]?.message).toMatch(/zone scope/);
-    expect(changeProblems("stock", { type: "global", id: null }, { zonePriceConflictMode: "maybe" })[0]?.message).toMatch(/block, warn/);
-    expect(changeProblems("eta", zone, { packMinutes: null })).toEqual([]);
+    expect(changeProblems("discounts", zone, { rainExtraMinutes: 6 })).toEqual([]);
+    expect(changeProblems("discounts", zone, { rainExtraMinutes: 6.5 })[0]?.key).toBe("rainExtraMinutes");
+    expect(changeProblems("discounts", zone, { rainExtraMinutes: 999 })[0]?.key).toBe("rainExtraMinutes");
+    expect(changeProblems("discounts", zone, { rainExtraMinutes: "6" })[0]?.key).toBe("rainExtraMinutes");
+    expect(changeProblems("discounts", zone, { nope: 1 })).toEqual([{ key: "nope", message: "Unknown setting" }]);
+    expect(changeProblems("eta", zone, { extraMinutes: 5 })[0]?.message).toMatch(/zone scope/);
+    expect(changeProblems("orders", { type: "global", id: null }, { confirmMode: "maybe" })[0]?.message).toMatch(/auto, manual/);
+    expect(changeProblems("discounts", zone, { rainExtraMinutes: null })).toEqual([]);
   });
   it("lets the most specific scope win and falls back to the default", () => {
-    const def = DEFS.get("eta.packMinutes")!;
+    const def = DEFS.get("discounts.rainExtraMinutes")!;
     const layers: Layer[] = [{ scope: "global", value: 8, version: 1 }, { scope: "zone", value: 7, version: 2 }, { scope: "warehouse", value: 6, version: 3 }];
     expect(resolveKey(def, layers)).toEqual({ value: 6, source: "warehouse", version: 3 });
     expect(resolveKey(def, layers.slice(0, 2))).toEqual({ value: 7, source: "zone", version: 2 });
     expect(resolveKey(def, layers.slice(0, 1))).toEqual({ value: 8, source: "global", version: 1 });
-    expect(resolveKey(def, [])).toEqual({ value: 5, source: "default", version: 0 });
+    expect(resolveKey(def, [])).toEqual({ value: 10, source: "default", version: 0 });
   });
   it("checks rules that tie several keys together", () => {
     expect(dependencyProblems({ rainSurchargeAmount: 6000, surchargeCap: 5000 })[0]?.key).toBe("rainSurchargeAmount");
     expect(dependencyProblems({ rainSurchargeAmount: 1500, surchargeCap: 5000 })).toEqual([]);
     expect(dependencyProblems({ rainSurchargeAmount: 1500, surchargeCap: 0 })).toEqual([]);
-    expect(dependencyProblems({ slaPackMinutes: 2, slaConfirmMinutes: 5 })[0]?.key).toBe("slaPackMinutes");
   });
   it("lists every spec group and gives each key to exactly one group", () => {
     expect(GROUPS).toHaveLength(15);
-    expect(defsOf("eta").map(d => d.key)).toContain("packMinutes");
+    expect(defsOf("eta").map(d => d.key)).toContain("extraMinutes");
+    // The values that are fixed in code are not editable, and never share a name with an editable one.
+    for (const [group, values] of Object.entries(FIXED_VALUES)) for (const key of Object.keys(values)) expect(DEFS.has(`${group}.${key}`), `${group}.${key}`).toBe(false);
   });
 });
 

@@ -47,64 +47,65 @@ beforeEach(async () => {
 });
 
 describe("settings", () => {
+  // Only the settings worth changing over time are editable; the rest are fixed in code. rainExtraMinutes is a zone/global one.
+  const KEY = "rainExtraMinutes";
+  const valueOf = (res: { body: { data: { values: { key: string }[] } } }) => res.body.data.values.find(v => v.key === KEY);
+
   it("lists the registry and resolves defaults", async () => {
     const registry = await get("/admin/settings/registry");
     expect(registry.status).toBe(200);
-    expect(registry.body.data.find((d: { key: string }) => d.key === "packMinutes")).toMatchObject({ group: "eta", default: 5, type: "integer" });
-    const eta = await get(`/admin/settings/eta?scopeType=warehouse&scopeId=${W1}`);
-    expect(eta.body.data.values.find((v: { key: string }) => v.key === "packMinutes")).toEqual({ key: "packMinutes", value: 5, source: "default", version: 0 });
+    expect(registry.body.data.find((d: { key: string }) => d.key === KEY)).toMatchObject({ group: "discounts", default: 10, type: "integer" });
+    expect(registry.body.data.some((d: { key: string }) => d.key === "packMinutes")).toBe(false);
+    const discounts = await get(`/admin/settings/discounts?scopeType=zone&scopeId=${ZONE}`);
+    expect(valueOf(discounts)).toEqual({ key: KEY, value: 10, source: "default", version: 0 });
   });
 
   it("applies the most specific scope, records history, and removes overrides with null", async () => {
-    expect((await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 8 } })).status).toBe(200);
-    expect((await send("put", "/admin/settings/eta", { scope: { type: "zone", id: ZONE }, values: { packMinutes: 7 } })).status).toBe(200);
-    const w = await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W1 }, values: { packMinutes: 6 } });
-    expect(w.body.data.values.find((v: { key: string }) => v.key === "packMinutes")).toEqual({ key: "packMinutes", value: 6, source: "warehouse", version: 1 });
-    expect((await get(`/admin/settings/eta?scopeType=warehouse&scopeId=${W2}`)).body.data.values[0]).toMatchObject({ value: 7, source: "zone" });
-    expect((await get("/admin/settings/eta")).body.data.values[0]).toMatchObject({ value: 8, source: "global" });
+    expect((await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { [KEY]: 8 } })).status).toBe(200);
+    const z = await send("put", "/admin/settings/discounts", { scope: { type: "zone", id: ZONE }, values: { [KEY]: 7 } });
+    expect(valueOf(z)).toEqual({ key: KEY, value: 7, source: "zone", version: 1 });
+    expect(valueOf(await get("/admin/settings/discounts"))).toMatchObject({ value: 8, source: "global" });
 
-    const again = await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W1 }, values: { packMinutes: 9 } });
-    expect(again.body.data.values[0]).toMatchObject({ value: 9, version: 2 });
-    const removed = await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W1 }, values: { packMinutes: null } });
-    expect(removed.body.data.values[0]).toMatchObject({ value: 7, source: "zone" });
+    const again = await send("put", "/admin/settings/discounts", { scope: { type: "zone", id: ZONE }, values: { [KEY]: 9 } });
+    expect(valueOf(again)).toMatchObject({ value: 9, version: 2 });
+    const removed = await send("put", "/admin/settings/discounts", { scope: { type: "zone", id: ZONE }, values: { [KEY]: null } });
+    expect(valueOf(removed)).toMatchObject({ value: 8, source: "global" });
 
-    const history = await get("/admin/settings/history?group=eta&key=packMinutes");
+    const history = await get(`/admin/settings/history?group=discounts&key=${KEY}`);
     expect(history.body.data.map((r: { oldValue: unknown; newValue: unknown; scope: { type: string } }) => [r.scope.type, r.oldValue, r.newValue])).toEqual([
-      ["warehouse", 9, null], ["warehouse", 6, 9], ["warehouse", null, 6], ["zone", null, 7], ["global", null, 8],
+      ["zone", 9, null], ["zone", 7, 9], ["zone", null, 7], ["global", null, 8],
     ]);
   });
 
   it("does nothing, and writes no history, when the value is unchanged", async () => {
-    await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 8 } });
-    await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 8 } });
+    await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { [KEY]: 8 } });
+    await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { [KEY]: 8 } });
     expect(await col("settings_history").countDocuments()).toBe(1);
   });
 
-  it("rejects invalid input without saving anything", async () => {
-    const bad = await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 5, extraMinutes: 500 } });
+  it("rejects invalid input without saving anything, including a setting that is fixed in code", async () => {
+    const bad = await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { [KEY]: 5, rainSurchargeAmount: 500_000 } });
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("VALIDATION_ERROR");
-    expect(bad.body.error.details).toEqual([{ key: "extraMinutes", message: "must be a whole number from 0 to 120" }]);
+    expect(bad.body.error.details).toEqual([{ key: "rainSurchargeAmount", message: "must be a whole number from 0 to 100000" }]);
+    expect((await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 8 } })).status).toBe(400);
     expect((await send("put", "/admin/settings/stock", { scope: { type: "zone", id: ZONE }, values: { zonePriceConflictMode: "warn" } })).status).toBe(400);
     expect((await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { rainSurchargeAmount: 9000 } })).status).toBe(400);
     expect((await send("put", "/admin/settings/orders", { scope: { type: "global" }, values: { slaConfirmMinutes: 20 } })).status).toBe(400);
-    expect((await send("put", "/admin/settings/eta", { scope: { type: "zone", id: "b".repeat(24) }, values: { packMinutes: 5 } })).status).toBe(404);
+    expect((await send("put", "/admin/settings/discounts", { scope: { type: "zone", id: "b".repeat(24) }, values: { [KEY]: 5 } })).status).toBe(404);
     expect((await send("put", "/admin/settings/nope", { scope: { type: "global" }, values: { a: 1 } })).status).toBe(404);
-    expect((await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: {} })).status).toBe(400);
+    expect((await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: {} })).status).toBe(400);
     expect(await col("settings").countDocuments()).toBe(0);
   });
 
-  it("keeps scoped staff to their own warehouse and to their own history", async () => {
-    expect((await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W1 }, values: { packMinutes: 6 } }, "w1")).status).toBe(200);
-    expect((await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W2 }, values: { packMinutes: 6 } }, "w1")).status).toBe(403);
-    expect((await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 6 } }, "w1")).status).toBe(403);
-    expect((await get("/admin/settings/eta", "w1")).status).toBe(403);
-    expect((await get(`/admin/settings/eta?scopeType=warehouse&scopeId=${W2}`, "w1")).status).toBe(403);
-    await send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 9 } });
-    await send("put", "/admin/settings/eta", { scope: { type: "warehouse", id: W2 }, values: { packMinutes: 4 } });
+  it("keeps staff who are limited to one warehouse away from zone and global settings and from their history", async () => {
+    expect((await send("put", "/admin/settings/discounts", { scope: { type: "zone", id: ZONE }, values: { [KEY]: 6 } }, "w1")).status).toBe(403);
+    expect((await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { [KEY]: 6 } }, "w1")).status).toBe(403);
+    expect((await get("/admin/settings/discounts", "w1")).status).toBe(403);
+    expect((await get(`/admin/settings/discounts?scopeType=zone&scopeId=${ZONE}`, "w1")).status).toBe(403);
+    await send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { [KEY]: 9 } });
     const mine = await get("/admin/settings/history", "w1");
-    expect(mine.body.data).toHaveLength(1);
-    expect(mine.body.data[0].scope).toEqual({ type: "warehouse", id: W1 });
+    expect(mine.body.data).toHaveLength(0);
   });
 
   it("needs the right permission and a session", async () => {
@@ -113,11 +114,11 @@ describe("settings", () => {
   });
 
   it("lets two simultaneous changes to one key finish with a single consistent version history", async () => {
-    const calls = await Promise.all([1, 2, 3, 4].map(n => send("put", "/admin/settings/eta", { scope: { type: "global" }, values: { packMinutes: 10 + n } })));
+    const calls = await Promise.all([1, 2, 3, 4].map(n => send("put", "/admin/settings/discounts", { scope: { type: "global" }, values: { [KEY]: 10 + n } })));
     expect(calls.every(c => c.status === 200 || c.status === 409)).toBe(true);
-    const stored = await col("settings").find({ key: "packMinutes" }).toArray();
+    const stored = await col("settings").find({ key: KEY }).toArray();
     expect(stored).toHaveLength(1);
-    expect(await col("settings_history").countDocuments({ key: "packMinutes" })).toBe(stored[0]!.version);
+    expect(await col("settings_history").countDocuments({ key: KEY })).toBe(stored[0]!.version);
   });
 });
 

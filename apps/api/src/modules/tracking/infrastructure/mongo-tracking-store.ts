@@ -4,15 +4,22 @@ import type { StoredEta, StoredPoint, TrackingStore } from "../application/ports
 interface PointDoc extends StoredPoint { receivedAt: Date }
 interface EtaDoc { _id: string; riderId: string; minutes: number; etaAt: Date; updatedAt: Date }
 
-export function createMongoTrackingStore(connection: Connection): TrackingStore {
+const HISTORY_SECONDS = 2 * 86_400;
+
+/** `keepHistory` false: the position history collection is neither created nor indexed (nothing writes to it). */
+export function createMongoTrackingStore(connection: Connection, keepHistory = true): TrackingStore {
   const points = () => connection.collection<PointDoc>("rider_locations");
   const etas = () => connection.collection<EtaDoc>("order_etas");
   const revoked = () => connection.collection<{ _id: string; at: Date }>("tracking_revoked");
   return {
     async ensureIndexes() {
-      await points().createIndex({ riderId: 1, at: -1 }, { unique: true });
-      // Position history is kept for 30 days.
-      await points().createIndex({ receivedAt: 1 }, { expireAfterSeconds: 30 * 86_400 });
+      if (keepHistory) await points().createIndex({ riderId: 1, at: -1 }, { unique: true });
+      // The live position is the rider's own lastLocation; this history is only for settling a dispute, so it is kept for 2 days.
+      // An older database already has this index with a longer expiry: change it in place (createIndex would refuse), ignoring "no such index" on a new one.
+      if (keepHistory) {
+        await connection.db!.command({ collMod: "rider_locations", index: { keyPattern: { receivedAt: 1 }, expireAfterSeconds: HISTORY_SECONDS } }).catch(() => undefined);
+        await points().createIndex({ receivedAt: 1 }, { expireAfterSeconds: HISTORY_SECONDS });
+      }
       await etas().createIndex({ riderId: 1 });
     },
     async insertPoints(list) {

@@ -5,7 +5,8 @@ import type { Job } from "../domain/job.js";
 // Ids are 24-character hex strings stored as strings, like the other Dev 2 modules.
 type JobDoc = Omit<Job, "id"> & { _id: string };
 interface ScheduleDoc { _id: string; intervalMs: number; nextRunAt: Date }
-const toJob = ({ _id, ...rest }: JobDoc): Job => ({ id: _id, ...rest });
+const RECURRING_KEEP_MS = 60 * 60_000;
+const toJob =({ _id, ...rest }: JobDoc): Job => ({ id: _id, ...rest });
 
 export function createMongoJobStore(connection: Connection): JobStore {
   const jobs = () => connection.collection<JobDoc>("jobs");
@@ -18,6 +19,8 @@ export function createMongoJobStore(connection: Connection): JobStore {
       await jobs().createIndex({ dedupeKey: 1 }, { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } });
       // Finished jobs are kept for a while for debugging, then removed.
       await jobs().createIndex({ completedAt: 1 }, { expireAfterSeconds: 14 * 86_400, partialFilterExpression: { status: { $in: ["done", "cancelled"] } } });
+      // Recurring runs (sweeps every 10-60 s) finish by the thousand and say nothing useful, so they carry their own short expiry.
+      await jobs().createIndex({ expireAt: 1 }, { expireAfterSeconds: 0, partialFilterExpression: { expireAt: { $type: "date" } } });
     },
 
     async insert(job) {
@@ -45,7 +48,9 @@ export function createMongoJobStore(connection: Connection): JobStore {
     async complete(id, workerId, result, at) {
       const done = await jobs().updateOne(
         { _id: id, status: "running", lockedBy: workerId },
-        { $set: { status: "done", result, completedAt: at, updatedAt: at, lockedUntil: null, lockedBy: null, lastError: null } },
+        // Pipeline update: a finished recurring run is removed after an hour; every other job keeps the 14 day history.
+        [{ $set: { status: "done", result, completedAt: at, updatedAt: at, lockedUntil: null, lockedBy: null, lastError: null,
+          expireAt: { $cond: [{ $regexMatch: { input: "$type", regex: "^recurring:" } }, new Date(at.getTime() + RECURRING_KEEP_MS), "$$REMOVE"] } } }],
       );
       return done.modifiedCount === 1;
     },

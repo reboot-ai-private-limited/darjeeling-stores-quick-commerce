@@ -19,7 +19,8 @@ export interface CatalogReads {
   listBrands(): Promise<Brand[]>;
   countProductsOfBrand(id: string): Promise<number>;
   getProduct(id: string): Promise<Product | null>;
-  getProducts(ids: readonly string[]): Promise<Product[]>;
+  /** `slim` leaves out the long text (description, highlights, key info, nutrition, info sections) for lists that never show it. */
+  getProducts(ids: readonly string[], options?: { slim?: boolean }): Promise<Product[]>;
   listProducts(query: ProductQuery): Promise<Product[]>;
   listAllProducts(): Promise<Product[]>;
   listNameKeys(): Promise<{ id: string; name: string; nameKey: string }[]>;

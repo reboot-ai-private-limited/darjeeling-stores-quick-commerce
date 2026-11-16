@@ -371,7 +371,7 @@ export function createCatalogService(deps: CatalogDeps) {
 
     // ---------- reads for other modules ----------
     /** Used by the offerings module. */
-    getProducts(ids: readonly string[]) { return store.getProducts(ids); },
+    getProducts(ids: readonly string[], options?: { slim?: boolean }) { return store.getProducts(ids, options); },
     getProductEntity(id: string) { return store.getProduct(id); },
     getCategory(id: string) { return store.getCategory(id); },
   };

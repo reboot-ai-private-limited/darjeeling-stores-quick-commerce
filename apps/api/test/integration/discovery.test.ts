@@ -360,6 +360,25 @@ describe("listing products", () => {
     expect((await guest(`/catalog/products?${q1}&inStockOnly=maybe`)).status).toBe(400);
   });
 
+  it("sorts by price or discount, keeps shelf order for equal values, and pages through a sorted list", async () => {
+    const veg = await category("Vegetables");
+    // The card shows the 250 g size: A 1900 (5% off), B 1100 (45% off), C 1500 (25% off); MRP is 2000 for all three.
+    await f.pooledOffer(W1, await pooled(veg, "A", { sortOrder: 0 }), 5000, { v250: 1900 });
+    await f.pooledOffer(W1, await pooled(veg, "B", { sortOrder: 1 }), 5000, { v250: 1100 });
+    await f.pooledOffer(W1, await pooled(veg, "C", { sortOrder: 2 }), 5000, { v250: 1500 });
+    const names = async (sort: string) => (await guest(`/catalog/products?${q1}&sort=${sort}`)).body.data.map((p: { name: string }) => p.name);
+    expect(await names("relevance")).toEqual(["A", "B", "C"]);
+    expect(await names("price_asc")).toEqual(["B", "C", "A"]);
+    expect(await names("price_desc")).toEqual(["A", "C", "B"]);
+    expect(await names("discount")).toEqual(["B", "C", "A"]);
+    const first = await guest(`/catalog/products?${q1}&sort=price_asc&limit=2`);
+    expect(first.body.data.map((p: { name: string }) => p.name)).toEqual(["B", "C"]);
+    const second = await guest(`/catalog/products?${q1}&sort=price_asc&limit=2&cursor=${first.body.meta.nextCursor}`);
+    expect(second.body.data.map((p: { name: string }) => p.name)).toEqual(["A"]);
+    expect(second.body.meta.nextCursor).toBeNull();
+    expect((await guest(`/catalog/products?${q1}&sort=cheapest`)).status).toBe(400);
+  });
+
   it("can show only what is in stock, and the store can choose never to list sold-out items", async () => {
     const veg = await category("Vegetables");
     await f.pooledOffer(W1, await pooled(veg, "Plenty"), 5000);

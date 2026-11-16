@@ -12,6 +12,8 @@ const flag = z.enum(["true", "false"]).transform(value => value === "true");
 export const homeQuery = z.object({ zoneId });
 export const productsQuery = z.object({
   zoneId, categoryId: id.optional(), brandId: id.optional(), foodType: z.enum(["veg", "non_veg", "egg", "vegan", "not_applicable"]).optional(), limit: z.coerce.number().int().min(1).max(100).default(40), cursor: z.string().max(100).optional(), inStockOnly: flag.optional(),
+  /** relevance is the shelf order; the others sort by the price or discount of the size shown on the card. */
+  sort: z.enum(["relevance", "price_asc", "price_desc", "discount"]).default("relevance"),
 });
 export const searchQuery = z.object({ zoneId, q: z.string().trim().min(2).max(100), limit: z.coerce.number().int().min(1).max(50).default(20) });
 export const changesQuery = z.object({ zoneId, since: z.coerce.number().int().min(0) });
