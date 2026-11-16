@@ -1,9 +1,8 @@
-import { BlurTargetView, BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { createContext, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from "react";
-import { FlatList, StyleSheet, Text, View, useWindowDimensions, Linking, type StyleProp, type ViewStyle } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { FlatList, StyleSheet, Text, View, useWindowDimensions, Linking } from "react-native";
 import Animated, { SlideInDown } from "react-native-reanimated";
 import { liftIn } from "../motion";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -63,7 +62,7 @@ export function ProductCard({ product, width = 132, eta, onPress }: { product: P
   );
 }
 
-const TINTS = ["#fff4d1", "#fde8e6", "#e8f3e1", "#e6eefb", "#f6ebdd", "#efe6f7"];
+const TINTS = ["#D7EFD9", "#F6E6E1", "#EEF1DF", "#E4ECF3", "#F3EBDD", "#EEE8F3"];
 export function CategoryTile({ category, picture, tint = 0, onPress }: { category: Category; picture?: { uri: string; product: boolean }; tint?: number; onPress?: () => void }) {
   return (
     <Animated.View entering={liftIn((tint % 8) * 40)} style={{ width: "25%" }}>
@@ -133,7 +132,7 @@ export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: strin
           </LinearGradient>
         ) : (
           <Press onPress={() => openBanner(item)} disabled={!item.link}>
-            <View style={[s.banner, { width: w, backgroundColor: colors.yellow }]}>
+            <View style={[s.banner, { width: w, backgroundColor: colors.yellowSoft }]}>
               {item.image?.urls && <Image source={{ uri: item.image.urls["1080"] ?? item.image.urls["640"] ?? Object.values(item.image.urls)[0] }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />}
               {!item.image && <Text style={[s.bannerTitle, { color: colors.maroon }]}>{item.title}</Text>}
             </View>
@@ -145,48 +144,38 @@ export function BannerCarousel({ banners, eta }: { banners: Banner[]; eta: strin
   );
 }
 
-type BlurTarget = RefObject<ComponentRef<typeof View> | null>;
-const GlassTargetContext = createContext<BlurTarget | null>(null);
-
-/** Wraps a page so the cart bar can blur what scrolls behind it. On Android the blur needs the content it blurs marked as a target, with the bar beside it, not inside. */
-export function GlassScene({ children, bar, style }: { children: ReactNode; bar: ReactNode; style?: StyleProp<ViewStyle> }) {
-  const target = useRef<ComponentRef<typeof View>>(null);
-  return (
-    <GlassTargetContext.Provider value={target}>
-      <View style={[{ flex: 1 }, style]}>
-        <BlurTargetView ref={target} style={{ flex: 1 }}>{children}</BlurTargetView>
-        {bar}
-      </View>
-    </GlassTargetContext.Provider>
-  );
-}
-
-/** Frosted-glass bar that slides up from the bottom once the cart has something in it. */
+/** Green gradient bar that slides up from the bottom once the cart has something in it: a bag with a count, the total, and a yellow "View cart" button. */
 export function CartBar({ eta, onPress, bottom = 0 }: { eta?: string; onPress?: () => void; bottom?: number }) {
   const { count, subtotal } = useCart();
   const insets = useSafeAreaInsets();
-  const target = useContext(GlassTargetContext);
   if (count === 0) return null;
   return (
     <Animated.View entering={SlideInDown.duration(280)} style={[s.bar, { bottom: bottom + insets.bottom + space.sm }]}>
-      <BlurView intensity={70} tint="dark" blurMethod="dimezisBlurView" blurTarget={target ?? undefined} style={StyleSheet.absoluteFill} />
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(48,16,14,0.80)" }]} />
-      <LinearGradient pointerEvents="none" colors={["rgba(255,201,51,0.34)", "rgba(255,201,51,0.07)", "rgba(255,201,51,0)"]} style={s.barSheen} />
-      <View style={s.barIcon}><Icon name="shopping-bag" size={20} color={colors.yellow} /></View>
-      <View style={{ flex: 1 }}>
-        <Text style={s.barTop}>{count} {count === 1 ? "item" : "items"} · {rupees(subtotal)}</Text>
-        {eta ? <Text style={s.barSub}>Arriving in {eta}</Text> : <Text style={s.barSub}>Ready to checkout</Text>}
+      <LinearGradient pointerEvents="none" colors={[colors.maroonSoft, colors.maroon, colors.maroonDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      {/* A soft sheen across the top half gives the bar a little depth */}
+      <LinearGradient pointerEvents="none" colors={["rgba(255,255,255,0.20)", "rgba(255,255,255,0)"]} style={s.barSheen} />
+      <View style={s.barIcon}>
+        <Icon name="shopping-bag" size={22} color={colors.white} />
+        <View style={s.barCount}><Text style={s.barCountText}>{count > 99 ? "99+" : count}</Text></View>
       </View>
-      <Press onPress={onPress ?? (() => router.push("/cart"))} haptic style={s.barBtn}><Text style={s.barBtnText}>View cart</Text><Icon name="arrow-right" size={15} color={colors.maroon} /></Press>
+      <View style={{ flex: 1 }}>
+        <Text style={s.barTop}>{rupees(subtotal)}</Text>
+        <Text style={s.barSub} numberOfLines={1}>{count} {count === 1 ? "item" : "items"} · {eta ? `Arriving in ${eta}` : "Ready to checkout"}</Text>
+      </View>
+      <Press onPress={onPress ?? (() => router.push("/cart"))} haptic style={s.barBtn}>
+        <LinearGradient pointerEvents="none" colors={["#FFE680", "#FFD43B", "#F7B900"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={StyleSheet.absoluteFill} />
+        <Text style={s.barBtnText}>View cart</Text>
+        <View style={s.barArrow}><Icon name="arrow-right" size={14} color={colors.maroon} /></View>
+      </Press>
     </Animated.View>
   );
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 62, height: 32, borderRadius: 10, borderWidth: 1.5, borderColor: colors.maroon, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
-  addText: { color: colors.maroon, fontWeight: "900", fontSize: 13, letterSpacing: 0.5 },
+  addBtn: { width: 62, height: 32, borderRadius: 10, borderWidth: 1.5, borderColor: colors.green, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
+  addText: { color: colors.green, fontWeight: "900", fontSize: 13, letterSpacing: 0.5 },
   addPos: { position: "absolute", right: 6, bottom: -14 },
-  stepper: { width: 74, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.maroon, borderRadius: 10, height: 32 },
+  stepper: { width: 74, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: 10, height: 32 },
   stepBtn: { width: 24, height: 32, alignItems: "center", justifyContent: "center" },
   stepQty: { color: colors.white, fontWeight: "900", fontSize: 14, textAlign: "center" },
   imgWrap: { height: 124, borderRadius: radius.md, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center", overflow: "hidden" },
@@ -211,11 +200,14 @@ const s = StyleSheet.create({
   dots: { position: "absolute", bottom: 10, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.6)" },
   dotOn: { width: 18, backgroundColor: colors.yellow },
-  bar: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", alignItems: "center", gap: space.md, overflow: "hidden", borderRadius: radius.xl, borderWidth: 1.5, borderColor: "rgba(255,201,51,0.45)", paddingVertical: 10, paddingLeft: space.md, paddingRight: 10 },
-  barSheen: { position: "absolute", top: 0, left: 0, right: 0, height: "70%" },
-  barIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,201,51,0.16)", borderWidth: 1, borderColor: "rgba(255,201,51,0.4)", alignItems: "center", justifyContent: "center" },
-  barTop: { color: colors.white, fontWeight: "900", fontSize: 15 },
-  barSub: { color: "rgba(255,255,255,0.78)", fontSize: 12, marginTop: 1 },
-  barBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 18, height: 44, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)" },
-  barBtnText: { fontWeight: "900", color: colors.maroon, fontSize: 14 },
+  bar: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", alignItems: "center", gap: space.md, overflow: "hidden", borderRadius: 28, borderWidth: 1, borderColor: "rgba(255,255,255,0.28)", paddingVertical: 10, paddingLeft: space.md, paddingRight: 10 },
+  barSheen: { position: "absolute", top: 0, left: 0, right: 0, height: "55%" },
+  barIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(255,255,255,0.18)", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", alignItems: "center", justifyContent: "center" },
+  barCount: { position: "absolute", top: -4, right: -4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.yellow, borderWidth: 2, borderColor: colors.maroon, alignItems: "center", justifyContent: "center" },
+  barCountText: { color: colors.maroon, fontSize: 10, fontWeight: "900" },
+  barTop: { color: colors.white, fontWeight: "900", fontSize: 19, letterSpacing: -0.4 },
+  barSub: { color: "rgba(255,255,255,0.80)", fontSize: 12, fontWeight: "600", marginTop: 1 },
+  barBtn: { flexDirection: "row", alignItems: "center", gap: 8, overflow: "hidden", borderRadius: radius.pill, paddingLeft: 18, paddingRight: 7, height: 46, borderWidth: 1, borderColor: "rgba(255,255,255,0.55)" },
+  barBtnText: { fontWeight: "900", color: colors.maroon, fontSize: 15, letterSpacing: 0.2 },
+  barArrow: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.10)", alignItems: "center", justifyContent: "center" },
 });

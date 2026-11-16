@@ -10,7 +10,7 @@
     "android": {
       "package": "in.darjeelingstores.customer",
       "adaptiveIcon": {
-        "backgroundColor": "#401815",
+        "backgroundColor": "#0F5B43",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -23,7 +23,7 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      ["expo-splash-screen", { "image": "./assets/splash-icon.png", "backgroundColor": "#401815", "imageWidth": 200 }],
+      ["expo-splash-screen", { "image": "./assets/splash-icon.png", "backgroundColor": "#0F5B43", "imageWidth": 200 }],
       "expo-secure-store",
       ["expo-image-picker", { "photosPermission": "Darjeeling Stores uses your photos so you can add a picture of your door or of a problem item.", "cameraPermission": "Darjeeling Stores uses the camera to take a picture of your door or of a problem item." }],
       ["expo-audio", { "microphonePermission": "Darjeeling Stores uses the microphone to record a voice note for your delivery partner." }],

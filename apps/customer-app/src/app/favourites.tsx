@@ -1,7 +1,7 @@
 import { useFocusEffect } from "expo-router";
 import { FlatList, Text, View } from "react-native";
 import { useFavourites } from "../api/favourites";
-import { fillRow, CartBar, GlassScene, ProductCard } from "../components/shop";
+import { fillRow, CartBar, ProductCard } from "../components/shop";
 import { Header, Icon, Screen } from "../components/ui";
 import { colors, space, type } from "../theme";
 
@@ -10,7 +10,7 @@ export default function Favourites() {
   const { list, reload } = useFavourites();
   useFocusEffect(reload);
   return (
-    <GlassScene bar={<CartBar />}>
+    <View style={{ flex: 1 }}>
       <Screen pad={false} bottomPad={0}>
         <View style={{ paddingHorizontal: space.lg }}><Header title="Favourites" /></View>
         {list.length === 0 ? (
@@ -26,6 +26,7 @@ export default function Favourites() {
           />
         )}
       </Screen>
-    </GlassScene>
+      <CartBar />
+    </View>
   );
 }

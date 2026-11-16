@@ -41,7 +41,7 @@ export function Dropdown<T extends string | number>({ title, label, value, optio
 
 const s = StyleSheet.create({
   btn: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
-  btnOn: { backgroundColor: colors.maroon, borderColor: colors.maroon },
+  btnOn: { backgroundColor: colors.green, borderColor: colors.green },
   btnText: { fontSize: 13, fontWeight: "800", color: colors.ink, maxWidth: 140 },
   backdrop: { flex: 1, backgroundColor: "rgba(35,24,21,0.45)", justifyContent: "flex-end" },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: space.lg, paddingBottom: space.xxl, ...shadow.lift },

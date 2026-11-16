@@ -55,7 +55,7 @@ export function LiveOrderCard({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-const OFFER_TINTS: [string, string][] = [["#fff4d1", "#d98a00"], ["#e2f5ec", "#1f9d62"], ["#fde8e6", "#c62828"], ["#e5eefc", "#2f6fdb"]];
+const OFFER_TINTS: [string, string][] = [["#D7EFD9", "#63A96E"], ["#F6EBD3", "#9A7B2C"], ["#F6E4E0", "#B23A32"], ["#E4ECF3", "#2F6FDB"]];
 
 /** Ticket-style coupon cards. Tapping one opens the coupon screen to apply it. */
 export function OffersRow({ zoneId, signedIn }: { zoneId?: string; signedIn: boolean }) {
@@ -135,8 +135,8 @@ const s = StyleSheet.create({
   offerMin: { fontSize: 11, color: colors.muted, fontWeight: "600" },
   again: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.white, borderRadius: radius.lg, padding: space.md, ...shadow.card },
   againIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.yellowSoft, alignItems: "center", justifyContent: "center" },
-  againBtn: { backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 14, height: 34, alignItems: "center", justifyContent: "center" },
-  againBtnText: { fontWeight: "900", color: colors.maroon, fontSize: 13 },
+  againBtn: { backgroundColor: colors.green, borderRadius: radius.pill, paddingHorizontal: 14, height: 34, alignItems: "center", justifyContent: "center" },
+  againBtnText: { fontWeight: "900", color: colors.white, fontSize: 13 },
 });
 
 /** Space between the search bar and the tab strip under it. The home header adds the same amount to its height. */
@@ -148,11 +148,11 @@ export function CategoryTabs({ categories, pics, active, onPick }: { categories:
     const on = active === id;
     return (
       <Press key={id ?? "all"} haptic onPress={() => onPick(id)} style={t.tab}>
-        <View style={[t.circle, on && { backgroundColor: colors.yellow, borderColor: colors.yellow }]}>
-          {uri ? <Image source={{ uri }} style={{ width: 34, height: 34, borderRadius: 17 }} contentFit="cover" /> : <Icon name={icon} size={18} color={on ? colors.maroon : colors.white} />}
+        <View style={[t.circle, on && { backgroundColor: colors.green, borderColor: colors.green }]}>
+          {uri ? <Image source={{ uri }} style={{ width: 42, height: 42, borderRadius: 21 }} contentFit="cover" /> : <Icon name={icon} size={22} color={on ? colors.white : colors.maroon} />}
         </View>
-        <Text style={[t.label, on && { color: colors.yellow, fontWeight: "900" }]} numberOfLines={1}>{label}</Text>
-        <View style={[t.bar, on && { backgroundColor: colors.yellow }]} />
+        <Text style={[t.label, on && { color: colors.green, fontWeight: "900" }]} numberOfLines={1}>{label}</Text>
+        <View style={[t.bar, on && { backgroundColor: colors.green }]} />
       </Press>
     );
   };
@@ -165,8 +165,8 @@ export function CategoryTabs({ categories, pics, active, onPick }: { categories:
 }
 
 const t = StyleSheet.create({
-  tab: { width: 70, alignItems: "center", gap: 3 },
-  circle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.35)", alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  label: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "700" },
+  tab: { width: 72, alignItems: "center", gap: 3 },
+  circle: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: "rgba(15,91,67,0.22)", backgroundColor: colors.white, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  label: { color: colors.ink, fontSize: 11, fontWeight: "700" },
   bar: { height: 3, width: 28, borderRadius: 2, backgroundColor: "transparent", marginTop: 1 },
 });

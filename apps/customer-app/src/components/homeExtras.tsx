@@ -198,9 +198,9 @@ const s = StyleSheet.create({
   dealTitle: { fontSize: 24, fontWeight: "900", letterSpacing: -0.6, color: colors.maroon },
   chips: { flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingTop: TITLE_GAP },
   chip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, height: 36, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
-  chipOn: { backgroundColor: colors.maroon, borderColor: colors.maroon },
+  chipOn: { backgroundColor: colors.green, borderColor: colors.green },
   chipText: { fontSize: 13, fontWeight: "800", color: colors.ink },
-  brand: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.yellowSoft, borderWidth: 1.5, borderColor: colors.yellow, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  brand: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.yellowSoft, borderWidth: 1.5, borderColor: "rgba(15,91,67,0.25)", alignItems: "center", justifyContent: "center", overflow: "hidden" },
   brandLetter: { fontSize: 24, fontWeight: "900", color: colors.maroon },
   brandName: { fontSize: 12, fontWeight: "700", color: colors.ink },
 });

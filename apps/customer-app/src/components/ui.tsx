@@ -140,7 +140,7 @@ export function Press({ children, onPress, style, haptic = false, disabled = fal
 
 type Variant = "primary" | "accent" | "ghost" | "danger" | "soft";
 export function Button({ label, onPress, variant = "primary", icon, disabled, style }: { label: string; onPress?: () => void; variant?: Variant; icon?: IconName; disabled?: boolean; style?: StyleProp<ViewStyle> }) {
-  const bg = { primary: colors.maroon, accent: colors.yellow, ghost: "transparent", danger: colors.red, soft: colors.creamDeep }[variant];
+  const bg = { primary: colors.green, accent: colors.sun, ghost: "transparent", danger: colors.red, soft: colors.creamDeep }[variant];
   const fg = { primary: colors.white, accent: colors.maroon, ghost: colors.maroon, danger: colors.white, soft: colors.maroon }[variant];
   return (
     <Press onPress={onPress} haptic disabled={disabled} style={[s.button, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, variant === "ghost" && { borderWidth: 1.5, borderColor: colors.line }, style]}>
@@ -154,7 +154,7 @@ export const Card = ({ children, style }: { children: ReactNode; style?: StylePr
 
 export function Chip({ label, active, onPress, icon }: { label: string; active?: boolean; onPress?: () => void; icon?: IconName }) {
   return (
-    <Press onPress={onPress} haptic style={[s.chip, active && { backgroundColor: colors.maroon, borderColor: colors.maroon }]}>
+    <Press onPress={onPress} haptic style={[s.chip, active && { backgroundColor: colors.green, borderColor: colors.green }]}>
       {icon && <Icon name={icon} size={15} color={active ? colors.white : colors.muted} />}
       <Text style={{ fontSize: 13, fontWeight: "700", color: active ? colors.white : colors.ink }}>{label}</Text>
     </Press>

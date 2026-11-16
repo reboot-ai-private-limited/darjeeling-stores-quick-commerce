@@ -264,7 +264,7 @@ const s = StyleSheet.create({
   kv: { flexDirection: "row", gap: space.md, paddingVertical: 2 },
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", gap: space.lg, backgroundColor: colors.white, paddingHorizontal: space.lg, paddingTop: space.md, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, ...shadow.lift },
   barPrice: { fontSize: 22, fontWeight: "900", color: colors.ink },
-  stepper: { flex: 1.3, height: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.maroon, borderRadius: radius.lg },
+  stepper: { flex: 1.3, height: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: radius.lg },
   stepBtn: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
   stepQty: { color: colors.white, fontWeight: "900", fontSize: 18 },
 });

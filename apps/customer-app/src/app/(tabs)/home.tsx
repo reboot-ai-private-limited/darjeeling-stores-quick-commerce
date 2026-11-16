@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
@@ -12,14 +13,14 @@ import { BannerCarousel, CategoryTile, ProductCard } from "../../components/shop
 import { HomeSkeleton } from "../../components/Skeleton";
 import { Button, Icon, Press } from "../../components/ui";
 import { useStore } from "../../state/store";
-import { colors, radius, SECTION_GAP, shadow, space, TITLE_GAP, type } from "../../theme";
+import { colors, radius, SECTION_GAP, space, TITLE_GAP, type } from "../../theme";
 
 /** Height of the "Delivery in … minutes" row. It slides away on scroll so only the search bar stays pinned. */
 const TITLE_H = 52;
 /** How far the header slides up: the title row plus the gaps around it, leaving a small gap under the status bar. */
 const SLIDE = TITLE_H + space.md * 2 - space.sm;
-/** Height of the category tab strip under the search bar (circle 40 + label + underline). */
-const TABS_H = 64;
+/** Height of the category tab strip under the search bar (circle 48 + label + underline). */
+const TABS_H = 72;
 const HINTS = ["tea", "snacks", "spices", "gift boxes", "biscuits"];
 
 /** Quick-commerce home: a big delivery-time header with a pinned search bar, then banners, a dense category grid and product rows. */
@@ -131,16 +132,20 @@ export default function Home() {
       </Animated.ScrollView>
       {/* Floating header: the delivery-time row slides away on scroll; the search bar stays pinned */}
       <Animated.View style={[s.header, { paddingTop: insets.top + space.md }, headStyle]}>
+        {/* Glassy gradient: ivory at the top-left fading through light green, with a soft green glow at the bottom-right and a white sheen on top */}
+        <LinearGradient pointerEvents="none" colors={["#F6FBF4", "#DDEFD8", "#C3E2C5"]} locations={[0, 0.55, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <LinearGradient pointerEvents="none" colors={["rgba(62,127,83,0)", "rgba(62,127,83,0.22)"]} start={{ x: 0.35, y: 0.3 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <LinearGradient pointerEvents="none" colors={["rgba(255,255,255,0.75)", "rgba(255,255,255,0)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={s.headerSheen} />
         <Animated.View style={[s.headRow, { height: TITLE_H }, titleStyle]}>
           <Press onPress={() => router.push("/location")} haptic style={{ flex: 1 }}>
             <Text style={s.deliver} numberOfLines={1}>{headline}</Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
               <Text style={s.addr} numberOfLines={1}>{place?.label ?? "Choose location"}</Text>
-              <Icon name="chevron-down" size={16} color={colors.yellow} />
+              <Icon name="chevron-down" size={16} color="#184D38" />
             </View>
           </Press>
-          <Press onPress={() => router.push("/notifications")} haptic style={[s.profile, { backgroundColor: "rgba(255,255,255,0.16)" }]}><Icon name="bell" size={19} color={colors.white} /></Press>
-          <Press onPress={() => router.push("/account")} haptic style={s.profile}><Icon name="user" size={20} color={colors.maroon} /></Press>
+          <Press onPress={() => router.push("/notifications")} haptic style={[s.profile, { backgroundColor: "rgba(255,255,255,0.85)", borderWidth: 1, borderColor: "rgba(255,255,255,0.95)" }]}><Icon name="bell" size={19} color="#184D38" /></Press>
+          <Press onPress={() => router.push("/account")} haptic style={s.profile}><Icon name="user" size={20} color={colors.white} /></Press>
         </Animated.View>
         <Press onPress={() => router.push("/search")} style={{ marginTop: space.md }}>
           <View style={s.search}>
@@ -159,12 +164,13 @@ export default function Home() {
 }
 
 const s = StyleSheet.create({
-  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: colors.maroon, paddingHorizontal: space.lg, paddingBottom: space.md, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: "#DDEFD8", overflow: "hidden", paddingHorizontal: space.lg, paddingBottom: space.md, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.85)" },
+  headerSheen: { position: "absolute", top: 0, left: 0, right: 0, height: "55%" },
   headRow: { flexDirection: "row", alignItems: "center", gap: space.md },
-  deliver: { color: colors.white, fontSize: 24, fontWeight: "900", letterSpacing: -0.6 },
-  addr: { color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: "600", flexShrink: 1 },
-  profile: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
-  search: { flexDirection: "row", alignItems: "center", gap: space.sm, height: 48, borderRadius: radius.lg, backgroundColor: colors.white, paddingHorizontal: space.lg, ...shadow.card },
+  deliver: { color: "#184D38", fontSize: 24, fontWeight: "900", letterSpacing: -0.6 },
+  addr: { color: colors.muted, fontSize: 13, fontWeight: "600", flexShrink: 1 },
+  profile: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#184D38", alignItems: "center", justifyContent: "center" },
+  search: { flexDirection: "row", alignItems: "center", gap: space.sm, height: 48, borderRadius: radius.lg, backgroundColor: "rgba(255,255,255,0.82)", borderWidth: 1, borderColor: "rgba(255,255,255,0.95)", paddingHorizontal: space.lg },
   hint: { fontSize: 15, fontWeight: "500", color: colors.faint },
   sectionTitle: { fontSize: 19, fontWeight: "900", letterSpacing: -0.4, color: colors.ink },
   secHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg },
