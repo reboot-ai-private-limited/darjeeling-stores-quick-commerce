@@ -58,7 +58,7 @@ const sections: PolicySection[] = [
     bullets: [
       "See and update your name, email and addresses in your account.",
       "Turn offers and reminders on or off in Notification settings.",
-      "Ask us to delete your account from Help & support. We will remove or anonymise your information, except what we must keep by law, such as order and tax records.",
+      "Ask us to delete your account: in the app go to Account > Delete account, or read how on our Delete your account page (/delete-account). We will remove or anonymise your information, except what we must keep by law, such as order and tax records.",
       "Contact us if you want a copy of your information or think something is wrong.",
     ],
   },

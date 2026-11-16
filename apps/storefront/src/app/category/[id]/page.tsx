@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { getCategories, getCategoryProducts } from "../../../lib/api";
-import type { Category, Product } from "../../../lib/types";
+import { getCategories, getProductsPage } from "../../../lib/api";
+import { usePagedProducts } from "../../../lib/usePagedProducts";
+import type { Category } from "../../../lib/types";
 import { useStore } from "../../../state/StoreContext";
 import { ProductCard } from "../../../components/ui/ProductCard";
 import { ProductCardSkeleton } from "../../../components/ui/Skeleton";
@@ -14,12 +15,10 @@ export default function CategoryProductsPage({ params }: { params: Promise<{ id:
   const { zone, storeStatus } = useStore();
 
   const [category, setCategory] = useState<Category | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
   const [subCategoryId, setSubCategoryId] = useState<string | undefined>(undefined);
   const [sort, setSort] = useState<string>("relevance");
   const [vegOnly, setVegOnly] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   // Load category details
   useEffect(() => {
@@ -32,23 +31,16 @@ export default function CategoryProductsPage({ params }: { params: Promise<{ id:
       .catch(() => undefined);
   }, [zone, categoryId]);
 
-  // Load category products
-  useEffect(() => {
-    if (!zone) return;
-    setLoading(true);
-    getCategoryProducts(zone.id, categoryId, subCategoryId, sort)
-      .then((res) => setProducts(res))
-      .catch(() => setProducts([]))
-      .finally(() => setLoading(false));
-  }, [zone, categoryId, subCategoryId, sort]);
+  // Products load 10 at a time as the page is scrolled; veg and in-stock are asked of the server so every page respects them.
+  const { items: products, loading, loadingMore, hasMore, failed, retry, sentinelRef } = usePagedProducts(
+    (cursor) => getProductsPage({ zoneId: zone!.id, categoryId: subCategoryId ?? categoryId, foodType: vegOnly ? "veg" : undefined, inStockOnly: inStockOnly || undefined, sort: sort as "relevance" | "price_asc" | "price_desc" | "discount", cursor }),
+    !!zone,
+    [zone?.id, categoryId, subCategoryId, vegOnly, inStockOnly, sort],
+  );
 
   const eta = storeStatus ? `${storeStatus.etaMinMinutes}-${storeStatus.etaMaxMinutes} mins` : "10-15 mins";
 
-  const filteredProducts = products.filter((p) => {
-    if (vegOnly && p.foodType !== "veg") return false;
-    if (inStockOnly && p.availability !== "in_stock") return false;
-    return true;
-  });
+  const filteredProducts = products;
 
   return (
     <main className="page-container" style={{ padding: "16px 16px 40px" }}>
@@ -62,7 +54,7 @@ export default function CategoryProductsPage({ params }: { params: Promise<{ id:
             {category?.name ?? "Category Products"}
           </h1>
           <span style={{ fontSize: 12, color: "var(--muted)" }}>
-            {filteredProducts.length} {filteredProducts.length === 1 ? "product" : "products"}
+            {filteredProducts.length}{hasMore ? "+" : ""} {filteredProducts.length === 1 ? "product" : "products"}
           </span>
         </div>
       </div>
@@ -202,11 +194,22 @@ export default function CategoryProductsPage({ params }: { params: Promise<{ id:
           ))}
         </div>
       ) : filteredProducts.length > 0 ? (
-        <div className="product-grid">
-          {filteredProducts.map((p) => (
-            <ProductCard key={p.id} product={p} eta={eta} />
-          ))}
-        </div>
+        <>
+          <div className="product-grid">
+            {filteredProducts.map((p) => (
+              <ProductCard key={p.id} product={p} eta={eta} />
+            ))}
+            {loadingMore && Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={`more${i}`} />)}
+          </div>
+          {failed && (
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
+              <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 8 }}>Couldn&apos;t load more products.</p>
+              <button onClick={retry} className="admin-text-button" style={{ fontWeight: 700, color: "var(--maroon)", cursor: "pointer" }}>Try again</button>
+            </div>
+          )}
+          {/* Passing this marker near the bottom loads the next ten. */}
+          <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
+        </>
       ) : (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
           <p style={{ color: "var(--muted)", fontSize: 15 }}>No matching products found in this category.</p>

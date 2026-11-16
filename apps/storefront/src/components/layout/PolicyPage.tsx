@@ -13,10 +13,12 @@ interface PolicyPageProps {
   intro: string;
   updated?: string;
   sections: PolicySection[];
+  /** Extra content shown after the sections (for example a form). */
+  children?: React.ReactNode;
 }
 
 /** Policy pages other than Contact share this layout: a title, a short intro and numbered sections. */
-export const PolicyPage: React.FC<PolicyPageProps> = ({ title, intro, updated = "12 November 2026", sections }) => (
+export const PolicyPage: React.FC<PolicyPageProps> = ({ title, intro, updated = "12 November 2026", sections, children }) => (
   <main className="page-container policy">
     <Link href="/" className="policy-back">
       <Icon name="arrow-left" size={16} /> Back to home
@@ -42,6 +44,8 @@ export const PolicyPage: React.FC<PolicyPageProps> = ({ title, intro, updated = 
         )}
       </section>
     ))}
+
+    {children}
 
     <div className="policy-help">
       <b>Questions about this page?</b>

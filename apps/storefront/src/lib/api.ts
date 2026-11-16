@@ -67,9 +67,20 @@ export async function apiFetch<T>(
   path: string,
   body?: unknown,
   customHeaders?: Record<string, string>,
+  revalidate = 0
+): Promise<T> {
+  return (await apiRequest<T>(method, path, body, customHeaders, revalidate)).data;
+}
+
+/** Like apiFetch, but also returns the response's `meta` (for example the cursor of the next page). */
+async function apiRequest<T>(
+  method: "GET" | "POST" | "PUT" | "DELETE",
+  path: string,
+  body?: unknown,
+  customHeaders?: Record<string, string>,
   revalidate = 0,
   retried = false
-): Promise<T> {
+): Promise<{ data: T; meta: Record<string, unknown> | null }> {
   const url = isBrowser
     ? `/api/v1${path.startsWith("/") ? path : `/${path}`}`
     : `${SERVER_ORIGIN}/api/v1${path.startsWith("/") ? path : `/${path}`}`;
@@ -103,7 +114,7 @@ export async function apiFetch<T>(
 
   // Expired access cookie: renew it and try once more (never for the sign-in calls themselves).
   if (res.status === 401 && isBrowser && !retried && !path.startsWith("/auth/") && (await refreshSession())) {
-    return apiFetch<T>(method, path, body, customHeaders, revalidate, true);
+    return apiRequest<T>(method, path, body, customHeaders, revalidate, true);
   }
 
   const contentType = res.headers.get("content-type");
@@ -116,7 +127,7 @@ export async function apiFetch<T>(
     throw new ApiError(res.status, code, message, data?.error?.details);
   }
 
-  return (data?.data ?? data) as T;
+  return { data: (data?.data ?? data) as T, meta: (data?.meta ?? null) as Record<string, unknown> | null };
 }
 
 /** Server-side catalog fetcher (safely returns null on failure so SSR can render honest empty states) */
@@ -265,6 +276,25 @@ export async function getCategoryProducts(
   return (await apiFetch<Raw[]>("GET", `/catalog/products?${query.toString()}`)).map((p) => mapProduct(p));
 }
 
+/** Products load this many at a time; the next page loads when the list is scrolled to its end. */
+export const PAGE_SIZE = 10;
+
+export async function getProductsPage(opts: {
+  zoneId: string; categoryId?: string | undefined; brandId?: string | undefined; foodType?: "veg" | undefined; inStockOnly?: boolean | undefined;
+  sort?: "relevance" | "price_asc" | "price_desc" | "discount" | undefined;
+  cursor?: string | null | undefined; limit?: number | undefined;
+}): Promise<{ items: Product[]; nextCursor: string | null }> {
+  const query = new URLSearchParams({ zoneId: opts.zoneId, limit: String(opts.limit ?? PAGE_SIZE) });
+  if (opts.categoryId) query.set("categoryId", opts.categoryId);
+  if (opts.brandId) query.set("brandId", opts.brandId);
+  if (opts.foodType) query.set("foodType", opts.foodType);
+  if (opts.inStockOnly) query.set("inStockOnly", "true");
+  if (opts.sort && opts.sort !== "relevance") query.set("sort", opts.sort);
+  if (opts.cursor) query.set("cursor", opts.cursor);
+  const { data, meta } = await apiRequest<Raw[]>("GET", `/catalog/products?${query.toString()}`);
+  return { items: data.map((p) => mapProduct(p)), nextCursor: (meta?.nextCursor as string | null | undefined) ?? null };
+}
+
 export async function getProduct(productId: string, zoneId?: string): Promise<Product> {
   const query = zoneId ? `?zoneId=${encodeURIComponent(zoneId)}` : "";
   return mapProduct(await apiFetch<Raw>("GET", `/catalog/products/${encodeURIComponent(productId)}${query}`));
@@ -309,6 +339,11 @@ export async function getMe(): Promise<User> {
 
 export async function updateProfile(data: { name?: string; email?: string }): Promise<User> {
   return apiFetch<User>("PUT", "/me", data);
+}
+
+/** Asks to delete the signed-in customer's account. The server ends every session and clears the sign-in cookies; staff then finish the deletion. */
+export async function requestAccountDeletion(reason?: string): Promise<void> {
+  await apiFetch("POST", "/me/delete-request", reason ? { reason } : {});
 }
 
 export async function signOutRemote(): Promise<void> {

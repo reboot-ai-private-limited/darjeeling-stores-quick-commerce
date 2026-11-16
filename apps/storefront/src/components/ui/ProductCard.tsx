@@ -37,7 +37,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, eta }) => {
         {out ? (
           <span className="sold-chip">{product.availability === "closed" ? "Closed" : "Sold out"}</span>
         ) : (
-          <AddButton product={product} variant={v} />
+          <AddButton product={product} variant={v} withOptions />
         )}
       </div>
 
