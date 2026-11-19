@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "bootstrap-owner": "tsx --env-file-if-exists=../../.env src/bootstrap-owner.ts",
+    "seed:review": "tsx --env-file-if-exists=../../.env src/seed-review-account.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "pnpm build && vitest run test/integration --config vitest.integration.config.ts",
