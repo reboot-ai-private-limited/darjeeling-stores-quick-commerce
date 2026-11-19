@@ -11,6 +11,7 @@ import { createStaffActorResolver, trustedCookieMutation } from "./modules/ident
 import { createAppConfigModule } from "./modules/settings/app-config.public.js";
 import { createAdminModules } from "./composition/admin.js";
 import { createProduction } from "./composition/production.js";
+import { apnsConfigFromEnv, apnsSetupProblems, fcmConfigFromEnv } from "./modules/notifications/notifications.public.js";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config/env.js";
 import { connectDatabase, disconnectDatabase, isDatabaseReady } from "./shared/db/mongo.js";
@@ -19,6 +20,15 @@ async function main() {
   let config: ReturnType<typeof loadConfig>;
   try { config = loadConfig(process.env); }
   catch (error) { console.error(error instanceof Error ? error.message : "Invalid configuration"); process.exitCode = 1; return; }
+  // Say plainly which push services are set up, so a mistake in .env shows here instead of notifications quietly not arriving. No secrets are printed.
+  const apns = apnsConfigFromEnv(process.env);
+  const apnsProblems = await apnsSetupProblems(process.env);
+  console.info(JSON.stringify({
+    event: "push_status",
+    android_fcm: fcmConfigFromEnv(process.env) ? "ready" : "not configured",
+    iphone_apns: apns && !apnsProblems.length ? { status: "ready", environment: apns.sandbox ? "sandbox" : "production", team: apns.teamId, key: apns.keyId, app: apns.bundleId } : "not configured",
+  }));
+  if (apnsProblems.length) console.warn(JSON.stringify({ event: "apns_settings_problem", problems: apnsProblems, hint: "Run: pnpm --filter @darjeeling/api apns:check" }));
   try { await connectDatabase(config.MONGODB_URI); }
   catch { console.error(JSON.stringify({ event: "database_connection_failed" })); process.exitCode = 1; return; }
   try { await createAccessStore(mongoose.connection).initialize(); }

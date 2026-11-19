@@ -23,7 +23,7 @@ export type {
 export { ProviderError } from "./application/ports.js";
 export type { Channel, Purpose } from "./domain/notification.js";
 export { createFcmPush, fcmConfigFromEnv } from "./infrastructure/fcm-push.js";
-export { apnsConfigFromEnv, createApnsPush, createRoutingPush, isApnsToken } from "./infrastructure/apns-push.js";
+export { apnsAdvice, apnsConfigFromEnv, apnsSetupProblems, createApnsPush, createRoutingPush, isApnsToken } from "./infrastructure/apns-push.js";
 export { createWhatsAppCloud, whatsappConfigFromEnv } from "./infrastructure/whatsapp-cloud.js";
 export { unconfiguredPush, unconfiguredSms, unconfiguredWhatsApp } from "./infrastructure/unconfigured.js";
 export { noCustomers, type CustomerResolver, type WebhookConfig } from "./interface/routes.js";

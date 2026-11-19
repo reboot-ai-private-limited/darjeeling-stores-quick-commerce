@@ -89,3 +89,41 @@ export function createApnsPush(config: ApnsConfig): PushProvider {
 export function createRoutingPush(fcm: PushProvider, apns: PushProvider): PushProvider {
   return { name: `${fcm.name}+${apns.name}`, send: m => (isApnsToken(m.token) ? apns : fcm).send(m) };
 }
+
+/**
+ * What is wrong with the Apple push settings, in plain words. Empty when they are unset (iPhone push is simply off) or complete and readable.
+ * Used at start-up so a typo shows in the log instead of push quietly failing later.
+ */
+export async function apnsSetupProblems(env: NodeJS.ProcessEnv): Promise<string[]> {
+  const anySet = ["APNS_KEY", "APNS_KEY_FILE", "APNS_KEY_ID", "APNS_TEAM_ID"].some(name => env[name]);
+  if (!anySet) return [];
+  const problems: string[] = [];
+  if (!env.APNS_KEY_ID) problems.push("APNS_KEY_ID is missing (the 10-character Key ID shown next to the .p8 key)");
+  if (!env.APNS_TEAM_ID) problems.push("APNS_TEAM_ID is missing (the 10-character Team ID from Membership details)");
+  if (env.APNS_KEY_ID && !/^[A-Z0-9]{10}$/i.test(env.APNS_KEY_ID)) problems.push("APNS_KEY_ID should be exactly 10 letters or digits");
+  if (env.APNS_TEAM_ID && !/^[A-Z0-9]{10}$/i.test(env.APNS_TEAM_ID)) problems.push("APNS_TEAM_ID should be exactly 10 letters or digits");
+  if (env.APNS_ENV && !["production", "sandbox"].includes(env.APNS_ENV)) problems.push('APNS_ENV must be "production" or "sandbox"');
+  let key = env.APNS_KEY;
+  if (!key && env.APNS_KEY_FILE) {
+    try { key = fs.readFileSync(env.APNS_KEY_FILE, "utf8"); } catch { problems.push(`APNS_KEY_FILE cannot be read: ${env.APNS_KEY_FILE}`); }
+  } else if (!key) problems.push("The .p8 key is missing: set APNS_KEY_FILE (a path) or APNS_KEY (the text)");
+  if (key) {
+    try { await importPKCS8(key.replace(/\n/g, "\n"), "ES256"); }
+    catch { problems.push("The .p8 key is not a valid Apple key (it should start with -----BEGIN PRIVATE KEY-----)"); }
+  }
+  return problems;
+}
+
+/** Plain-words advice for the answers Apple gives, so a failed test says what to fix. */
+export function apnsAdvice(code: string | undefined): string {
+  switch (code) {
+    case "InvalidProviderToken": return "Apple rejected the login: the Key ID, Team ID or .p8 file do not match each other. Re-check all three.";
+    case "ExpiredProviderToken": return "The signing clock is off. Check the server's date and time.";
+    case "TopicDisallowed": return "This key cannot send for this app. Check APNS_BUNDLE_ID, and that the key has Apple Push Notifications service enabled.";
+    case "BadDeviceToken": return "The login is fine, but this token does not belong here. Usually the wrong APNS_ENV (sandbox vs production), or a token from another app.";
+    case "DeviceTokenNotForTopic": return "The token belongs to a different app than APNS_BUNDLE_ID.";
+    case "Unregistered": return "The app was removed from that phone.";
+    case "MissingTopic": return "APNS_BUNDLE_ID is empty.";
+    default: return "";
+  }
+}
