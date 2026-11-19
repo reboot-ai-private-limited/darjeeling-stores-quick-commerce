@@ -6,9 +6,9 @@ import { api } from "./api/http";
 /**
  * Push notifications (Firebase). They need a real build that contains Firebase: a development build or the release build.
  * Expo Go cannot receive them, so there everything here quietly does nothing and the rest of the app works as usual.
- * (iPhones are not set up yet: the server sends through Firebase, which needs extra Apple keys. Android works.)
+ * On Android the token is a Firebase (FCM) one; on iPhone it is an Apple (APNs) one, which the server sends to directly.
  */
-export const pushSupported = Platform.OS === "android" && !isRunningInExpoGo() && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+export const pushSupported = (Platform.OS === "android" || Platform.OS === "ios") && !isRunningInExpoGo() && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 type Notifications = typeof import("expo-notifications");
 let loaded: Notifications | null | undefined;
@@ -28,14 +28,14 @@ export async function registerPush(): Promise<void> {
   const n = notifications();
   if (!n) return;
   try {
-    await n.setNotificationChannelAsync("default", { name: "Order updates", importance: n.AndroidImportance.HIGH, sound: "default", vibrationPattern: [0, 250, 250, 250], lightColor: "#FFC933" });
+    if (Platform.OS === "android") await n.setNotificationChannelAsync("default", { name: "Order updates", importance: n.AndroidImportance.HIGH, sound: "default", vibrationPattern: [0, 250, 250, 250], lightColor: "#FFC933" });
     let permission = await n.getPermissionsAsync();
     if (!permission.granted && permission.canAskAgain) permission = await n.requestPermissionsAsync();
     if (!permission.granted) return;
-    // On Android this is the Firebase (FCM) token, which is what the server sends to.
+    // Android: the Firebase (FCM) token. iPhone: the Apple (APNs) token. The server tells them apart and sends each the right way.
     const token = String((await n.getDevicePushTokenAsync()).data);
     currentToken = token;
-    await api("POST", "/devices", { fcmToken: token, platform: "android", app: "customer", appVersion: Constants.expoConfig?.version ?? "0.1.0" });
+    await api("POST", "/devices", { fcmToken: token, platform: Platform.OS === "ios" ? "ios" : "android", app: "customer", appVersion: Constants.expoConfig?.version ?? "1.0.0" });
   } catch { /* no Firebase in this build, offline, or permission refused: the app still works without push */ }
 }
 

@@ -17,6 +17,32 @@ function BlockedGate() {
   return null;
 }
 
+/** Opens the screen a `ds://section/optional-id` link names. Returns false when the link isn't one the app knows, so the caller can fall back. */
+function openDeepLink(link: string): boolean {
+  const m = /^ds:\/\/([a-z]+)(?:\/([A-Za-z0-9_-]+))?\/?$/.exec(link.trim());
+  if (!m) return false;
+  const [, section, id] = m;
+  if (id) {
+    switch (section) {
+      case "product": router.push({ pathname: "/product/[id]", params: { id } }); return true;
+      case "category": router.push({ pathname: "/category/[id]", params: { id } }); return true;
+      case "brand": router.push({ pathname: "/brand/[id]", params: { id } }); return true;
+      case "order": router.push({ pathname: "/order/[id]", params: { id } }); return true;
+      default: return false;
+    }
+  }
+  switch (section) {
+    case "home": router.push("/(tabs)/home"); return true;
+    case "categories": router.push("/(tabs)/categories"); return true;
+    case "orders": router.push("/(tabs)/orders"); return true;
+    case "account": router.push("/(tabs)/account"); return true;
+    case "cart": router.push("/cart"); return true;
+    case "search": router.push("/search"); return true;
+    case "refunds": router.push("/refunds"); return true;
+    default: return false;
+  }
+}
+
 /** Once signed in: tells the server this phone's notification address, and opens the right screen when a notification is tapped. */
 function PushGate() {
   const { signedIn, booting } = useStore();
@@ -25,6 +51,8 @@ function PushGate() {
     void registerPush();
     return listenForPush((data: PushData) => {
       const group = typeof data.groupId === "string" ? data.groupId : null;
+      // Promo and back-in-stock notifications carry a link such as ds://product/<id> or ds://category/<id>.
+      if (typeof data.deepLink === "string" && openDeepLink(data.deepLink)) return;
       if (data.type === "refund") router.push("/refunds");
       else if (group) router.push({ pathname: "/order/[id]", params: { id: group } });
       else router.push("/(tabs)/orders");
