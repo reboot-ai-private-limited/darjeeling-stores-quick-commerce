@@ -1,9 +1,10 @@
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getOrderGroup, isActiveStatus, reorder, statusInfo, STEPS, stepTimes, trackingHeadline, type ChildOrder, type OrderGroup } from "../../api/orders";
+import { OrderDetailSkeleton } from "../../components/Skeleton";
 import { Button, Header, Icon, Press, Screen, type IconName } from "../../components/ui";
 import { useCart } from "../../state/cart";
 import { colors, radius, rupees, shadow, space, type } from "../../theme";
@@ -54,7 +55,7 @@ export default function OrderDetail() {
   };
 
   if (error && !g) return <Screen><Header title="Order" /><View style={s.center}><Icon name="wifi-off" size={36} color={colors.faint} /><Text style={type.small}>{error}</Text><Button label="Try again" variant="soft" onPress={() => void load()} /></View></Screen>;
-  if (!g) return <Screen><Header title="Order" /><ActivityIndicator color={colors.maroon} style={{ marginTop: 100 }} /></Screen>;
+  if (!g) return <Screen pad={false}><View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}><Header title="Order" /></View><OrderDetailSkeleton /></Screen>;
 
   const a = g.address;
   const multi = g.children.length > 1;

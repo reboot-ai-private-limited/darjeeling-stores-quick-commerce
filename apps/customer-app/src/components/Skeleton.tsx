@@ -157,6 +157,45 @@ export function BillSkeleton() {
   );
 }
 
+/** An order's page while it loads: the status card with its progress strip, the items, the bill and the delivery details. */
+export function OrderDetailSkeleton() {
+  const card = { backgroundColor: colors.white, borderRadius: radius.lg, padding: space.lg, gap: space.md } as const;
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading your order" style={{ paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.md }}>
+      <View style={card}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+          <Bone w={44} h={44} r={22} />
+          <View style={{ flex: 1, gap: 8 }}><Bone w="65%" h={18} /><Bone w="40%" h={13} /></View>
+        </View>
+        <View style={{ flexDirection: "row", gap: 6, marginTop: space.xs }}>{[0, 1, 2, 3, 4].map(i => <View key={i} style={{ flex: 1 }}><Bone h={6} r={3} /></View>)}</View>
+      </View>
+      <View style={card}>
+        <Bone w={90} h={16} />
+        {[0, 1, 2].map(i => (
+          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+            <Bone w={48} h={48} r={radius.sm} />
+            <View style={{ flex: 1, gap: 8 }}><Bone w="75%" h={14} /><Bone w="45%" h={12} /></View>
+            <Bone w={50} h={16} />
+          </View>
+        ))}
+      </View>
+      <View style={card}>
+        <Bone w={120} h={16} />
+        <BillSkeleton />
+      </View>
+      <View style={card}>
+        <Bone w={160} h={16} />
+        {[0, 1].map(i => (
+          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+            <Bone w={36} h={36} r={18} />
+            <View style={{ flex: 1, gap: 8 }}><Bone w="50%" h={14} /><Bone w="85%" h={12} /></View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 /** Checkout while the address, tip options and the first bill load: the same blocks, as grey shapes. */
 export function CheckoutSkeleton() {
   return (
