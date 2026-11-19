@@ -8,6 +8,7 @@ import { createOtpTransport } from "./application/otp-transport.js";
 import type {
   AudienceDirectory, BackInStockOutbox, DeviceRegistry, MediaUrls, PushProvider, SmsProvider, UserContacts, WhatsAppProvider,
 } from "./application/ports.js";
+import { apnsConfigFromEnv, createApnsPush, createRoutingPush } from "./infrastructure/apns-push.js";
 import { createFcmPush, fcmConfigFromEnv } from "./infrastructure/fcm-push.js";
 import { createMongoNotificationStore } from "./infrastructure/mongo-notification-store.js";
 import { unconfiguredPush, unconfiguredSms, unconfiguredWhatsApp } from "./infrastructure/unconfigured.js";
@@ -22,6 +23,7 @@ export type {
 export { ProviderError } from "./application/ports.js";
 export type { Channel, Purpose } from "./domain/notification.js";
 export { createFcmPush, fcmConfigFromEnv } from "./infrastructure/fcm-push.js";
+export { apnsConfigFromEnv, createApnsPush, createRoutingPush, isApnsToken } from "./infrastructure/apns-push.js";
 export { createWhatsAppCloud, whatsappConfigFromEnv } from "./infrastructure/whatsapp-cloud.js";
 export { unconfiguredPush, unconfiguredSms, unconfiguredWhatsApp } from "./infrastructure/unconfigured.js";
 export { noCustomers, type CustomerResolver, type WebhookConfig } from "./interface/routes.js";
@@ -37,10 +39,14 @@ export const noMediaUrls: MediaUrls = { urls: async () => ({}) };
 
 /** Providers named by environment variables; any that is missing is "not configured" and fails with a clear reason. */
 export function providersFromEnv(env: NodeJS.ProcessEnv): { push: PushProvider; whatsapp: WhatsAppProvider; sms: SmsProvider; webhook: WebhookConfig } {
-  const fcm = fcmConfigFromEnv(env);
+  const fcmConfig = fcmConfigFromEnv(env);
+  const apnsConfig = apnsConfigFromEnv(env);
+  // Android phones go through Firebase, iPhones straight through Apple. Whichever is not set up fails with a clear reason in the log.
+  const fcmPush = fcmConfig ? createFcmPush(fcmConfig) : unconfiguredPush;
+  const apnsPush = apnsConfig ? createApnsPush(apnsConfig) : unconfiguredPush;
   const wa = whatsappConfigFromEnv(env);
   return {
-    push: fcm ? createFcmPush(fcm) : unconfiguredPush,
+    push: !fcmConfig && !apnsConfig ? unconfiguredPush : !apnsConfig ? fcmPush : !fcmConfig ? apnsPush : createRoutingPush(fcmPush, apnsPush),
     whatsapp: wa ? createWhatsAppCloud(wa) : unconfiguredWhatsApp,
     sms: unconfiguredSms,
     webhook: { ...(env.WHATSAPP_VERIFY_TOKEN && { verifyToken: env.WHATSAPP_VERIFY_TOKEN }), ...(env.WHATSAPP_APP_SECRET && { appSecret: env.WHATSAPP_APP_SECRET }) },
