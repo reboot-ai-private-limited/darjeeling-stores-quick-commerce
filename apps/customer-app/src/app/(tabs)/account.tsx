@@ -22,7 +22,8 @@ export default function Account() {
   useEffect(() => { if (signedIn) void getMe().then(setMe).catch(() => setMe(null)); else setMe(null); }, [signedIn]);
 
   return (
-    <Screen scroll>
+    // The floating tab bar and cart bar sit over the bottom of the page, so leave room below the last button (same as the other tabs).
+    <Screen scroll bottomPad={190}>
       <Text style={[type.title, { marginTop: space.lg }]}>Account</Text>
       <Card style={{ marginTop: space.lg, flexDirection: "row", alignItems: "center", gap: space.md }}>
         <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" }}><Icon name="user" size={26} color={colors.maroon} /></View>
