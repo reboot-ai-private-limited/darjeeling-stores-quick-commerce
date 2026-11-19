@@ -15,8 +15,13 @@ module.exports = ({ config }) => {
   const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!mapsKey) console.warn("[customer-app] GOOGLE_MAPS_API_KEY is not set: the app will close when a map screen opens in a release build.");
   if (!hasFirebaseFile) console.warn("[customer-app] google-services.json not found: builds will not receive push notifications until you add it.");
+  // iOS: the GoogleService-Info.plist for bundle in.darjeelingstores.customer. EAS can supply it as the GOOGLE_SERVICE_INFO_PLIST secret.
+  const iosFile = process.env.GOOGLE_SERVICE_INFO_PLIST || "./GoogleService-Info.plist";
+  const hasIosFile = fs.existsSync(iosFile);
+  if (!hasIosFile) console.warn("[customer-app] GoogleService-Info.plist not found: iOS builds will not include Firebase.");
   return {
     ...config,
+    ios: { ...config.ios, ...(hasIosFile ? { googleServicesFile: iosFile } : {}), config: { usesNonExemptEncryption: false } },
     // The map screens need a Google Maps key in a real build; without one the app closes as soon as a map opens.
     android: { ...config.android, ...(hasFirebaseFile ? { googleServicesFile: file } : {}), ...(mapsKey ? { config: { ...(config.android?.config ?? {}), googleMaps: { apiKey: mapsKey } } } : {}) },
     plugins: [
