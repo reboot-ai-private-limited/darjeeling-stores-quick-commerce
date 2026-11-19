@@ -66,7 +66,11 @@ export function createApnsPush(config: ApnsConfig): PushProvider {
         authorization: `bearer ${token}`, "apns-topic": config.bundleId, "apns-push-type": "alert",
         "apns-priority": m.priority === "high" ? "10" : "5", "content-type": "application/json",
       }, JSON.stringify(payload), timeout);
-    } catch { throw new ProviderError("Could not reach Apple's push service", false); }
+    } catch (error) {
+      // Say why (DNS failure, timeout, blocked port...) so a network problem on the server is easy to spot.
+      const why = error instanceof Error ? ((error as { code?: string }).code ?? error.message) : "unknown";
+      throw new ProviderError(`Could not reach Apple's push service (${why})`, false, "NETWORK");
+    }
   }
 
   return {
